@@ -96,8 +96,6 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateStagesProjectLocalRuntimeReferenceFolders();
         count++;
-        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
-        count++;
         MigrationVerifierSkipsWindowsReservedDeviceNames();
         count++;
         VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType();
@@ -178,6 +176,8 @@ internal sealed class S1InteropFixtureTests
         VerifyMigrationMovesAbsoluteSiblingDllHintPaths();
         count++;
         MigrationApplyReplacesStalePublicizedReferenceWithPublicizer();
+        count++;
+        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
         count++;
         SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
         count++;
