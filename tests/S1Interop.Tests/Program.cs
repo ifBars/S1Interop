@@ -1,0 +1,4048 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Xml.Linq;
+using S1Interop.Core;
+
+var tests = new S1InteropFixtureTests();
+tests.RunAll();
+Console.WriteLine("S1Interop fixture tests passed.");
+
+internal sealed class S1InteropFixtureTests
+{
+    private readonly WorkspaceAnalyzer analyzer = new();
+    private readonly string workspaceRoot = FindWorkspaceRoot();
+
+    public void RunAll()
+    {
+        AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic();
+        JackpotEveryTimeReportsManagedIl2CppSurface();
+        GunsAlwaysAccurateIsRecognizedAsCleanDualRuntimeBaseline();
+        DedicatedServerModEffectiveConfigurationConditionsAreEvaluated();
+        OverTheCounterStartsWithConditionsAreEvaluated();
+        OverTheCounterReportsHarmonyTranspilerRisk();
+        SourceInteropAnalyzerReportsIl2CppSourceRisks();
+        SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
+        MigrationApplyAndRollbackRewritesUnityEventListeners();
+        MigrationApplyAndRollbackGeneratesSourceRiskReport();
+        VerifyMigrationCanIncludeSourceMigrationsInSandbox();
+        EmployeeTweaksPackageReferencesAreRuntimeEvidence();
+        MsBuildOsPlatformConditionsAreEvaluated();
+        MigrationPreservesLocalPropsUnderOsConditionedGameDir();
+        MigrationApplyAndRollbackScaffoldsLocalReferenceProperties();
+        VerifyMigrationSupportsLegacyConfigurationPlatformConditions();
+        BetterJukeboxReportsMissingRuntimeDefines();
+        RuntimeDefineMigrationUsesDiagnosticDefineEvidenceForLegacyPlatformGroups();
+        DualRuntimeGeneratedUsingGuardsAddMonoDefinesForLegacyNames();
+        S1FuelModInjectedTypesAreAnalyzed();
+        MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
+        VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
+        VerifyMigrationCleansBigWillyPropertyBasedReferences();
+        VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths();
+        VerifyMigrationPreservesBguiMixedConfigurationPaths();
+        VerifyMigrationMovesGameRootModDependencyHintPaths();
+        VerifyMigrationHandlesIterativeRuntimeDefineFixes();
+        S1DockExportsCrossCompatIsNotForcedToIl2CppFramework();
+        VerifyMigrationMovesAbsoluteSiblingDllHintPaths();
+        VerifyMigrationSupportsWorkspaceDirectories();
+        WorkspaceAnalysisSkipsEditorMetadataDirectories();
+        VerifyMigrationBuildGateBuildsSandboxConfigurations();
+        VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
+        VerifyMigrationBuildGateClassifiesExternalReferenceSurfaceFailures();
+        VerifyMigrationBuildGateReportsMissingHintPathReadiness();
+        VerifyMigrationBuildGateClassifiesExternalMemberSurfaceFailures();
+        VerifyMigrationBuildGateClassifiesSiblingBinReferencesAsModDependencies();
+        VerifyMigrationBuildGatePreservesProjectLocalDependencyDlls();
+        VerifyMigrationBuildGateReportsUnsetLocalReferenceProperties();
+        VerifyMigrationBuildGateClassifiesMissingTransitiveExternalAssembly();
+        VerifyMigrationBuildGatePassesRuntimeGameRootsToMsBuild();
+        VerifyMigrationBuildGateHydratesModDependencyProperties();
+        VerifyMigrationBuildGateStagesConfigurationScopedFileDependencyProperties();
+        VerifyMigrationBuildGateStagesProjectLocalRuntimeReferenceFolders();
+        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
+        MigrationVerifierSkipsWindowsReservedDeviceNames();
+        MigrationApplyReplacesStalePublicizedReferenceWithPublicizer();
+        MigrationApplyAddsIntPtrConstructorToMonoBehaviourInjectedType();
+        VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType();
+        BuildHookInstallsReversibleValidationTarget();
+        BuildHookFailsBuildForResidualInteropDiagnostics();
+        BuildHookValidatesOnlyActiveConfiguration();
+        SourceInteropAnalyzerIgnoresGeneratedAndToolDirectories();
+        ScheduleOneUsingRewriterGroupsAdjacentUsings();
+        ScheduleOneUsingRewriterCanPreferGlobalFacade();
+        SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
+        MigrationApplyAndRollbackRewritesFullyQualifiedScheduleOneTypes();
+        HideFromIl2CppMigrationHandlesMultipleTargetsAndOverloads();
+        SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
+        SdkFacadeMigrationRequiresCSharp10ForDefaultLangVersionProjects();
+        MigrationPlannerCreatesOperationsForBrokenFixture();
+        MigrationApplyAndRollbackWorkOnCopiedFixture();
+        MigrationApplyAndRollbackFixRuntimeDefinesOnCopiedFixture();
+        DualRuntimeMigrationScaffoldsS1DsPlayerListFixture();
+        DualRuntimeMigrationAddsGeneratedMonoGuardDefines();
+        ExplicitIl2CppConfigurationNameWinsOverSharedMonoReferences();
+        MigrationTargetFrameworkOverrideWinsAfterImportedProps();
+    }
+
+    private void AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"AlwaysJackpot\AlwaysJackpot.csproj");
+
+        AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "IL2CPP", RuntimeKind.Il2Cpp);
+        AssertHasDiagnostic(project, "wrong_target_framework", "IL2CPP");
+    }
+
+    private void JackpotEveryTimeReportsManagedIl2CppSurface()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"JackpotEveryTime\JackpotEveryTime.csproj");
+
+        AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "Il2Cpp", RuntimeKind.Il2Cpp);
+        AssertHasDiagnostic(project, "wrong_il2cpp_reference_surface", "Il2Cpp");
+        AssertHasDiagnostic(project, "wrong_target_framework", "Il2Cpp");
+    }
+
+    private void GunsAlwaysAccurateIsRecognizedAsCleanDualRuntimeBaseline()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"GunsAlwaysAccurate\GunsAlwaysAccurate.csproj");
+
+        AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "IL2CPP", RuntimeKind.Il2Cpp);
+
+        bool hasIl2CppFrameworkError = project.Diagnostics.Any(diagnostic =>
+            diagnostic.RuleId == "wrong_target_framework" &&
+            diagnostic.Configuration == "IL2CPP" &&
+            diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert(!hasIl2CppFrameworkError, "GunsAlwaysAccurate IL2CPP config should not report wrong_target_framework.");
+    }
+
+    private void DedicatedServerModEffectiveConfigurationConditionsAreEvaluated()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"DedicatedServerMod\DedicatedServerMod.csproj");
+
+        AssertHasRuntime(project, "Mono_Client", RuntimeKind.Mono);
+        AssertHasRuntime(project, "Mono_Server", RuntimeKind.Mono);
+        AssertHasRuntime(project, "Il2cpp_Client", RuntimeKind.Il2Cpp);
+        AssertHasRuntime(project, "Il2cpp_Server", RuntimeKind.Il2Cpp);
+        AssertHasTargetFramework(project, "Mono_Client", "netstandard2.1");
+        AssertHasTargetFramework(project, "Mono_Server", "netstandard2.1");
+        AssertHasTargetFramework(project, "Il2cpp_Client", "net6.0");
+        AssertHasTargetFramework(project, "Il2cpp_Server", "net6.0");
+        Assert(
+            project.Diagnostics.All(diagnostic => diagnostic.RuleId != "wrong_target_framework"),
+            "DedicatedServerMod EffectiveConfiguration conditions should not produce false target-framework diagnostics.");
+    }
+
+    private void OverTheCounterStartsWithConditionsAreEvaluated()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"snl-consumers\OTC-S1-Mod\OverTheCounter\OverTheCounter.csproj");
+
+        AssertHasRuntime(project, "Debug", RuntimeKind.Il2Cpp);
+        AssertHasRuntime(project, "Release", RuntimeKind.Il2Cpp);
+        AssertHasRuntime(project, "MonoDebug", RuntimeKind.Mono);
+        AssertHasRuntime(project, "MonoRelease", RuntimeKind.Mono);
+        AssertHasTargetFramework(project, "Debug", "net6.0");
+        AssertHasTargetFramework(project, "Release", "net6.0");
+        AssertHasTargetFramework(project, "MonoDebug", "netstandard2.1");
+        AssertHasTargetFramework(project, "MonoRelease", "netstandard2.1");
+        Assert(
+            project.Diagnostics.All(diagnostic => diagnostic.RuleId != "wrong_target_framework"),
+            "OverTheCounter StartsWith conditions should not produce false target-framework diagnostics.");
+    }
+
+    private void OverTheCounterReportsHarmonyTranspilerRisk()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"snl-consumers\OTC-S1-Mod\OverTheCounter\OverTheCounter.csproj");
+
+        Assert(
+            project.SourceInterop?.SourceRisks.Any(risk =>
+                risk.Kind == "HarmonyTranspiler" &&
+                risk.FilePath.EndsWith(@"Patches\NpcTypeDiscoveryPatch.cs", StringComparison.OrdinalIgnoreCase)) == true,
+            "OverTheCounter should report its NpcTypeDiscoveryPatch transpiler as an IL2CPP source risk.");
+    }
+
+    private void SourceInteropAnalyzerReportsIl2CppSourceRisks()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "RiskySourceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Risky.cs"),
+                """
+                using System;
+                using System.Collections.Generic;
+                using HarmonyLib;
+                using UnityEngine.UI;
+
+                namespace RiskySourceMod;
+
+                public static class Risky
+                {
+                    public static void Bind(Button button)
+                    {
+                        button.onClick.AddListener(OnClicked);
+                        SomeEvent = (Action)Delegate.Combine(SomeEvent, new Action(OnClicked));
+                    }
+
+                    [HarmonyTranspiler]
+                    public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) => instructions;
+
+                    private static event Action? SomeEvent;
+                    private static void OnClicked() { }
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceInteropAnalysis source = project.SourceInterop!;
+
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "HarmonyTranspiler"),
+                "Source analyzer should report Harmony transpiler risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "DirectUnityEventListener"),
+                "Source analyzer should report direct UnityEvent listener risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "DirectDelegateCombine"),
+                "Source analyzer should report direct delegate combine risk.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "generate_unity_event_bridge" &&
+                    operation.Automatic),
+                "Migration plan should generate a UnityEvent bridge for safely rewritable listener risks.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "rewrite_unity_event_listeners" &&
+                    operation.Automatic),
+                "Migration plan should rewrite safely rewritable UnityEvent listener risks.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "source_risk_harmony_transpiler" &&
+                    !operation.Automatic),
+                "Migration plan should surface Harmony transpiler risks as non-automatic guidance.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "GuardedSourceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Guarded.cs"),
+                """
+                using System;
+                using HarmonyLib;
+                using UnityEngine.Events;
+                using UnityEngine.UI;
+
+                namespace GuardedSourceMod;
+
+                public static class Guarded
+                {
+                    public static void Bind(Button button)
+                    {
+                #if MONO
+                        button.onClick.AddListener(OnClicked);
+                        SomeEvent = (Action)Delegate.Combine(SomeEvent, OnClicked);
+                #elif IL2CPP
+                        button.onClick.AddListener(new System.Action(OnClicked));
+                        Il2CppSystem.Delegate combined = Il2CppSystem.Delegate.Combine(SomeEvent, SomeEvent);
+                #endif
+                    }
+
+                    public static void BindSafe(Button button, UnityAction callback)
+                    {
+                        button.onClick.AddListener(callback);
+                        button.onClick.AddListener(Utils.ToUnityAction(OnClicked));
+                    }
+
+                    [HarmonyTranspiler]
+                    public static System.Collections.Generic.IEnumerable<CodeInstruction> Transpiler(System.Collections.Generic.IEnumerable<CodeInstruction> instructions) => instructions;
+
+                    private static event Action? SomeEvent;
+                    private static void OnClicked() { }
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
+
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("SomeEvent = (Action)Delegate.Combine", StringComparison.Ordinal)),
+                "Runtime-guarded Mono Delegate.Combine code should not be reported as unhandled migration risk.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("Il2CppSystem.Delegate.Combine", StringComparison.Ordinal)),
+                "Explicit Il2CppSystem.Delegate code should not be reported as direct Mono delegate risk.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("button.onClick.AddListener(OnClicked)", StringComparison.Ordinal)),
+                "Runtime-guarded Mono listener code should not be reported as unhandled migration risk.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("button.onClick.AddListener(callback)", StringComparison.Ordinal)),
+                "UnityAction listener parameters should not be reported as unhandled migration risk.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("Utils.ToUnityAction", StringComparison.Ordinal)),
+                "Explicit ToUnityAction helper calls should not be reported as unhandled migration risk.");
+            Assert(
+                risks.Any(risk => risk.Kind == "HarmonyTranspiler"),
+                "Unguarded Harmony transpiler should still be reported.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesUnityEventListeners()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ListenerMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "ListenerUi.cs");
+            string bridgePath = Path.Combine(tempRoot, "S1Interop.Generated", UnityEventBridgeGenerator.SourceFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using System;
+                using UnityEngine.Events;
+                using UnityEngine.UI;
+
+                namespace ListenerMod;
+
+                public static class ListenerUi
+                {
+                    public static void Bind(Button button, InputField input, Button otherButton, Button systemButton, Button multilineButton, Button delegateButton, Button cachedActionButton, Button unityActionButton, Button wrappedActionButton, Action listener)
+                    {
+                        button.onClick.AddListener(OnClicked);
+                        input.onValueChanged.AddListener(text => OnText(text));
+                        otherButton.onClick.AddListener(callback);
+                        systemButton.onClick.AddListener(new System.Action(OnClicked));
+                        cachedActionButton.onClick.AddListener(cachedAction);
+                        unityActionButton.onClick.AddListener(cachedUnityAction);
+                        multilineButton.onClick.AddListener(new Action(() =>
+                        {
+                            OnClicked();
+                        }));
+                        delegateButton.onClick.AddListener(delegate()
+                        {
+                            OnClicked();
+                        });
+                        var uAction = new UnityAction(listener);
+                        wrappedActionButton.onClick.AddListener(uAction);
+                    }
+
+                    private static System.Action callback = () => { };
+                    private static readonly Action cachedAction = OnClicked;
+                    private static readonly UnityAction cachedUnityAction = new UnityAction(OnClicked);
+                    private static void OnClicked() { }
+                    private static void OnText(string text) { }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_unity_event_bridge"),
+                "Expected UnityEvent bridge generation operation.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_unity_event_listeners"),
+                "Expected UnityEvent listener rewrite operation.");
+            Assert(
+                projectPlan.Operations.All(operation => operation.RuleId != "source_risk_direct_unity_event_listener"),
+                "Known Action listeners should be automatic, and known UnityAction listeners should be treated as already runtime-safe.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(File.Exists(bridgePath), "UnityEvent bridge source was not generated.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_unity_event_listeners"),
+                "Migration apply should rewrite UnityEvent listeners.");
+
+            string bridgeSource = File.ReadAllText(bridgePath);
+            Assert(
+                bridgeSource.Contains("namespace S1Interop.Generated", StringComparison.Ordinal) &&
+                !bridgeSource.Contains("namespace S1Interop.Generated;", StringComparison.Ordinal) &&
+                !bridgeSource.Contains("#nullable", StringComparison.Ordinal) &&
+                !bridgeSource.Contains("= new();", StringComparison.Ordinal),
+                "Generated UnityEvent bridge should avoid C# 10-only syntax.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(button.onClick, new System.Action(OnClicked));", StringComparison.Ordinal),
+                "Method-group onClick listener should be rewritten through the bridge with an explicit System.Action.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(input.onValueChanged, text => OnText(text));", StringComparison.Ordinal),
+                "Lambda value-change listener should be rewritten through the bridge.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(otherButton.onClick, callback);", StringComparison.Ordinal),
+                "Known System.Action variable listener should be rewritten automatically.");
+            Assert(
+                migratedSource.Contains("systemButton.onClick.AddListener(new System.Action(OnClicked));", StringComparison.Ordinal),
+                "Already runtime-specific System.Action listener should not be rewritten automatically.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(cachedActionButton.onClick, cachedAction);", StringComparison.Ordinal),
+                "Known cached System.Action listener should be rewritten through the bridge.");
+            Assert(
+                migratedSource.Contains("unityActionButton.onClick.AddListener(cachedUnityAction);", StringComparison.Ordinal),
+                "Known UnityAction listener should not be rewritten automatically.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(wrappedActionButton.onClick, listener);", StringComparison.Ordinal),
+                "Local UnityAction wrapper variables should be rewritten through the bridge using their original Action listener.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(multilineButton.onClick, new Action(() =>", StringComparison.Ordinal),
+                "Multi-line Action listener should rewrite its opening line through the bridge.");
+            Assert(
+                !migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(multilineButton.onClick, new Action(() =>)", StringComparison.Ordinal),
+                "Multi-line Action listener rewrite should not close the bridge call before the lambda body.");
+            Assert(
+                migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(delegateButton.onClick, delegate()", StringComparison.Ordinal),
+                "Multi-line delegate listener should rewrite its opening line through the bridge.");
+            Assert(
+                !migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(delegateButton.onClick, delegate())", StringComparison.Ordinal),
+                "Multi-line delegate listener rewrite should not close the bridge call before the delegate body.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            SourceRisk[] directListenerRisks = after.Projects.Single().SourceInterop!.SourceRisks
+                .Where(risk => risk.Kind == "DirectUnityEventListener")
+                .ToArray();
+            Assert(
+                directListenerRisks.Length == 0,
+                "No direct listener risks should remain after automatic rewrites and runtime-safe listener detection.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the rewritten source file.");
+            Assert(rollbackResult.RemovedFiles.Contains(bridgePath), "Rollback did not remove the generated UnityEvent bridge.");
+            Assert(!File.Exists(bridgePath), "Generated UnityEvent bridge should be removed by rollback.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackGeneratesSourceRiskReport()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "RiskySourceMod.csproj");
+            string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Risky.cs"),
+                """
+                using System;
+                using System.Collections.Generic;
+                using HarmonyLib;
+                using UnityEngine.UI;
+
+                namespace RiskySourceMod;
+
+                public static class Risky
+                {
+                    public static void Bind(Button button)
+                    {
+                        button.onClick.AddListener(OnClicked);
+                        SomeEvent = (Action)Delegate.Combine(SomeEvent, new Action(OnClicked));
+                    }
+
+                    [HarmonyTranspiler]
+                    public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) => instructions;
+
+                    private static event Action? SomeEvent;
+                    private static void OnClicked() { }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_source_risk_report" && operation.Automatic),
+                "Migration plan should generate a source-risk report when source risks exist.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
+                "Migration apply should create the source-risk report.");
+            Assert(File.Exists(reportPath), "Source-risk report was not written.");
+
+            string report = File.ReadAllText(reportPath);
+            Assert(report.Contains("Harmony Transpiler", StringComparison.Ordinal), "Report should group Harmony transpiler risks.");
+            Assert(!report.Contains("Direct Unity Event Listener", StringComparison.Ordinal), "Automatically rewritable listener risks should not remain in the manual report.");
+            Assert(report.Contains("DelegateSupport.ConvertDelegate", StringComparison.Ordinal), "Report should include delegate conversion remediation.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(
+                rollbackResult.RemovedFiles.Contains(reportPath),
+                "Rollback should report removing the generated source-risk report.");
+            Assert(!File.Exists(reportPath), "Rollback should remove the generated source-risk report.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationCanIncludeSourceMigrationsInSandbox()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "SourceMigrationMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "UiBindings.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using UnityEngine.UI;
+
+                namespace SourceMigrationMod;
+
+                public static class UiBindings
+                {
+                    public static void Bind(Button button)
+                    {
+                        button.onClick.AddListener(OnClicked);
+                    }
+
+                    private static void OnClicked() { }
+                }
+                """);
+
+            string originalSourceHash = ComputeSha256(tempSource);
+
+            MigrationVerificationResult defaultResult = new MigrationVerifier().Verify(tempProject);
+            Assert(defaultResult.Success, "Source-only verifier baseline should pass without requiring source migrations.");
+            Assert(defaultResult.PlannedOperations == 0, $"Default verify-migration should not plan advisory source migrations, planned {defaultResult.PlannedOperations}.");
+            Assert(defaultResult.AppliedOperations == 0, $"Default verify-migration should not apply advisory source migrations, applied {defaultResult.AppliedOperations}.");
+
+            MigrationVerificationResult sourceResult = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, IncludeSourceMigrations: true));
+
+            Assert(sourceResult.Success, "Source migration verification should pass after sandboxed source rewrites.");
+            Assert(
+                sourceResult.PlannedOperations == 2,
+                $"Source migration verification should plan bridge generation and listener rewrite, planned {sourceResult.PlannedOperations}.");
+            Assert(
+                sourceResult.AppliedOperations == 2,
+                $"Source migration verification should apply bridge generation and listener rewrite, applied {sourceResult.AppliedOperations}.");
+            Assert(sourceResult.SandboxDeleted, "Source migration verification should delete its sandbox.");
+            Assert(
+                string.Equals(ComputeSha256(tempSource), originalSourceHash, StringComparison.Ordinal),
+                "Source migration verification should not mutate the real source file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void EmployeeTweaksPackageReferencesAreRuntimeEvidence()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"s1-employeetweaks\EmployeeTweaks.csproj");
+        ConfigurationAnalysis mono = GetConfiguration(project, "Mono");
+        ConfigurationAnalysis il2Cpp = GetConfiguration(project, "IL2CPP");
+
+        AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "IL2CPP", RuntimeKind.Il2Cpp);
+        Assert(
+            mono.PackageReferences.Any(package =>
+                package.Include == "RefGen.Schedule-I.Mono" &&
+                package.Version == "0.4.5-f1"),
+            "EmployeeTweaks Mono config should expose its RefGen.Schedule-I.Mono package reference.");
+        Assert(
+            il2Cpp.PackageReferences.Any(package =>
+                package.Include == "RefGen.Schedule-I.Il2Cpp" &&
+                package.Version == "0.4.5-f1"),
+            "EmployeeTweaks IL2CPP config should expose its RefGen.Schedule-I.Il2Cpp package reference.");
+        Assert(
+            mono.PackageReferences.All(package => package.Include != "RefGen.Schedule-I.Il2Cpp"),
+            "EmployeeTweaks Mono config should not include the IL2CPP-only RefGen package.");
+        Assert(
+            il2Cpp.PackageReferences.All(package => package.Include != "RefGen.Schedule-I.Mono"),
+            "EmployeeTweaks IL2CPP config should not include the Mono-only RefGen package.");
+        Assert(
+            mono.Evidence.Any(evidence => evidence.Contains("Mono package RefGen.Schedule-I.Mono", StringComparison.Ordinal)),
+            "EmployeeTweaks Mono runtime evidence should include its RefGen package.");
+        Assert(
+            il2Cpp.Evidence.Any(evidence => evidence.Contains("IL2CPP package RefGen.Schedule-I.Il2Cpp", StringComparison.Ordinal)),
+            "EmployeeTweaks IL2CPP runtime evidence should include its RefGen package.");
+    }
+
+    private void MsBuildOsPlatformConditionsAreEvaluated()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "OsConditionMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+                    <GameDir>C:\Schedule I</GameDir>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+                    <GameDir>/home/user/Schedule I</GameDir>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>$(GameDir)\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            string? hintPath = GetConfiguration(project, "Debug").References.Single().HintPath;
+
+            if (OperatingSystem.IsWindows())
+            {
+                Assert(
+                    hintPath?.StartsWith(@"C:\Schedule I\", StringComparison.OrdinalIgnoreCase) == true,
+                    $"Windows OS condition should select the Windows GameDir, got {hintPath}.");
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                Assert(
+                    hintPath?.StartsWith("/home/user/Schedule I", StringComparison.OrdinalIgnoreCase) == true,
+                    $"Linux OS condition should select the Linux GameDir, got {hintPath}.");
+            }
+
+            Assert(
+                hintPath is null ||
+                !hintPath.Contains(@"C:\home\user", StringComparison.OrdinalIgnoreCase),
+                $"OS conditions should not combine Windows path semantics with the Linux GameDir, got {hintPath}.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationPreservesLocalPropsUnderOsConditionedGameDir()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "OsConditionMigrationMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+                    <GameDir>C:\Schedule I</GameDir>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+                    <GameDir>/home/user/Schedule I</GameDir>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>$(GameDir)\MelonLoader\Il2CppAssemblies\UnityEngine.CoreModule.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = new WorkspaceAnalyzer().Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "local_path_in_project"),
+                "OS-conditioned GameDir fixture should exercise local path migration.");
+            Assert(File.Exists(Path.Combine(tempRoot, "local.build.props")), "local.build.props should be generated for OS-conditioned GameDir migration.");
+
+            ProjectAnalysis after = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            string? hintPath = GetConfiguration(after, "Debug").References
+                .Single(reference => reference.Include == "UnityEngine.CoreModule")
+                .HintPath;
+            if (OperatingSystem.IsWindows())
+            {
+                Assert(
+                    hintPath?.StartsWith(@"C:\Schedule I\", StringComparison.OrdinalIgnoreCase) == true,
+                    $"Migrated Windows OS-conditioned GameDir should still resolve through local.build.props, got {hintPath}.");
+            }
+
+            Assert(
+                hintPath is null ||
+                !hintPath.StartsWith(@"\MelonLoader", StringComparison.OrdinalIgnoreCase) &&
+                !hintPath.StartsWith(@"C:\MelonLoader", StringComparison.OrdinalIgnoreCase),
+                $"Migrated OS-conditioned GameDir should not be overwritten by an empty project property, got {hintPath}.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackScaffoldsLocalReferenceProperties()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "RootRelativeReferencesMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+                    <GameDllPath>$(ManagedDllPath)</GameDllPath>
+                    <MLPath>$(MelonLoaderNet6Path)</MLPath>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GameDllPath)\Assembly-CSharp.dll</HintPath>
+                    </Reference>
+                    <Reference Include="MelonLoader">
+                      <HintPath>$(MLPath)\MelonLoader.dll</HintPath>
+                    </Reference>
+                    <Reference Include="S1API">
+                      <HintPath>$(S1APIModsPath)\S1API.Mono.MelonLoader.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = new WorkspaceAnalyzer().Analyze(tempProject);
+            ProjectAnalysis beforeProject = before.Projects.Single();
+            Assert(
+                beforeProject.Diagnostics.Any(diagnostic => diagnostic.RuleId == "missing_local_reference_properties"),
+                "Root-relative reference paths should report missing local reference properties before migration.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            Assert(
+                plan.Projects.Single().Operations.Any(operation => operation.RuleId == "missing_local_reference_properties"),
+                "Migration plan should include local reference property scaffolding.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            string localPropsPath = Path.Combine(tempRoot, "local.build.props");
+            string examplePropsPath = Path.Combine(tempRoot, "local.build.props.example");
+            Assert(File.Exists(localPropsPath), "local.build.props was not created for root-relative reference paths.");
+            Assert(File.Exists(examplePropsPath), "local.build.props.example was not created for root-relative reference paths.");
+            Assert(CountProjectImports(tempProject, "local.build.props") == 1, "Project should import local.build.props exactly once.");
+
+            string localProps = File.ReadAllText(localPropsPath);
+            Assert(localProps.Contains("<ManagedDllPath>", StringComparison.Ordinal), "Scaffold should expose the terminal ManagedDllPath property.");
+            Assert(localProps.Contains("<MelonLoaderNet6Path>", StringComparison.Ordinal), "Scaffold should expose the terminal MelonLoaderNet6Path property.");
+            Assert(localProps.Contains("<S1APIModsPath>", StringComparison.Ordinal), "Scaffold should expose direct dependency path properties.");
+            Assert(!localProps.Contains("<GameDllPath>", StringComparison.Ordinal), "Scaffold should avoid aliases that the project overwrites.");
+
+            ProjectAnalysis afterProject = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            Assert(
+                afterProject.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_local_reference_properties"),
+                "Generated local reference property scaffolding should clear the scaffold diagnostic.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the project file after scaffold migration.");
+            Assert(rollbackResult.RemovedFiles.Contains(localPropsPath), "Rollback should remove generated local.build.props.");
+            Assert(rollbackResult.RemovedFiles.Contains(examplePropsPath), "Rollback should remove generated local.build.props.example.");
+            Assert(!File.Exists(localPropsPath), "Rollback did not remove local.build.props.");
+            Assert(!File.Exists(examplePropsPath), "Rollback did not remove local.build.props.example.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationSupportsLegacyConfigurationPlatformConditions()
+    {
+        string projectPath = Path.Combine(workspaceRoot, @"MrsMingsAuthenticPets\Mrs_Mings_Authentic_Pets\Mrs_Mings_Authentic_Pets.csproj");
+        ProjectAnalysis project = AnalyzeProject(@"MrsMingsAuthenticPets\Mrs_Mings_Authentic_Pets\Mrs_Mings_Authentic_Pets.csproj");
+
+        AssertHasRuntime(project, "Debug", RuntimeKind.Il2Cpp);
+        AssertHasRuntime(project, "Release", RuntimeKind.Il2Cpp);
+        Assert(
+            project.Configurations.All(configuration => !configuration.Name.Equals("=", StringComparison.Ordinal)),
+            "Legacy Configuration|Platform conditions should not produce an '=' configuration name.");
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(projectPath, new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, "Mrs Mings legacy Configuration|Platform project should pass sandboxed migration.");
+        Assert(result.SandboxDeleted, "Mrs Mings verify-migration should delete its sandbox.");
+        Assert(
+            result.BeforeDiagnostics.Any(diagnostic =>
+                diagnostic.RuleId == "wrong_target_framework" &&
+                diagnostic.Configuration == "Debug"),
+            "Mrs Mings should initially report a target-framework migration for Debug.");
+        Assert(
+            result.BeforeDiagnostics.Any(diagnostic =>
+                diagnostic.RuleId == "wrong_target_framework" &&
+                diagnostic.Configuration == "Release"),
+            "Mrs Mings should initially report a target-framework migration for Release.");
+        Assert(result.AfterDiagnostics.Count == 0, "Mrs Mings should have no residual diagnostics after sandboxed migration.");
+    }
+
+    private void BetterJukeboxReportsMissingRuntimeDefines()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"BetterJukebox\BetterJukebox.csproj");
+
+        AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "IL2CPP", RuntimeKind.Il2Cpp);
+        AssertHasDiagnostic(project, "missing_runtime_define", "Mono");
+        AssertHasDiagnostic(project, "missing_runtime_define", "IL2CPP");
+    }
+
+    private void RuntimeDefineMigrationUsesDiagnosticDefineEvidenceForLegacyPlatformGroups()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "LegacyPlatformMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                  <PropertyGroup>
+                    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+                    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+                    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+                  </PropertyGroup>
+                  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+                    <DefineConstants>DEBUG;TRACE</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+                    <DefineConstants>DEBUG;TRACE;X64_ONLY</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                    </Reference>
+                    <Reference Include="MelonLoader">
+                      <HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                  <ItemGroup>
+                    <Compile Include="Core.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                #if MONO
+                namespace LegacyPlatformMod;
+                #endif
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectAnalysis beforeProject = before.Projects.Single();
+            AssertHasDiagnostic(beforeProject, "missing_runtime_define", "Debug");
+            InteropDiagnostic diagnostic = beforeProject.Diagnostics.First(diagnostic =>
+                diagnostic.RuleId == "missing_runtime_define" &&
+                diagnostic.Configuration == "Debug");
+            Assert(
+                diagnostic.Evidence?.Contains("DefineConstants=DEBUG;TRACE;X64_ONLY", StringComparison.Ordinal) == true,
+                $"Expected diagnostic evidence to identify the x64 define list, got {diagnostic.Evidence ?? "<none>"}.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlanner().Plan(before));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "missing_runtime_define"),
+                "Migration apply should add missing runtime defines for legacy platform groups.");
+
+            XDocument document = XDocument.Load(tempProject);
+            string anyCpuDefines = GetConditionedDefineConstants(document, "Debug|AnyCPU");
+            string x64Defines = GetConditionedDefineConstants(document, "Debug|x64");
+            Assert(
+                string.Equals(anyCpuDefines, "DEBUG;TRACE;MONO", StringComparison.Ordinal),
+                $"Missing runtime define should be applied to every platform group for the configuration, got {anyCpuDefines}.");
+            Assert(
+                string.Equals(x64Defines, "DEBUG;TRACE;X64_ONLY;MONO", StringComparison.Ordinal),
+                $"Missing runtime define should be applied to the platform group matching diagnostic evidence, got {x64Defines}.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+                "Legacy platform fixture should not retain missing runtime define diagnostics after migration.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeGeneratedUsingGuardsAddMonoDefinesForLegacyNames()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "AliasUsingMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                  <PropertyGroup>
+                    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+                    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+                    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+                  </PropertyGroup>
+                  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+                    <DefineConstants>DEBUG;TRACE</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+                    <DefineConstants>TRACE</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                    </Reference>
+                    <Reference Include="MelonLoader">
+                      <HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                  <ItemGroup>
+                    <Compile Include="Core.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                using ConsoleUI = ScheduleOne.UI.ConsoleUI;
+
+                namespace AliasUsingMod;
+
+                public static class Core
+                {
+                    public static ConsoleUI? Current;
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Debug" &&
+                    operation.Evidence?.Contains("MONO", StringComparison.Ordinal) == true),
+                "Dual-runtime alias using migration should plan MONO for Debug even when the config name is not Mono.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Release" &&
+                    operation.Evidence?.Contains("MONO", StringComparison.Ordinal) == true),
+                "Dual-runtime alias using migration should plan MONO for Release even when the config name is not Mono.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Debug"),
+                "Migration apply should add MONO to Debug for generated using guards.");
+            Assert(
+                applyResult.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Release"),
+                "Migration apply should add MONO to Release for generated using guards.");
+
+            XDocument document = XDocument.Load(tempProject);
+            Assert(
+                GetConditionedDefineConstants(document, "Debug|AnyCPU") == "DEBUG;TRACE;MONO",
+                "Debug should define MONO after generated using guard migration.");
+            Assert(
+                GetConditionedDefineConstants(document, "Release|AnyCPU") == "TRACE;MONO",
+                "Release should define MONO after generated using guard migration.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+                "Generated using guard migration should not leave missing runtime define diagnostics.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void S1FuelModInjectedTypesAreAnalyzed()
+    {
+        string projectPath = Path.Combine(workspaceRoot, @"S1FuelMod\S1FuelMod.csproj");
+        SourceInteropAnalysis source = new SourceInteropAnalyzer().Analyze(projectPath);
+
+        string[] expectedInjectedTypes =
+        [
+            "Equippable_GasolineCan",
+            "FuelSignManager",
+            "FuelSign",
+            "FuelStation",
+            "VehicleRefuelInteractable",
+            "FuelVehicleData",
+            "VehicleFuelSystem",
+            "FuelTypeManager"
+        ];
+
+        Assert(
+            expectedInjectedTypes.All(expected => source.InjectedTypes.Any(actual => actual.Name == expected)),
+            "S1FuelMod source analysis should detect all expected injected types.");
+        Assert(
+            source.InjectedTypes.Count == expectedInjectedTypes.Length,
+            $"S1FuelMod should have exactly {expectedInjectedTypes.Length} injected types in this fixture.");
+        Assert(
+            source.InjectedTypes.All(type => type.HasIntPtrConstructor),
+            "Every S1FuelMod injected type should expose the required IntPtr constructor.");
+        Assert(
+            source.InjectedTypes.Where(type => type.HasDerivedConstructorPointer).All(type => type.HasDerivedConstructorBody),
+            "ClassInjector constructor pointers should be paired with DerivedConstructorBody(this).");
+        Assert(
+            source.Il2CppGuardEvidence.Any(evidence => evidence.Contains("#if !MONO", StringComparison.Ordinal)),
+            "S1FuelMod should be recognized as using #if !MONO for IL2CPP branches.");
+        Assert(
+            source.BridgeEvidence.Any(evidence => evidence.Contains("Il2CppSystem.Collections.Generic.List", StringComparison.Ordinal)),
+            "S1FuelMod should expose compliant Il2CppSystem.Collections.Generic.List bridge evidence.");
+        Assert(
+            source.BridgeEvidence.Any(evidence => evidence.Contains("Il2CppStructArray", StringComparison.Ordinal)),
+            "S1FuelMod should expose compliant Il2CppStructArray bridge evidence.");
+
+        InteropDiagnostic[] hideDiagnostics = source.Diagnostics
+            .Where(diagnostic => diagnostic.RuleId == "injected_member_requires_hidefromil2cpp")
+            .ToArray();
+        Assert(hideDiagnostics.Length == 1, "S1FuelMod should currently report one unhidden managed-surface diagnostic.");
+        string hideEvidence = hideDiagnostics[0].Evidence ?? string.Empty;
+        Assert(
+            hideEvidence.Contains("FuelVehicleData.FromVehicleData", StringComparison.Ordinal) &&
+            hideEvidence.Contains("FuelData", StringComparison.Ordinal),
+            "The unhidden managed-surface diagnostic should point at FuelVehicleData.FromVehicleData(... FuelData ...).");
+
+        ProjectAnalysis project = AnalyzeProject(@"S1FuelMod\S1FuelMod.csproj");
+        Assert(
+            project.Configurations.Select(configuration => configuration.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).SequenceEqual(
+                ["Debug IL2CPP", "Debug Mono", "Release IL2CPP", "Release Mono"],
+                StringComparer.OrdinalIgnoreCase),
+            "S1FuelMod analysis should preserve configuration names that contain spaces.");
+        AssertHasRuntime(project, "Debug Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "Release Mono", RuntimeKind.Mono);
+        AssertHasRuntime(project, "Debug IL2CPP", RuntimeKind.Il2Cpp);
+        AssertHasRuntime(project, "Release IL2CPP", RuntimeKind.Il2Cpp);
+        AssertHasTargetFramework(project, "Debug Mono", "netstandard2.1");
+        AssertHasTargetFramework(project, "Release Mono", "netstandard2.1");
+        AssertHasTargetFramework(project, "Debug IL2CPP", "net6");
+        AssertHasTargetFramework(project, "Release IL2CPP", "net6");
+        ConfigurationAnalysis debugMono = GetConfiguration(project, "Debug Mono");
+        ConfigurationAnalysis debugIl2Cpp = GetConfiguration(project, "Debug IL2CPP");
+        Assert(
+            debugMono.References.Any(reference =>
+                reference.Imported &&
+                (reference.SourcePath ?? string.Empty).EndsWith(@"build\references\MelonMono.targets", StringComparison.OrdinalIgnoreCase) &&
+                (reference.HintPath ?? string.Empty).Contains(@"Schedule I_Data\Managed", StringComparison.OrdinalIgnoreCase)),
+            "S1FuelMod Mono analysis should include imported managed references from MelonMono.targets.");
+        Assert(
+            debugIl2Cpp.References.Any(reference =>
+                reference.Imported &&
+                reference.Include.Equals("Il2CppInterop.Runtime", StringComparison.OrdinalIgnoreCase) &&
+                (reference.HintPath ?? string.Empty).Contains(@"MelonLoader\net6\Il2CppInterop.Runtime.dll", StringComparison.OrdinalIgnoreCase)),
+            "S1FuelMod IL2CPP analysis should include imported Il2CppInterop.Runtime from MelonIL2CPP.targets.");
+        Assert(
+            debugIl2Cpp.References.Any(reference =>
+                reference.Imported &&
+                (reference.HintPath ?? string.Empty).Contains(@"MelonLoader\Il2CppAssemblies", StringComparison.OrdinalIgnoreCase)),
+            "S1FuelMod IL2CPP analysis should include generated-wrapper references from MelonIL2CPP.targets.");
+        Assert(
+            debugIl2Cpp.References.All(reference =>
+                !(reference.HintPath ?? string.Empty).Contains(@"Schedule I_Data\Managed", StringComparison.OrdinalIgnoreCase)),
+            "S1FuelMod IL2CPP imported references should not point at the Mono Managed folder.");
+        Assert(
+            project.Diagnostics.Any(diagnostic => diagnostic.RuleId == "injected_member_requires_hidefromil2cpp"),
+            "Project analysis should include injected member HideFromIl2Cpp diagnostics.");
+        Assert(
+            project.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+            "S1FuelMod already defines MONO for Mono configurations and should not report missing runtime defines.");
+        Assert(
+            project.Diagnostics.All(diagnostic => diagnostic.RuleId != "wrong_target_framework"),
+            "S1FuelMod imported build conditions should provide valid Mono and IL2CPP target frameworks.");
+    }
+
+    private void ExplicitIl2CppConfigurationNameWinsOverSharedMonoReferences()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MixedEvidenceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>Mono;Debug IL2CPP</Configurations>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="RefGen.Schedule-I.Mono" Version="0.4.5-f1" />
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'Mono'">
+                    <DefineConstants>$(DefineConstants);MONO</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'Debug IL2CPP'">
+                    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+
+            AssertHasRuntime(project, "Mono", RuntimeKind.Mono);
+            AssertHasRuntime(project, "Debug IL2CPP", RuntimeKind.Il2Cpp);
+            AssertHasDiagnostic(project, "wrong_target_framework", "Debug IL2CPP");
+            AssertHasDiagnostic(project, "wrong_il2cpp_reference_surface", "Debug IL2CPP");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationTargetFrameworkOverrideWinsAfterImportedProps()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ImportedFrameworkMod.csproj");
+            string importedProps = Path.Combine(tempRoot, "build.conditions.props");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>Debug IL2CPP</Configurations>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'Debug IL2CPP'">
+                    <DefineConstants>$(DefineConstants);IL2CPP</DefineConstants>
+                  </PropertyGroup>
+                  <Import Project="build.conditions.props" />
+                </Project>
+                """);
+            File.WriteAllText(
+                importedProps,
+                """
+                <Project>
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = new WorkspaceAnalyzer().Analyze(tempProject);
+            Assert(
+                before.Diagnostics.Any(diagnostic =>
+                    diagnostic.RuleId == "wrong_target_framework" &&
+                    diagnostic.Configuration == "Debug IL2CPP"),
+                "Imported target framework fixture should start with an IL2CPP framework diagnostic.");
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false));
+
+            Assert(result.Success, "Migration should add a root project override that wins after imported TargetFramework props.");
+            Assert(
+                result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "wrong_target_framework"),
+                "Imported target framework fixture should have no target-framework diagnostic after migration.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceDirectory = Path.Combine(workspaceRoot, "S1FuelMod");
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "S1FuelMod.csproj");
+            string tempFuelVehicleData = Path.Combine(tempRoot, "Systems", "FuelVehicleData.cs");
+            string originalSource = File.ReadAllText(tempFuelVehicleData);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            MigrationOperation hideOperation = projectPlan.Operations.Single(operation =>
+                operation.RuleId == "injected_member_requires_hidefromil2cpp");
+            Assert(
+                projectPlan.Operations.All(operation => !operation.FilePath.Contains($"{Path.DirectorySeparatorChar}build{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)),
+                "S1FuelMod migration should not plan automatic edits against imported build targets.");
+            Assert(
+                projectPlan.Operations.All(operation => operation.RuleId != "wrong_target_framework" && operation.RuleId != "missing_il2cppinterop_reference"),
+                "S1FuelMod imported build targets should prevent redundant target-framework and Il2CppInterop migration operations.");
+
+            Assert(
+                string.Equals(hideOperation.FilePath, tempFuelVehicleData, StringComparison.OrdinalIgnoreCase),
+                "HideFromIl2Cpp migration should target the copied FuelVehicleData source file.");
+            Assert(
+                hideOperation.Evidence?.Contains("FuelVehicleData.FromVehicleData", StringComparison.Ordinal) == true,
+                "HideFromIl2Cpp migration should retain evidence for the target member.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "injected_member_requires_hidefromil2cpp"),
+                "Migration apply did not apply the HideFromIl2Cpp source operation.");
+            MigrationFileChange fuelVehicleBackup = applyResult.FileChanges.Single(change =>
+                string.Equals(change.FilePath, tempFuelVehicleData, StringComparison.OrdinalIgnoreCase));
+            Assert(
+                !fuelVehicleBackup.BackupPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase),
+                "Rollback backups for C# source files should not keep the .cs extension, or SDK-style compile globs can compile them.");
+
+            string migratedSource = File.ReadAllText(tempFuelVehicleData);
+            int attributeIndex = migratedSource.IndexOf("[Il2CppInterop.Runtime.Attributes.HideFromIl2Cpp]", StringComparison.Ordinal);
+            int methodIndex = migratedSource.IndexOf("public static FuelVehicleData FromVehicleData", StringComparison.Ordinal);
+            Assert(attributeIndex >= 0, "Migrated source should contain the fully qualified HideFromIl2Cpp attribute.");
+            Assert(methodIndex > attributeIndex, "Migrated HideFromIl2Cpp attribute should be inserted before FromVehicleData.");
+            Assert(
+                CountOccurrences(migratedSource, "HideFromIl2Cpp") == CountOccurrences(originalSource, "HideFromIl2Cpp") + 1,
+                "Migration should add exactly one HideFromIl2Cpp attribute to FuelVehicleData.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(after.Diagnostics.Count == 0, "Copied S1FuelMod fixture should have no diagnostics after migration apply.");
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "injected_member_requires_hidefromil2cpp"),
+                "Copied S1FuelMod fixture should not retain HideFromIl2Cpp diagnostics after migration apply.");
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "wrong_target_framework"),
+                "Copied S1FuelMod fixture should not retain target framework diagnostics after migration apply.");
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+                "Copied S1FuelMod fixture should not retain missing runtime define diagnostics after migration apply.");
+            ProjectAnalysis migratedProject = after.Projects.Single();
+            AssertHasTargetFramework(migratedProject, "Debug IL2CPP", "net6");
+            AssertHasTargetFramework(migratedProject, "Release IL2CPP", "net6");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempFuelVehicleData), "Rollback did not restore FuelVehicleData.cs.");
+            Assert(
+                string.Equals(File.ReadAllText(tempFuelVehicleData), originalSource, StringComparison.Ordinal),
+                "Rollback should restore the original FuelVehicleData source.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource()
+    {
+        string sourceDirectory = Path.Combine(workspaceRoot, "S1FuelMod");
+        string sourceProject = Path.Combine(sourceDirectory, "S1FuelMod.csproj");
+        string sourceFuelVehicleData = Path.Combine(sourceDirectory, "Systems", "FuelVehicleData.cs");
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string originalFuelVehicleDataHash = ComputeSha256(sourceFuelVehicleData);
+        string generatedFacadeDirectory = Path.Combine(sourceDirectory, "S1Interop.Generated");
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadGeneratedFacadeDirectory = Directory.Exists(generatedFacadeDirectory);
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(sourceProject);
+
+        Assert(result.Success, "S1FuelMod verify-migration should pass after sandboxed migration apply.");
+        Assert(result.PlannedOperations >= 2, "S1FuelMod verify-migration should plan the HideFromIl2Cpp and SDK facade operations.");
+        Assert(result.AppliedOperations >= 2, "S1FuelMod verify-migration should apply the planned automatic operations in the sandbox.");
+        Assert(result.AfterDiagnostics.Count == 0, "S1FuelMod verify-migration should leave no residual diagnostics.");
+        Assert(result.SandboxDeleted, "S1FuelMod verify-migration should delete its sandbox.");
+        Assert(
+            !Directory.Exists(Path.GetDirectoryName(result.SandboxProjectPath)!),
+            "S1FuelMod verify-migration should remove the sandbox project directory.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "S1FuelMod verify-migration should not mutate the real project file.");
+        Assert(
+            string.Equals(ComputeSha256(sourceFuelVehicleData), originalFuelVehicleDataHash, StringComparison.Ordinal),
+            "S1FuelMod verify-migration should not mutate real source files.");
+        Assert(
+            Directory.Exists(generatedFacadeDirectory) == hadGeneratedFacadeDirectory,
+            "S1FuelMod verify-migration should not create or remove the real generated facade directory.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "S1FuelMod verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "S1FuelMod verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationCleansBigWillyPropertyBasedReferences()
+    {
+        string sourceDirectory = Path.Combine(workspaceRoot, "BigWillyMod");
+        string sourceProject = Path.Combine(sourceDirectory, "BigWillyMod.csproj");
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, $"BigWillyMod verify-migration should pass after fixing property-based generated-wrapper references. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(
+            result.AppliedOperations > 0,
+            "BigWillyMod verify-migration should apply build-surface operations in the sandbox.");
+        Assert(
+            result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "reference_should_not_copy_local"),
+            "BigWillyMod verify-migration should clear property-based Private=false reference diagnostics.");
+        Assert(result.SandboxDeleted, "BigWillyMod verify-migration should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "BigWillyMod verify-migration should not mutate the real project file.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "BigWillyMod verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "BigWillyMod verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths()
+    {
+        string sourceDirectory = Path.Combine(workspaceRoot, "BetterJukebox");
+        string sourceProject = Path.Combine(sourceDirectory, "BetterJukebox.csproj");
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, $"BetterJukebox verify-migration should clear automatic migration diagnostics. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(
+            result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "local_path_in_project"),
+            $"BetterJukebox migration should move absolute HintPath values into local build props. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(
+            result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "stale_publicized_surface"),
+            $"BetterJukebox migration should replace stale publicized references with build-time publicization. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(result.SandboxDeleted, "BetterJukebox verify-migration should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "BetterJukebox verify-migration should not mutate the real project file.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "BetterJukebox verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "BetterJukebox verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationPreservesBguiMixedConfigurationPaths()
+    {
+        string sourceDirectory = Path.Combine(workspaceRoot, "bGUI");
+        string sourceProject = Path.Combine(sourceDirectory, "bGUI.csproj");
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, $"bGUI verify-migration should preserve mixed Debug/Mono/Il2cpp config inference. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(result.SandboxDeleted, "bGUI verify-migration should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "bGUI verify-migration should not mutate the real project file.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "bGUI verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "bGUI verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationMovesGameRootModDependencyHintPaths()
+    {
+        string sourceDirectory = Path.Combine(workspaceRoot, "CasinoDirectDeposit");
+        string sourceProject = Path.Combine(sourceDirectory, "CasinoDirectDeposit.csproj");
+        string originalProjectHash = ComputeSha256(sourceProject);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, $"CasinoDirectDeposit verify-migration should move game-root Mods dependency HintPath values. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(result.SandboxDeleted, "CasinoDirectDeposit verify-migration should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "CasinoDirectDeposit verify-migration should not mutate the real project file.");
+    }
+
+    private void VerifyMigrationHandlesIterativeRuntimeDefineFixes()
+    {
+        string[] projectRelativePaths =
+        [
+            @"LocalLobby\LocalLobby.csproj",
+            @"SteamGameServerMod\SteamGameServerMod\SteamGameServerMod.csproj"
+        ];
+
+        foreach (string projectRelativePath in projectRelativePaths)
+        {
+            string sourceProject = Path.Combine(workspaceRoot, projectRelativePath);
+            string originalProjectHash = ComputeSha256(sourceProject);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                sourceProject,
+                new MigrationVerifierOptions(DualRuntime: true));
+
+            Assert(result.Success, $"{projectRelativePath} verify-migration should converge after iterative runtime define fixes. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.PlannedOperations > result.AppliedOperations, $"{projectRelativePath} should exercise multi-pass verification planning.");
+            Assert(result.SandboxDeleted, $"{projectRelativePath} verify-migration should delete its sandbox.");
+            Assert(
+                string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+                $"{projectRelativePath} verify-migration should not mutate the real project file.");
+        }
+    }
+
+    private void S1DockExportsCrossCompatIsNotForcedToIl2CppFramework()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"S1DockExports\S1DockExports.csproj");
+
+        AssertHasRuntime(project, "CrossCompat", RuntimeKind.CrossCompat);
+        AssertHasTargetFramework(project, "CrossCompat", "netstandard2.1");
+        Assert(
+            project.Diagnostics.All(diagnostic =>
+                diagnostic.RuleId != "wrong_target_framework" ||
+                !string.Equals(diagnostic.Configuration, "CrossCompat", StringComparison.OrdinalIgnoreCase)),
+            "S1DockExports CrossCompat config should not be forced to net6.0.");
+    }
+
+    private void VerifyMigrationMovesAbsoluteSiblingDllHintPaths()
+    {
+        string projectPath = Path.Combine(workspaceRoot, @"NPCPack\NPCPack.csproj");
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(projectPath, new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(result.Success, "NPCPack verify-migration should move absolute sibling DLL hint paths into local props.");
+        Assert(result.SandboxDeleted, "NPCPack verify-migration should delete its sandbox.");
+        Assert(
+            result.BeforeDiagnostics.Any(diagnostic =>
+                diagnostic.RuleId == "local_path_in_project" &&
+                (diagnostic.Evidence ?? string.Empty).EndsWith(@"S1API.dll", StringComparison.OrdinalIgnoreCase)),
+            "NPCPack should initially report the absolute S1API.dll hint path.");
+        Assert(
+            result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "local_path_in_project"),
+            "NPCPack should not retain local path diagnostics after sandboxed migration.");
+    }
+
+    private void VerifyMigrationSupportsWorkspaceDirectories()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string firstProjectDirectory = Path.Combine(tempRoot, "FirstMod");
+            string secondProjectDirectory = Path.Combine(tempRoot, "SecondMod");
+            Directory.CreateDirectory(firstProjectDirectory);
+            Directory.CreateDirectory(secondProjectDirectory);
+            File.WriteAllText(
+                Path.Combine(firstProjectDirectory, "FirstMod.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(firstProjectDirectory, "Core.cs"),
+                """
+                namespace FirstMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+            File.WriteAllText(
+                Path.Combine(secondProjectDirectory, "SecondMod.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(secondProjectDirectory, "Core.cs"),
+                """
+                namespace SecondMod;
+
+                public static class Core
+                {
+                    public static int Value => 2;
+                }
+                """);
+
+            WorkspaceMigrationVerificationResult result = new MigrationVerifier().VerifyWorkspace(tempRoot);
+
+            Assert(result.Success, "Workspace verify-migration should pass when every discovered project passes.");
+            Assert(result.ProjectCount == 2, $"Workspace verify-migration should discover two projects, found {result.ProjectCount}.");
+            Assert(result.Projects.All(project => project.Success), "Every workspace project should pass verification.");
+            Assert(result.Projects.All(project => project.SandboxDeleted), "Every workspace project sandbox should be deleted.");
+            Assert(
+                result.Projects.All(project => !Directory.Exists(Path.GetDirectoryName(project.SandboxProjectPath)!)),
+                "Workspace verify-migration should remove every sandbox project directory.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void WorkspaceAnalysisSkipsEditorMetadataDirectories()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string realProjectDirectory = Path.Combine(tempRoot, "RealMod");
+            string metadataProjectDirectory = Path.Combine(tempRoot, ".cursor", "skills", "Noise");
+            string metadataSourceDirectory = Path.Combine(realProjectDirectory, ".cursor", "skills");
+            string toolProjectDirectory = Path.Combine(tempRoot, "S1Interop", "tests", "S1Interop.Tests");
+            Directory.CreateDirectory(realProjectDirectory);
+            Directory.CreateDirectory(metadataProjectDirectory);
+            Directory.CreateDirectory(metadataSourceDirectory);
+            Directory.CreateDirectory(toolProjectDirectory);
+
+            File.WriteAllText(
+                Path.Combine(realProjectDirectory, "RealMod.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(realProjectDirectory, "Core.cs"),
+                """
+                namespace RealMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+            File.WriteAllText(
+                Path.Combine(metadataProjectDirectory, "Noise.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(metadataSourceDirectory, "NoiseComponent.cs"),
+                """
+                namespace RealMod.Metadata;
+
+                [MelonLoader.RegisterTypeInIl2Cpp]
+                public class NoiseComponent : UnityEngine.MonoBehaviour
+                {
+                }
+                """);
+            File.WriteAllText(
+                Path.Combine(toolProjectDirectory, "S1Interop.Tests.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis analysis = analyzer.Analyze(tempRoot);
+
+            Assert(analysis.Projects.Count == 1, $"Workspace analysis should skip editor metadata and tool/test projects, found {analysis.Projects.Count}.");
+            Assert(
+                analysis.Projects.Single().ProjectPath.EndsWith(@"RealMod\RealMod.csproj", StringComparison.OrdinalIgnoreCase),
+                "Workspace analysis should retain the real mod project.");
+            Assert(
+                analysis.Diagnostics.All(diagnostic => diagnostic.RuleId != "injected_type_missing_intptr_constructor"),
+                "Workspace analysis should not inspect source files inside editor metadata directories.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateBuildsSandboxConfigurations()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "BuildableMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Configurations>Debug;Release</Configurations>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace BuildableMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(result.Success, $"Buildable project should pass sandboxed build verification. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Buildable project build verification should delete its sandbox.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run both configurations, got {result.BuildResults?.Count ?? 0}.");
+            IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults!;
+            Assert(
+                buildResults.All(build => build.Success),
+                $"Every sandbox build should pass. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                buildResults.All(build => build.FailureKind == "None"),
+                $"Successful sandbox builds should be classified as None. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                buildResults.All(build => build.ReadinessStatus == "Ready" && build.Attribution == "None"),
+                $"Successful sandbox builds should be classified as Ready/None. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                buildResults.Select(build => build.Configuration).OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(["Debug", "Release"], StringComparer.OrdinalIgnoreCase),
+                "Build verification should report Debug and Release configuration builds.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateFailsCompilerBrokenSandbox()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "CompilerBrokenMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace CompilerBrokenMod;
+
+                public static class Core
+                {
+                    public static int Value => MissingSymbol;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Compiler-broken project should fail verify-migration when build verification is enabled.");
+            Assert(result.AfterDiagnostics.Count == 0, "Compiler-broken project should be analyzer-clean so the failure is attributable to the build gate.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.Any(build => !build.Success && build.Output.Contains("MissingSymbol", StringComparison.Ordinal)),
+                $"Build failure output should include the compiler error. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "CompileError"),
+                $"Compiler-broken project should classify failures as CompileError. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "CompileFailed" &&
+                    build.Attribution == "MigrationCompileFailure"),
+                $"Compiler-broken project should classify attribution as MigrationCompileFailure. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Compiler-broken project build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateReportsMissingHintPathReadiness()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MissingReferenceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Missing.ScheduleOne.Dependency">
+                      <HintPath>external\Missing.ScheduleOne.Dependency.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace MissingReferenceMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing reference project should fail verify-migration when build verification is enabled.");
+            Assert(result.AfterDiagnostics.Count == 0, "Missing reference project should be analyzer-clean so the failure is attributable to build readiness.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "MissingReference"),
+                $"Missing hint paths should classify failures as MissingReference. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "BlockedByLocalReferences" &&
+                    build.Attribution == "DependencyNotReady"),
+                $"Missing hint paths should classify attribution as DependencyNotReady. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build => build.Issues.Any(issue =>
+                    issue.Kind == "MissingReference" &&
+                    issue.Include == "Missing.ScheduleOne.Dependency" &&
+                    issue.Path?.EndsWith(@"external\Missing.ScheduleOne.Dependency.dll", StringComparison.OrdinalIgnoreCase) == true)),
+                $"Missing hint paths should be reported as structured build issues. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Missing reference build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateClassifiesExternalReferenceSurfaceFailures()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ReferenceSurfaceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "ScheduleOneStub.cs"),
+                """
+                namespace ScheduleOne;
+
+                public static class ExistingNamespaceMarker
+                {
+                }
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                using ScheduleOne.Dialogue;
+
+                namespace ReferenceSurfaceMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing external reference surface project should fail verify-migration when build verification is enabled.");
+            Assert(result.AfterDiagnostics.Count == 0, "Missing external reference surface project should be analyzer-clean so the failure is attributable to build references.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "ReferenceSurfaceMissing"),
+                $"Missing external namespaces should classify failures as ReferenceSurfaceMissing. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "BlockedByReferenceSurface" &&
+                    build.Attribution == "DependencyNotReady"),
+                $"Missing external namespaces should be attributed to dependency readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build => build.Issues.Any(issue =>
+                    issue.Kind == "ReferenceSurfaceMissing" &&
+                    issue.Remediation?.Contains("runtime game root", StringComparison.OrdinalIgnoreCase) == true)),
+                $"Missing external namespaces should include actionable remediation. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Missing external reference surface build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateClassifiesExternalMemberSurfaceFailures()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ExternalMemberSurfaceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace ExternalMemberSurfaceMod;
+
+                public sealed class PlayerCamera
+                {
+                }
+
+                public static class Core
+                {
+                    public static void Restore(PlayerCamera camera)
+                    {
+                        camera.CloseInterface(0f, true);
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing external member surface project should fail verify-migration when build verification is enabled.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "ReferenceSurfaceMissing"),
+                $"Missing external member APIs should classify failures as ReferenceSurfaceMissing. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "BlockedByReferenceSurface" &&
+                    build.Attribution == "DependencyNotReady"),
+                $"Missing external member APIs should be attributed to dependency readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Missing external member surface build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateReportsUnsetLocalReferenceProperties()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "UnsetLocalReferencePropertiesMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup>
+                    <GameDllPath>$(ManagedDllPath)</GameDllPath>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GameDllPath)\Assembly-CSharp.dll</HintPath>
+                    </Reference>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>$(GameDllPath)\UnityEngine.CoreModule.dll</HintPath>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Unset local reference properties should fail verify-migration when build verification is enabled.");
+            Assert(
+                result.AppliedOperations > 0,
+                "Build verification should first apply local reference property scaffolding in the sandbox.");
+            Assert(
+                result.AfterDiagnostics.All(diagnostic => diagnostic.RuleId != "missing_local_reference_properties"),
+                $"Local reference property scaffold diagnostic should be cleared before build classification. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "LocalBuildPropertiesUnset"),
+                $"Unset local reference properties should classify failures as LocalBuildPropertiesUnset. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "BlockedByLocalReferences" &&
+                    build.Attribution == "DependencyNotReady"),
+                $"Unset local reference properties should be attributed to local dependency readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build => build.Issues.Any(issue =>
+                    issue.Kind == "LocalBuildPropertiesUnset" &&
+                    issue.Include?.Contains("references", StringComparison.OrdinalIgnoreCase) == true)),
+                $"Unset local reference properties should be collapsed into structured build issues. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Unset local reference property build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateClassifiesSiblingBinReferencesAsModDependencies()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string modDirectory = Path.Combine(tempRoot, "ConsumerMod");
+            Directory.CreateDirectory(modDirectory);
+            string tempProject = Path.Combine(modDirectory, "ConsumerMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="bGUI">
+                      <HintPath>..\bGUI\bin\Il2cppRelease\net6.0\bGUI.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="0Harmony">
+                      <HintPath>il2cpp_libs\0Harmony.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace ConsumerMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing sibling bin dependency should block build verification.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "ModDependencyMissing"),
+                $"Missing sibling bin dependencies should classify as ModDependencyMissing. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build => build.Issues.Any(issue =>
+                    issue.Kind == "ModDependencyMissing" &&
+                    issue.Include == "bGUI")),
+                $"Missing sibling bin dependencies should include the unresolved dependency reference. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Missing sibling bin dependency build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGatePreservesProjectLocalDependencyDlls()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string dependencyDirectory = Path.Combine(tempRoot, "mono_libs");
+            Directory.CreateDirectory(dependencyDirectory);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(dependencyDirectory, "S1Interop.Core.dll"),
+                overwrite: true);
+
+            string tempProject = Path.Combine(tempRoot, "ProjectLocalDependencyMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="S1Interop.Core">
+                      <HintPath>mono_libs\S1Interop.Core.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace ProjectLocalDependencyMod;
+
+                public static class Core
+                {
+                    public static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(result.Success, $"Project-local dependency DLLs under mono_libs should be preserved in the sandbox. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.BuildResults!.All(build => build.Success), $"Project-local dependency build verification should pass. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Project-local dependency build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateClassifiesMissingTransitiveExternalAssembly()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string fishNetProjectDirectory = Path.Combine(tempRoot, "FishNet.Runtime");
+            string scheduleOneProjectDirectory = Path.Combine(tempRoot, "ScheduleOne.Core");
+            string modDirectory = Path.Combine(tempRoot, "MissingTransitiveReferenceMod");
+            Directory.CreateDirectory(fishNetProjectDirectory);
+            Directory.CreateDirectory(scheduleOneProjectDirectory);
+            Directory.CreateDirectory(modDirectory);
+
+            string fishNetProject = Path.Combine(fishNetProjectDirectory, "FishNet.Runtime.csproj");
+            File.WriteAllText(
+                fishNetProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <AssemblyName>FishNet.Runtime</AssemblyName>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(fishNetProjectDirectory, "NetworkBehaviour.cs"),
+                """
+                namespace FishNet.Object
+                {
+                    public class NetworkBehaviour
+                    {
+                    }
+                }
+                """);
+
+            string scheduleOneProject = Path.Combine(scheduleOneProjectDirectory, "ScheduleOne.Core.csproj");
+            File.WriteAllText(
+                scheduleOneProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <AssemblyName>ScheduleOne.Core</AssemblyName>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="FishNet.Runtime">
+                      <HintPath>{Path.Combine(fishNetProjectDirectory, "bin", "Release", "netstandard2.1", "FishNet.Runtime.dll")}</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(scheduleOneProjectDirectory, "Property.cs"),
+                """
+                using FishNet.Object;
+
+                namespace ScheduleOne.Property
+                {
+                    public class Property : NetworkBehaviour
+                    {
+                    }
+                }
+                """);
+
+            ProcessResult fishNetBuild = RunDotNet("build", fishNetProject, "-c", "Release", "--nologo", "-v:minimal");
+            Assert(fishNetBuild.ExitCode == 0, $"Failed to build fake FishNet.Runtime fixture: {fishNetBuild.Output}");
+            ProcessResult scheduleOneBuild = RunDotNet("build", scheduleOneProject, "-c", "Release", "--nologo", "-v:minimal");
+            Assert(scheduleOneBuild.ExitCode == 0, $"Failed to build fake ScheduleOne.Core fixture: {scheduleOneBuild.Output}");
+
+            string libDirectory = Path.Combine(modDirectory, "lib");
+            Directory.CreateDirectory(libDirectory);
+            File.Copy(
+                Path.Combine(scheduleOneProjectDirectory, "bin", "Release", "netstandard2.1", "ScheduleOne.Core.dll"),
+                Path.Combine(libDirectory, "ScheduleOne.Core.dll"),
+                overwrite: true);
+
+            string tempProject = Path.Combine(modDirectory, "MissingTransitiveReferenceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="ScheduleOne.Core">
+                      <HintPath>lib\ScheduleOne.Core.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace MissingTransitiveReferenceMod
+                {
+                    public sealed class Core : ScheduleOne.Property.Property
+                    {
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing transitive external assembly project should fail verify-migration when build verification is enabled.");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run default Debug and Release configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.FailureKind == "ReferenceSurfaceMissing"),
+                $"CS0012 transitive external assemblies should classify as ReferenceSurfaceMissing. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.ReadinessStatus == "BlockedByReferenceSurface" &&
+                    build.Attribution == "DependencyNotReady"),
+                $"CS0012 transitive external assemblies should be attributed to dependency readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Missing transitive external assembly build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGatePassesRuntimeGameRootsToMsBuild()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "RuntimeRootBuildMod.csproj");
+            string il2CppRoot = Path.Combine(tempRoot, "Schedule I_public");
+            string monoRoot = Path.Combine(tempRoot, "Schedule I_alternate");
+            Directory.CreateDirectory(il2CppRoot);
+            Directory.CreateDirectory(monoRoot);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Configurations>Mono;IL2CPP</Configurations>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace RuntimeRootBuildMod
+                {
+                    public static class Core
+                    {
+                        public static int Value => 1;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: false,
+                    Build: true,
+                    BuildTimeoutSeconds: 60,
+                    Il2CppGamePath: il2CppRoot,
+                    MonoGamePath: monoRoot));
+
+            Assert(result.Success, $"Runtime root build project should pass build verification. Build output: {FormatBuildResults(result.BuildResults)}");
+            MigrationBuildResult monoBuild = result.BuildResults!.Single(build => build.Configuration == "Mono");
+            MigrationBuildResult il2CppBuild = result.BuildResults!.Single(build => build.Configuration == "IL2CPP");
+            Assert(
+                monoBuild.Command.Contains($"-p:S1Dir={monoRoot}", StringComparison.Ordinal) &&
+                monoBuild.Command.Contains($"-p:GamePath={monoRoot}", StringComparison.Ordinal),
+                $"Mono build command should receive Mono game roots. Command: {monoBuild.Command}");
+            Assert(
+                il2CppBuild.Command.Contains($"-p:S1Dir={il2CppRoot}", StringComparison.Ordinal) &&
+                il2CppBuild.Command.Contains($"-p:GamePath={il2CppRoot}", StringComparison.Ordinal),
+                $"IL2CPP build command should receive IL2CPP game roots. Command: {il2CppBuild.Command}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateHydratesModDependencyProperties()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string modDirectory = Path.Combine(tempRoot, "ConsumerMod");
+            string s1ApiDirectory = Path.Combine(tempRoot, "S1API", "S1API", "bin", "Il2CppMelon", "net6.0");
+            string staleS1ApiDirectory = Path.Combine(tempRoot, "S1API", "stale");
+            string bguiDirectory = Path.Combine(tempRoot, "bGUI", "bin", "Il2cppRelease", "net6.0");
+            Directory.CreateDirectory(modDirectory);
+            Directory.CreateDirectory(s1ApiDirectory);
+            Directory.CreateDirectory(staleS1ApiDirectory);
+            Directory.CreateDirectory(bguiDirectory);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(s1ApiDirectory, "S1API.dll"),
+                overwrite: true);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(bguiDirectory, "bGUI.dll"),
+                overwrite: true);
+            File.WriteAllText(
+                Path.Combine(staleS1ApiDirectory, "S1API.Il2Cpp.MelonLoader.dll"),
+                "not a valid assembly");
+
+            string tempProject = Path.Combine(modDirectory, "ConsumerMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Import Project="local.build.props" Condition="Exists('local.build.props')" />
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Configurations>IL2CPP</Configurations>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="S1API">
+                      <HintPath>$(S1APIModsPath)\S1API.Il2Cpp.MelonLoader.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="bGUI">
+                      <HintPath>$(BguiPath)\bGUI.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "local.build.props"),
+                """
+                <Project>
+                  <PropertyGroup>
+                    <S1APIModsPath></S1APIModsPath>
+                    <BguiPath></BguiPath>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace ConsumerMod
+                {
+                    public static class Core
+                    {
+                        public static int Value => 1;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(result.Success, $"Workspace sibling dependency should be staged into the sandbox under the expected reference filename. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.BuildResults!.Single().ReadinessStatus == "Ready", "Staged workspace dependency should make the sandbox build readiness check pass.");
+            Assert(result.SandboxDeleted, "Workspace dependency staging build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateStagesConfigurationScopedFileDependencyProperties()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string modDirectory = Path.Combine(tempRoot, "BarsGraphicsLikeMod");
+            string monoBguiDirectory = Path.Combine(tempRoot, "bGUI", "bin", "MonoRelease", "netstandard2.1");
+            string il2CppBguiDirectory = Path.Combine(tempRoot, "bGUI", "bin", "Il2cppRelease", "net6.0");
+            Directory.CreateDirectory(modDirectory);
+            Directory.CreateDirectory(monoBguiDirectory);
+            Directory.CreateDirectory(il2CppBguiDirectory);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(monoBguiDirectory, "bGUI.dll"),
+                overwrite: true);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(il2CppBguiDirectory, "bGUI.dll"),
+                overwrite: true);
+
+            string tempProject = Path.Combine(modDirectory, "BarsGraphicsLikeMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>MonoStable;Il2cppStable</Configurations>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='MonoStable'">
+                    <DefineConstants>MONO</DefineConstants>
+                    <BguiPath Condition="'$(BguiPath)'==''">..\bGUI\bin\MonoRelease\netstandard2.1\bGUI.dll</BguiPath>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Il2cppStable'">
+                    <TargetFramework>net6.0</TargetFramework>
+                    <DefineConstants>IL2CPP</DefineConstants>
+                    <BguiPath Condition="'$(BguiPath)'==''">..\bGUI\bin\Il2cppRelease\net6.0\bGUI.dll</BguiPath>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="bGUI">
+                      <HintPath>$(BguiPath)</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace BarsGraphicsLikeMod
+                {
+                    public static class Core
+                    {
+                        public static int Value => 1;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(result.Success, $"Configuration-scoped file dependency properties should be staged into the sandbox. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run both runtime configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(
+                result.BuildResults!.All(build => build.ReadinessStatus == "Ready"),
+                $"Staged configuration-scoped dependencies should pass readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Configuration-scoped dependency staging should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateStagesProjectLocalRuntimeReferenceFolders()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string modDirectory = Path.Combine(tempRoot, "RuntimeLibFolderMod");
+            string il2CppRoot = Path.Combine(tempRoot, "Schedule I_public");
+            string monoRoot = Path.Combine(tempRoot, "Schedule I_alternate");
+            string il2CppAssemblies = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies");
+            string il2CppMelonLoader = Path.Combine(il2CppRoot, "MelonLoader", "net6");
+            string monoManaged = Path.Combine(monoRoot, "Schedule I_Data", "Managed");
+            string monoMelonLoader = Path.Combine(monoRoot, "MelonLoader", "net35");
+            Directory.CreateDirectory(modDirectory);
+            Directory.CreateDirectory(il2CppAssemblies);
+            Directory.CreateDirectory(il2CppMelonLoader);
+            Directory.CreateDirectory(monoManaged);
+            Directory.CreateDirectory(monoMelonLoader);
+            foreach (string destination in new[]
+                     {
+                         Path.Combine(il2CppAssemblies, "Assembly-CSharp.dll"),
+                         Path.Combine(il2CppAssemblies, "UnityEngine.CoreModule.dll"),
+                         Path.Combine(il2CppMelonLoader, "MelonLoader.dll"),
+                         Path.Combine(monoManaged, "Assembly-CSharp.dll"),
+                         Path.Combine(monoManaged, "UnityEngine.CoreModule.dll"),
+                         Path.Combine(monoMelonLoader, "MelonLoader.dll")
+                     })
+            {
+                File.Copy(typeof(MigrationVerifier).Assembly.Location, destination, overwrite: true);
+            }
+
+            string tempProject = Path.Combine(modDirectory, "RuntimeLibFolderMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>Mono;IL2CPP</Configurations>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Mono'">
+                    <DefineConstants>MONO</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='IL2CPP'">
+                    <TargetFramework>net6.0</TargetFramework>
+                    <DefineConstants>IL2CPP</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup Condition="'$(Configuration)'=='Mono'">
+                    <Reference Include="MelonLoader">
+                      <HintPath>mono_libs\MelonLoader.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>mono_libs\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>mono_libs\UnityEngine.CoreModule.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                  <ItemGroup Condition="'$(Configuration)'=='IL2CPP'">
+                    <Reference Include="MelonLoader">
+                      <HintPath>il2cpp_libs\MelonLoader.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>il2cpp_libs\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>il2cpp_libs\UnityEngine.CoreModule.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace RuntimeLibFolderMod
+                {
+                    public static class Core
+                    {
+                        public static int Value => 1;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: false,
+                    Build: true,
+                    BuildTimeoutSeconds: 60,
+                    Il2CppGamePath: il2CppRoot,
+                    MonoGamePath: monoRoot));
+
+            Assert(result.Success, $"Project-local runtime reference folders should be staged from configured game roots. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.BuildResults?.Count == 2, $"Build verification should run both runtime configurations, got {result.BuildResults?.Count ?? 0}.");
+            Assert(result.BuildResults!.All(build => build.ReadinessStatus == "Ready"), $"Staged runtime lib folders should pass readiness. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Project-local runtime reference folder staging should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string modDirectory = Path.Combine(tempRoot, "Il2CppConsumerMod");
+            string il2CppRoot = Path.Combine(tempRoot, "Schedule I_public");
+            string il2CppAssemblies = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies");
+            Directory.CreateDirectory(modDirectory);
+            Directory.CreateDirectory(il2CppAssemblies);
+            File.Copy(
+                typeof(MigrationVerifier).Assembly.Location,
+                Path.Combine(il2CppAssemblies, "Il2CppExisting.Dependency.dll"),
+                overwrite: true);
+
+            string tempProject = Path.Combine(modDirectory, "Il2CppConsumerMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Import Project="local.build.props" Condition="Exists('local.build.props')" />
+                  <PropertyGroup>
+                    <TargetFramework>net6.0</TargetFramework>
+                    <Configurations>IL2CPP</Configurations>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Il2CppExisting.Dependency">
+                      <HintPath>$(Il2CppManagedDllPath)\Il2CppExisting.Dependency.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Il2CppMissing.One">
+                      <HintPath>$(Il2CppManagedDllPath)\Il2CppMissing.One.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Il2CppMissing.Two">
+                      <HintPath>$(Il2CppManagedDllPath)\Il2CppMissing.Two.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "local.build.props"),
+                """
+                <Project>
+                  <PropertyGroup>
+                    <Il2CppManagedDllPath></Il2CppManagedDllPath>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(modDirectory, "Core.cs"),
+                """
+                namespace Il2CppConsumerMod
+                {
+                    public static class Core
+                    {
+                        public static int Value => 1;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: false,
+                    Build: true,
+                    BuildTimeoutSeconds: 60,
+                    Il2CppGamePath: il2CppRoot));
+
+            Assert(!result.Success, "Missing staged IL2CPP wrapper references should block build verification.");
+            MigrationBuildResult build = result.BuildResults!.Single();
+            Assert(build.FailureKind == "GeneratedIl2CppAssembliesMissing", $"Expected generated wrapper failure, got {FormatBuildResults(result.BuildResults)}");
+            Assert(build.Issues.Count == 1, $"Staged generated wrapper misses should collapse into one issue. Build output: {FormatBuildResults(result.BuildResults)}");
+            MigrationBuildIssue issue = build.Issues[0];
+            Assert(issue.Include == "2 references", $"Collapsed issue should summarize the missing reference count. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                issue.Message.Contains("Il2CppMissing.One", StringComparison.Ordinal) &&
+                issue.Message.Contains("Il2CppMissing.Two", StringComparison.Ordinal),
+                $"Collapsed issue should include sample missing reference names. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                issue.Path?.Contains(@"S1Interop.ExternalReferences\Il2CppManagedDllPath", StringComparison.OrdinalIgnoreCase) == true,
+                $"Collapsed issue should group by the staged IL2CPP overlay directory. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Staged IL2CPP wrapper build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationVerifierSkipsWindowsReservedDeviceNames()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Assert(MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\nul"), "Windows NUL device files should be skipped.");
+        Assert(MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\NUL.txt"), "Windows NUL extension aliases should be skipped.");
+        Assert(MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\COM1.log"), "Windows COM device aliases should be skipped.");
+        Assert(MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\LPT9"), "Windows LPT device aliases should be skipped.");
+        Assert(!MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\null.txt"), "Ordinary files with similar names should not be skipped.");
+        Assert(!MigrationVerifier.IsReservedWindowsDevicePath(@"C:\Mods\SchizoGoblinMod\COM10.log"), "Only DOS COM1-COM9 device aliases should be skipped.");
+    }
+
+    private void MigrationApplyReplacesStalePublicizedReferenceWithPublicizer()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceDirectory = Path.Combine(workspaceRoot, "BiggerLobbies");
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "BiggerLobbies.csproj");
+            string originalProject = File.ReadAllText(tempProject);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true)).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "stale_publicized_surface"),
+                "BiggerLobbies should plan stale publicized-surface migration.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "stale_publicized_surface"),
+                "Migration apply should rewrite stale publicized references.");
+
+            string migratedProject = File.ReadAllText(tempProject);
+            Assert(
+                !migratedProject.Contains("Assembly-CSharp-publicized", StringComparison.OrdinalIgnoreCase),
+                "Migrated project should not keep stale Assembly-CSharp-publicized references.");
+            Assert(
+                migratedProject.Contains("PackageReference Include=\"Krafs.Publicizer\"", StringComparison.Ordinal),
+                "Migrated project should add Krafs.Publicizer for build-time publicization.");
+            Assert(
+                migratedProject.Contains("Publicize Include=\"Assembly-CSharp\"", StringComparison.Ordinal),
+                "Migrated project should publicize the current Assembly-CSharp reference at build time.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "stale_publicized_surface"),
+                "Migrated BiggerLobbies fixture should not retain stale publicized-surface diagnostics.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the BiggerLobbies project file.");
+            Assert(
+                string.Equals(File.ReadAllText(tempProject), originalProject, StringComparison.Ordinal),
+                "Rollback should restore the original publicized reference shape.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "BrokenInjectedType.csproj");
+            string tempSource = Path.Combine(tempRoot, "BrokenComponent.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace SyntheticMod;
+
+                [MelonLoader.RegisterTypeInIl2Cpp]
+                public class BrokenComponent
+                {
+                    public BrokenComponent()
+                    {
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(tempProject);
+
+            Assert(!result.Success, "Broken injected type verify-migration should fail with residual diagnostics.");
+            Assert(result.SandboxDeleted, "Broken injected type verify-migration should delete its sandbox.");
+            Assert(
+                result.AfterDiagnostics.Any(diagnostic => diagnostic.RuleId == "injected_type_missing_intptr_constructor"),
+                "Broken injected type verify-migration should report the residual IntPtr constructor diagnostic.");
+            Assert(File.Exists(tempProject), "verify-migration should not mutate or delete the source project under test.");
+            Assert(File.Exists(tempSource), "verify-migration should not mutate or delete the source file under test.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAddsIntPtrConstructorToMonoBehaviourInjectedType()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "InjectedOverlay.csproj");
+            string tempSource = Path.Combine(tempRoot, "Overlay.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace UnityEngine
+                {
+                    public class MonoBehaviour
+                    {
+                        public MonoBehaviour()
+                        {
+                        }
+
+                        public MonoBehaviour(System.IntPtr ptr)
+                        {
+                        }
+                    }
+                }
+
+                namespace SyntheticMod;
+
+                [MelonLoader.RegisterTypeInIl2Cpp]
+                public class Overlay : UnityEngine.MonoBehaviour
+                {
+                    public Overlay()
+                    {
+                    }
+
+                    public void Render()
+                    {
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "injected_type_missing_intptr_constructor"),
+                "Injected MonoBehaviour fixture should plan an IntPtr constructor migration.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "injected_type_missing_intptr_constructor"),
+                "Migration apply should add the IntPtr constructor.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("#if IL2CPP", StringComparison.Ordinal) &&
+                migratedSource.Contains("public Overlay(System.IntPtr ptr) : base(ptr) { }", StringComparison.Ordinal),
+                "Migrated source should contain a guarded System.IntPtr constructor.");
+            Assert(
+                migratedSource.Contains("public Overlay()", StringComparison.Ordinal),
+                "Migrated source should preserve the existing parameterless constructor.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "injected_type_missing_intptr_constructor"),
+                "Migrated injected MonoBehaviour fixture should not retain IntPtr constructor diagnostics.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the injected overlay source file.");
+            Assert(
+                !File.ReadAllText(tempSource).Contains("public Overlay(System.IntPtr ptr)", StringComparison.Ordinal),
+                "Rollback should remove the generated IntPtr constructor.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void BuildHookInstallsReversibleValidationTarget()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "CleanBuildHook.csproj");
+            string tempSource = Path.Combine(tempRoot, "Core.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace CleanBuildHook;
+
+                public static class Core
+                {
+                    public static int Value => 42;
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(
+                before,
+                new MigrationPlannerOptions(DualRuntime: false, BuildHook: true));
+            Assert(
+                plan.Projects.Single().Operations.Any(operation => operation.RuleId == "install_build_validation_hook"),
+                "Expected build hook migration operation for clean synthetic fixture.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            string targetsPath = Path.Combine(tempRoot, "S1Interop.Build.targets");
+            string localPropsPath = Path.Combine(tempRoot, "S1Interop.Build.local.props");
+            string gitIgnorePath = Path.Combine(tempRoot, ".gitignore");
+            Assert(File.Exists(targetsPath), "Build hook apply should create S1Interop.Build.targets.");
+            Assert(File.Exists(localPropsPath), "Build hook apply should create ignored local command props.");
+            Assert(File.Exists(gitIgnorePath), "Build hook apply should create a .gitignore for local command props.");
+            Assert(File.ReadAllText(tempProject).Contains("S1Interop.Build.targets", StringComparison.Ordinal), "Build hook apply should import S1Interop.Build.targets.");
+            Assert(
+                File.ReadAllText(targetsPath).Contains("S1Interop validating $(MSBuildProjectFile)", StringComparison.Ordinal),
+                "Build hook target should include the validation message.");
+            Assert(
+                File.ReadAllText(targetsPath).Contains("BeforeTargets=\"ResolveReferences\"", StringComparison.Ordinal),
+                "Build hook target should run before reference resolution.");
+            Assert(
+                File.ReadAllText(targetsPath).Contains("--configuration &quot;$(Configuration)&quot;", StringComparison.Ordinal),
+                "Build hook target should validate the active MSBuild configuration.");
+            Assert(
+                File.ReadAllText(targetsPath).Contains("<S1InteropCommand Condition=\"'$(S1InteropCommand)' == ''\">s1interop</S1InteropCommand>", StringComparison.Ordinal),
+                "Build hook target should keep the committed command default portable.");
+            Assert(
+                File.ReadAllText(localPropsPath).Contains("dotnet run --project", StringComparison.Ordinal),
+                "Local command props should point at the local S1Interop CLI project.");
+            Assert(
+                File.ReadAllLines(gitIgnorePath).Any(line => string.Equals(line.Trim(), "S1Interop.Build.local.props", StringComparison.OrdinalIgnoreCase)),
+                "Build hook apply should ignore local command props.");
+
+            MigrationApplyResult idempotentApplyResult = new MigrationApplier().Apply(new MigrationPlanner().Plan(
+                analyzer.Analyze(tempProject),
+                new MigrationPlannerOptions(DualRuntime: false, BuildHook: true)));
+            Assert(idempotentApplyResult.Operations.Count == 0, "Repeated build hook apply should not report changed operations.");
+            Assert(
+                CountProjectImports(tempProject, "S1Interop.Build.targets") == 1,
+                "Repeated build hook apply should not duplicate the project import.");
+
+            ProcessResult buildResult = RunDotNet("build", tempProject, "--nologo", "-v:minimal");
+            Assert(buildResult.ExitCode == 0, $"Clean project with S1Interop build hook should build. Output: {buildResult.Output}");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(ContainsPath(rollbackResult.RestoredFiles, tempProject), $"Build hook rollback should restore the project file. Restored: {string.Join(", ", rollbackResult.RestoredFiles)} Removed: {string.Join(", ", rollbackResult.RemovedFiles)}");
+            Assert(ContainsPath(rollbackResult.RemovedFiles, targetsPath), "Build hook rollback should remove S1Interop.Build.targets.");
+            Assert(ContainsPath(rollbackResult.RemovedFiles, localPropsPath), "Build hook rollback should remove local command props.");
+            Assert(ContainsPath(rollbackResult.RemovedFiles, gitIgnorePath), "Build hook rollback should remove generated .gitignore.");
+            Assert(!File.Exists(targetsPath), "Build hook rollback should delete S1Interop.Build.targets.");
+            Assert(!File.Exists(localPropsPath), "Build hook rollback should delete local command props.");
+            Assert(!File.Exists(gitIgnorePath), "Build hook rollback should delete generated .gitignore.");
+            Assert(
+                !File.ReadAllText(tempProject).Contains("S1Interop.Build.targets", StringComparison.Ordinal),
+                "Build hook rollback should remove the project import.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void BuildHookFailsBuildForResidualInteropDiagnostics()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "BrokenBuildHook.csproj");
+            string tempSource = Path.Combine(tempRoot, "BrokenComponent.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace MelonLoader
+                {
+                    [System.AttributeUsage(System.AttributeTargets.Class)]
+                    public sealed class RegisterTypeInIl2CppAttribute : System.Attribute
+                    {
+                    }
+                }
+
+                namespace BrokenBuildHook
+                {
+                    [MelonLoader.RegisterTypeInIl2Cpp]
+                    public sealed class BrokenComponent
+                    {
+                        public BrokenComponent()
+                        {
+                        }
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(
+                before,
+                new MigrationPlannerOptions(DualRuntime: false, BuildHook: true));
+            new MigrationApplier().Apply(plan);
+
+            ProcessResult buildResult = RunDotNet("build", tempProject, "--nologo", "-v:minimal");
+            Assert(buildResult.ExitCode != 0, "Broken project with S1Interop build hook should fail the build.");
+            Assert(
+                buildResult.Output.Contains("injected_type_missing_intptr_constructor", StringComparison.Ordinal),
+                $"Build hook failure should include the residual S1Interop diagnostic. Output: {buildResult.Output}");
+
+            ProcessResult disabledBuildResult = RunDotNet(
+                "build",
+                tempProject,
+                "--nologo",
+                "-v:minimal",
+                "-p:S1InteropBuildValidationEnabled=false");
+            Assert(disabledBuildResult.ExitCode == 0, $"Disabled S1Interop build validation should let the synthetic project compile. Output: {disabledBuildResult.Output}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void BuildHookValidatesOnlyActiveConfiguration()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MixedConfigBuildHook.csproj");
+            string tempSource = Path.Combine(tempRoot, "Core.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>Mono;IL2CPP</Configurations>
+                    <LangVersion>10.0</LangVersion>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Mono'">
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <DefineConstants>MONO</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='IL2CPP'">
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <DefineConstants>IL2CPP</DefineConstants>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace MixedConfigBuildHook;
+
+                public static class Core
+                {
+                    public static int Value => 42;
+                }
+                """);
+
+            MigrationPlan plan = new MigrationPlanner().Plan(
+                analyzer.Analyze(tempProject),
+                new MigrationPlannerOptions(DualRuntime: false, BuildHook: true));
+            MigrationPlan hookOnlyPlan = plan with
+            {
+                Projects = plan.Projects
+                    .Select(project => project with
+                    {
+                        Operations = project.Operations
+                            .Where(operation => operation.RuleId == "install_build_validation_hook")
+                            .ToArray()
+                    })
+                    .ToArray()
+            };
+            new MigrationApplier().Apply(hookOnlyPlan);
+
+            ProcessResult monoBuild = RunDotNet("build", tempProject, "--nologo", "-v:minimal", "-p:Configuration=Mono");
+            Assert(monoBuild.ExitCode == 0, $"Mono build should ignore unrelated IL2CPP diagnostics. Output: {monoBuild.Output}");
+
+            ProcessResult il2CppBuild = RunDotNet("build", tempProject, "--nologo", "-v:minimal", "-p:Configuration=IL2CPP");
+            Assert(il2CppBuild.ExitCode != 0, $"IL2CPP build should fail its own active configuration diagnostics. Output: {il2CppBuild.Output}");
+            Assert(
+                il2CppBuild.Output.Contains("wrong_target_framework", StringComparison.Ordinal),
+                $"IL2CPP build should report the active configuration diagnostic. Output: {il2CppBuild.Output}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SourceInteropAnalyzerIgnoresGeneratedAndToolDirectories()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ExcludedSources.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace ExcludedSources;
+
+                public static class Core
+                {
+                    public static int Value => 42;
+                }
+                """);
+
+            foreach (string directoryName in new[] { "artifacts", "AssetRipperExport", "Il2CppAssemblies", "MelonLoader" })
+            {
+                string directory = Path.Combine(tempRoot, directoryName);
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(
+                    Path.Combine(directory, directoryName == "artifacts" ? "Il2CppScheduleOne.Core.decompiled.cs" : "Poison.cs"),
+                    """
+                    namespace ExcludedSources;
+
+                    [MelonLoader.RegisterTypeInIl2Cpp]
+                    public sealed class Poison
+                    {
+                    }
+                    """);
+            }
+
+            SourceInteropAnalysis source = new SourceInteropAnalyzer().Analyze(tempProject);
+
+            Assert(source.Diagnostics.Count == 0, "Source interop analyzer should ignore poison files under generated/tool directories.");
+            Assert(source.InjectedTypes.Count == 0, "Source interop analyzer should not report injected types under generated/tool directories.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void ScheduleOneUsingRewriterGroupsAdjacentUsings()
+    {
+        string source =
+            """
+            using HarmonyLib;
+            using ScheduleOne.DevUtilities;
+            using ScheduleOne.Equipping;
+            using PlayerAlias = ScheduleOne.PlayerScripts;
+            using static ScheduleOne.UI.HUD;
+            using UnityEngine;
+
+            namespace SyntheticMod;
+            """;
+
+        string rewritten = ScheduleOneUsingRewriter.RewriteSource(source);
+
+        Assert(CountOccurrences(rewritten, "#if MONO") == 1, "Adjacent ScheduleOne usings should share one MONO guard.");
+        Assert(CountOccurrences(rewritten, "#elif IL2CPP") == 1, "Adjacent ScheduleOne usings should share one IL2CPP guard.");
+        Assert(CountOccurrences(rewritten, "#endif") == 1, "Adjacent ScheduleOne usings should share one closing guard.");
+        Assert(
+            rewritten.Contains(
+                """
+                #if MONO
+                using ScheduleOne.DevUtilities;
+                using ScheduleOne.Equipping;
+                using PlayerAlias = ScheduleOne.PlayerScripts;
+                using static ScheduleOne.UI.HUD;
+                #elif IL2CPP
+                using Il2CppScheduleOne.DevUtilities;
+                using Il2CppScheduleOne.Equipping;
+                using PlayerAlias = Il2CppScheduleOne.PlayerScripts;
+                using static Il2CppScheduleOne.UI.HUD;
+                #endif
+                """,
+                StringComparison.Ordinal),
+            $"Grouped ScheduleOne using block was not emitted as expected. Rewritten source:{Environment.NewLine}{rewritten}");
+        Assert(
+            rewritten.Contains("using HarmonyLib;", StringComparison.Ordinal) &&
+            rewritten.Contains("using UnityEngine;", StringComparison.Ordinal),
+            "Non-ScheduleOne usings should remain outside the generated runtime guard.");
+    }
+
+    private void ScheduleOneUsingRewriterCanPreferGlobalFacade()
+    {
+        string source =
+            """
+            using HarmonyLib;
+            using ScheduleOne.DevUtilities;
+            using ScheduleOne.Equipping;
+            using PlayerAlias = ScheduleOne.PlayerScripts;
+            using static ScheduleOne.UI.HUD;
+            using UnityEngine;
+
+            namespace SyntheticMod;
+            """;
+
+        string rewritten = ScheduleOneUsingRewriter.RewriteSource(
+            source,
+            ScheduleOneUsingRewriter.RewriteMode.PreferGlobalFacade);
+
+        Assert(
+            !rewritten.Contains("using ScheduleOne.DevUtilities;", StringComparison.Ordinal) &&
+            !rewritten.Contains("using Il2CppScheduleOne.DevUtilities;", StringComparison.Ordinal) &&
+            !rewritten.Contains("using ScheduleOne.Equipping;", StringComparison.Ordinal) &&
+            !rewritten.Contains("using Il2CppScheduleOne.Equipping;", StringComparison.Ordinal),
+            $"Normal ScheduleOne namespace usings should be removed when the global facade owns them. Rewritten source:{Environment.NewLine}{rewritten}");
+        Assert(CountOccurrences(rewritten, "#if MONO") == 1, "Alias/static ScheduleOne usings should still share one MONO guard.");
+        Assert(
+            rewritten.Contains("using PlayerAlias = ScheduleOne.PlayerScripts;", StringComparison.Ordinal) &&
+            rewritten.Contains("using PlayerAlias = Il2CppScheduleOne.PlayerScripts;", StringComparison.Ordinal) &&
+            rewritten.Contains("using static ScheduleOne.UI.HUD;", StringComparison.Ordinal) &&
+            rewritten.Contains("using static Il2CppScheduleOne.UI.HUD;", StringComparison.Ordinal),
+            "Alias and static ScheduleOne usings should remain source-level guarded because global namespace imports cannot replace them safely.");
+    }
+
+    private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "AliasFacadeMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace AliasFacadeMod
+                {
+                    public static class Core
+                    {
+                        private static ScheduleOne.Product.WeedDefinition? weed;
+                        private static ScheduleOne.Persistence.Datas.QuestEntryData? questEntry;
+                        private static ScheduleOne.Other.QuestEntryData? collidingQuestEntry;
+                    }
+                }
+                """);
+
+            ProjectAnalysis project = analyzer.Analyze(tempProject).Projects.Single();
+            var generator = new SdkFacadeGenerator();
+            SdkFacadePlan plan = generator.Plan(project);
+            string facadeSource = generator.GenerateSource(plan);
+
+            Assert(
+                plan.TypeAliases.Any(alias =>
+                    alias.Alias == "WeedDefinition" &&
+                    alias.MonoType == "ScheduleOne.Product.WeedDefinition" &&
+                    alias.Il2CppType == "Il2CppScheduleOne.Product.WeedDefinition"),
+                "Facade plan should alias unique fully-qualified ScheduleOne type references.");
+            Assert(
+                plan.TypeAliases.All(alias => alias.Alias != "QuestEntryData"),
+                "Facade plan should skip aliases when multiple fully-qualified types share the same simple name.");
+            Assert(
+                facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),
+                "Generated facade should include conditional aliases for unique fully-qualified type references.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesFullyQualifiedScheduleOneTypes()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "AliasRewriteMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "Core.cs");
+            string generatedFacade = Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using System;
+
+                namespace AliasRewriteMod
+                {
+                    public static class Core
+                    {
+                        public const string TypeName = "ScheduleOne.Product.WeedDefinition";
+                        public const string VerbatimTypeName = @"ScheduleOne.Product.WeedDefinition";
+                        // ScheduleOne.Product.WeedDefinition should remain readable in comments.
+                        public static Type WeedType => typeof(ScheduleOne.Product.WeedDefinition);
+                        public static ScheduleOne.Product.WeedDefinition? Find() => null;
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_sdk_facade"),
+                "Fully-qualified ScheduleOne types should trigger SDK facade generation.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_fully_qualified_scheduleone_types"),
+                "Fully-qualified ScheduleOne types should plan a source rewrite when the alias is unique.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_fully_qualified_scheduleone_types"),
+                "Migration apply should rewrite fully-qualified ScheduleOne type references.");
+            Assert(File.Exists(generatedFacade), "Migration apply should generate the SDK facade for type aliases.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            string facadeSource = File.ReadAllText(generatedFacade);
+            Assert(
+                migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
+                migratedSource.Contains("WeedDefinition? Find()", StringComparison.Ordinal),
+                "Migration should replace fully-qualified ScheduleOne type tokens with the generated alias.");
+            Assert(
+                !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&
+                !migratedSource.Contains("ScheduleOne.Product.WeedDefinition? Find()", StringComparison.Ordinal),
+                "Migration should remove fully-qualified ScheduleOne type tokens from code when the alias is unique.");
+            Assert(
+                migratedSource.Contains("public const string TypeName = \"ScheduleOne.Product.WeedDefinition\";", StringComparison.Ordinal) &&
+                migratedSource.Contains("public const string VerbatimTypeName = @\"ScheduleOne.Product.WeedDefinition\";", StringComparison.Ordinal) &&
+                migratedSource.Contains("// ScheduleOne.Product.WeedDefinition should remain readable in comments.", StringComparison.Ordinal),
+                "Migration should not rewrite fully-qualified ScheduleOne type names inside strings or comments.");
+            Assert(
+                facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),
+                "Generated facade should provide Mono and IL2CPP aliases for the rewritten type.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
+            Assert(!File.Exists(generatedFacade), "Rollback should remove the generated alias facade.");
+            Assert(
+                File.ReadAllText(tempSource).Contains("ScheduleOne.Product.WeedDefinition", StringComparison.Ordinal),
+                "Rollback should restore the original fully-qualified ScheduleOne type references.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void HideFromIl2CppMigrationHandlesMultipleTargetsAndOverloads()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "SyntheticMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "InjectedComponent.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace SyntheticMod;
+
+                public class HelperA
+                {
+                }
+
+                public class HelperB
+                {
+                }
+
+                #if !MONO
+                [MelonLoader.RegisterTypeInIl2Cpp]
+                #endif
+                public class InjectedComponent
+                {
+                #if !MONO
+                    public InjectedComponent(IntPtr ptr) : base(ptr) { }
+                #endif
+
+                    public void Convert(int value)
+                    {
+                    }
+
+                    public HelperA Convert(HelperA value)
+                    {
+                        return value;
+                    }
+
+                    public HelperB ConvertB(HelperB value)
+                    {
+                        return value;
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            MigrationOperation[] hideOperations = projectPlan.Operations
+                .Where(operation => operation.RuleId == "injected_member_requires_hidefromil2cpp")
+                .ToArray();
+            Assert(hideOperations.Length == 2, "Synthetic fixture should report two managed-surface migration operations.");
+            Assert(
+                hideOperations.Any(operation => operation.Evidence?.Contains("Convert(HelperA value)", StringComparison.Ordinal) == true),
+                "HideFromIl2Cpp migration evidence should preserve overload parameter text.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
+            Assert(
+                applyResult.Operations.Count(operation => operation.RuleId == "injected_member_requires_hidefromil2cpp") == 2,
+                "Migration apply should apply both same-file HideFromIl2Cpp operations.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                CountOccurrences(migratedSource, "Il2CppInterop.Runtime.Attributes.HideFromIl2Cpp") == 2,
+                "Migration should add exactly two HideFromIl2Cpp attributes.");
+
+            int primitiveOverloadIndex = migratedSource.IndexOf("public void Convert(int value)", StringComparison.Ordinal);
+            int helperOverloadIndex = migratedSource.IndexOf("public HelperA Convert(HelperA value)", StringComparison.Ordinal);
+            int firstAttributeIndex = migratedSource.IndexOf("[Il2CppInterop.Runtime.Attributes.HideFromIl2Cpp]", StringComparison.Ordinal);
+            Assert(
+                primitiveOverloadIndex >= 0 &&
+                helperOverloadIndex > primitiveOverloadIndex &&
+                firstAttributeIndex > primitiveOverloadIndex &&
+                firstAttributeIndex < helperOverloadIndex,
+                "Migration should hide the HelperA overload without hiding the primitive overload.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan idempotentPlan = new MigrationPlanner().Plan(after).Projects.Single();
+            Assert(
+                idempotentPlan.Operations.All(operation => operation.RuleId != "injected_member_requires_hidefromil2cpp"),
+                "A second migration plan should not duplicate HideFromIl2Cpp operations after apply.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationPlannerCreatesOperationsForBrokenFixture()
+    {
+        string path = Path.Combine(workspaceRoot, @"JackpotEveryTime\JackpotEveryTime.csproj");
+        WorkspaceAnalysis analysis = analyzer.Analyze(path);
+        MigrationPlan plan = new MigrationPlanner().Plan(analysis);
+        ProjectMigrationPlan projectPlan = plan.Projects.Single();
+
+        Assert(
+            projectPlan.Operations.Any(operation => operation.RuleId == "wrong_target_framework" && operation.Automatic),
+            "Expected automatic TargetFramework migration operation for JackpotEveryTime.");
+        Assert(
+            projectPlan.Operations.Any(operation => operation.RuleId == "wrong_il2cpp_reference_surface" && operation.Risk == "medium"),
+            "Expected IL2CPP reference-surface migration operation for JackpotEveryTime.");
+        Assert(
+            projectPlan.Operations.Any(operation => operation.RuleId == "generate_sdk_facade" && operation.Automatic),
+            "Expected SDK facade generation operation for JackpotEveryTime.");
+    }
+
+    private void SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"GunsAlwaysAccurate\GunsAlwaysAccurate.csproj");
+        var generator = new SdkFacadeGenerator();
+        SdkFacadePlan facadePlan = generator.Plan(project);
+        string source = generator.GenerateSource(facadePlan);
+
+        Assert(facadePlan.HasContent, "GunsAlwaysAccurate should produce a facade generation plan.");
+        Assert(
+            facadePlan.ScheduleOneNamespaces.Contains("ScheduleOne.DevUtilities"),
+            "Expected facade plan to include ScheduleOne.DevUtilities.");
+        Assert(
+            facadePlan.ScheduleOneNamespaces.Contains("ScheduleOne.UI"),
+            "Expected facade plan to include ScheduleOne.UI.");
+        Assert(
+            source.Contains("global using ScheduleOne.UI;", StringComparison.Ordinal),
+            "Expected generated source to include Mono ScheduleOne.UI global using.");
+        Assert(
+            source.Contains("global using Il2CppScheduleOne.UI;", StringComparison.Ordinal),
+            "Expected generated source to include IL2CPP ScheduleOne.UI global using.");
+        Assert(
+            !source.Contains("Il2CppIl2Cpp", StringComparison.Ordinal),
+            "Generated source should not double-prefix Il2Cpp namespaces.");
+    }
+
+    private void SdkFacadeMigrationRequiresCSharp10ForDefaultLangVersionProjects()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"DedicatedServerAddons\S1DS-PlayerList\S1DS-PlayerList.csproj");
+
+        AssertHasDiagnostic(project, "global_usings_require_langversion", null);
+
+        MigrationPlan plan = new MigrationPlanner().Plan(
+            new WorkspaceAnalysis(project.ProjectPath, [project]),
+            new MigrationPlannerOptions(DualRuntime: true));
+        Assert(
+            plan.Projects.Single().Operations.Any(operation =>
+                operation.RuleId == "global_usings_require_langversion" &&
+                operation.Automatic),
+            "Default LangVersion projects with generated S1Interop facades should plan a C# 10 migration.");
+    }
+
+    private void MigrationApplyAndRollbackWorkOnCopiedFixture()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceDirectory = Path.Combine(workspaceRoot, "JackpotEveryTime");
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "JackpotEveryTime.csproj");
+            string generatedFacade = Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+
+            Assert(File.Exists(applyResult.ManifestPath), "Migration manifest was not written.");
+            Assert(File.Exists(Path.Combine(tempRoot, "local.build.props")), "local.build.props was not created.");
+            Assert(File.Exists(Path.Combine(tempRoot, "local.build.props.example")), "local.build.props.example was not created.");
+            Assert(File.Exists(generatedFacade), "SDK facade was not generated.");
+
+            string facadeSource = File.ReadAllText(generatedFacade);
+            Assert(
+                facadeSource.Contains("global using ScheduleOne.Casino;", StringComparison.Ordinal),
+                "Generated facade should include Mono casino namespace.");
+            Assert(
+                facadeSource.Contains("global using Il2CppScheduleOne.Casino;", StringComparison.Ordinal),
+                "Generated facade should include IL2CPP casino namespace.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                !after.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                "Copied JackpotEveryTime fixture should have no error diagnostics after migration apply.");
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "local_path_in_project"),
+                "Copied JackpotEveryTime fixture should not retain committed local path diagnostics after migration apply.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the copied project file.");
+            Assert(!File.Exists(Path.Combine(tempRoot, "local.build.props")), "Rollback did not remove generated local.build.props.");
+            Assert(rollbackResult.RemovedFiles.Contains(generatedFacade), "Rollback did not report removing the generated SDK facade.");
+            Assert(!File.Exists(generatedFacade), "Rollback did not remove the generated SDK facade.");
+
+            WorkspaceAnalysis rolledBack = analyzer.Analyze(tempProject);
+            Assert(
+                rolledBack.Diagnostics.Any(diagnostic => diagnostic.RuleId == "wrong_target_framework"),
+                "Rollback should restore the original wrong_target_framework diagnostic.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackFixRuntimeDefinesOnCopiedFixture()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceProject = Path.Combine(workspaceRoot, @"BetterJukebox\BetterJukebox.csproj");
+            string sourceCore = Path.Combine(workspaceRoot, @"BetterJukebox\Core.cs");
+            string tempProject = Path.Combine(tempRoot, "BetterJukebox.csproj");
+            string tempCore = Path.Combine(tempRoot, "Core.cs");
+            File.Copy(sourceProject, tempProject);
+            File.Copy(sourceCore, tempCore);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectAnalysis beforeProject = before.Projects.Single();
+            AssertHasDiagnostic(beforeProject, "missing_runtime_define", "Mono");
+            AssertHasDiagnostic(beforeProject, "missing_runtime_define", "IL2CPP");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            Assert(
+                plan.Projects.Single().Operations.Any(operation => operation.RuleId == "missing_runtime_define"),
+                "Expected missing_runtime_define migration operations for BetterJukebox.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "missing_runtime_define"),
+                "Migration apply did not apply missing_runtime_define operations.");
+            Assert(
+                ConfigurationDefines(tempProject, "Mono").Contains("MONO"),
+                "Mono configuration should define MONO after migration.");
+            Assert(
+                ConfigurationDefines(tempProject, "IL2CPP").Contains("IL2CPP"),
+                "IL2CPP configuration should define IL2CPP after migration.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+                "Copied BetterJukebox fixture should not retain missing runtime define diagnostics after migration apply.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the BetterJukebox project file.");
+            Assert(
+                !ConfigurationDefines(tempProject, "Mono").Contains("MONO"),
+                "Rollback should remove the migrated MONO define.");
+            Assert(
+                !ConfigurationDefines(tempProject, "IL2CPP").Contains("IL2CPP"),
+                "Rollback should remove the migrated IL2CPP define.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationScaffoldsS1DsPlayerListFixture()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceDirectory = Path.Combine(workspaceRoot, @"DedicatedServerAddons\S1DS-PlayerList");
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "S1DS-PlayerList.csproj");
+            string tempClientSource = Path.Combine(tempRoot, "S1DSPlayerListClientMod.cs");
+            string generatedFacade = Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "add_il2cpp_configuration"),
+                "Expected dual-runtime migration to add IL2CPP configurations.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "conditionalize_scheduleone_usings" &&
+                    string.Equals(operation.FilePath, tempClientSource, StringComparison.OrdinalIgnoreCase)),
+                "Expected dual-runtime migration to conditionalize S1DS client ScheduleOne usings.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "add_il2cpp_configuration"),
+                "Dual-runtime apply did not scaffold IL2CPP configurations.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "conditionalize_scheduleone_usings"),
+                "Dual-runtime apply did not conditionalize source usings.");
+
+            string projectText = File.ReadAllText(tempProject);
+            Assert(projectText.Contains("Il2cpp_Client", StringComparison.Ordinal), "Scaffolded project should include Il2cpp_Client.");
+            Assert(projectText.Contains("Il2cpp_Server", StringComparison.Ordinal), "Scaffolded project should include Il2cpp_Server.");
+            Assert(projectText.Contains("<TargetFramework>net6.0</TargetFramework>", StringComparison.Ordinal), "IL2CPP configs should target net6.0.");
+            Assert(projectText.Contains("<DefineConstants>IL2CPP;CLIENT</DefineConstants>", StringComparison.Ordinal), "IL2CPP client config should define IL2CPP;CLIENT.");
+            Assert(projectText.Contains("<DefineConstants>IL2CPP;SERVER</DefineConstants>", StringComparison.Ordinal), "IL2CPP server config should define IL2CPP;SERVER.");
+            Assert(projectText.Contains("DedicatedServerMod_Il2cpp_Client", StringComparison.Ordinal), "Client references should target the IL2CPP DedicatedServerMod assembly.");
+            Assert(projectText.Contains("Il2CppFishNet.Runtime", StringComparison.Ordinal), "FishNet reference should be rewritten to the IL2CPP wrapper assembly.");
+            Assert(projectText.Contains("Il2CppInterop.Runtime", StringComparison.Ordinal), "IL2CPP configs should reference Il2CppInterop.Runtime.");
+            Assert(projectText.Contains("S1DSModSearchPath", StringComparison.Ordinal), "IL2CPP configs should retain the S1DS mod search path fallback.");
+
+            string clientSource = File.ReadAllText(tempClientSource);
+            Assert(
+                !clientSource.Contains("using ScheduleOne.PlayerScripts;", StringComparison.Ordinal) &&
+                !clientSource.Contains("using Il2CppScheduleOne.PlayerScripts;", StringComparison.Ordinal),
+                "Client source should let the generated facade own normal ScheduleOne namespace imports.");
+            Assert(File.Exists(generatedFacade), "Dual-runtime migration should generate the SDK facade.");
+            string facadeSource = File.ReadAllText(generatedFacade);
+            Assert(
+                facadeSource.Contains("global using ScheduleOne.PlayerScripts;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using Il2CppScheduleOne.PlayerScripts;", StringComparison.Ordinal),
+                "Generated facade should provide Mono and IL2CPP ScheduleOne.PlayerScripts imports.");
+            Assert(
+                projectText.Contains(@"<Compile Include=""S1Interop.Generated\S1Interop.GlobalUsings.g.cs""", StringComparison.Ordinal),
+                "Projects with EnableDefaultCompileItems=false should explicitly compile the generated facade.");
+            AssertHasUnconditionedCompileInclude(tempProject, @"S1Interop.Generated\S1Interop.GlobalUsings.g.cs");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the S1DS project file.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempClientSource), "Rollback did not restore the S1DS client source file.");
+
+            string rolledBackProject = File.ReadAllText(tempProject);
+            string rolledBackClientSource = File.ReadAllText(tempClientSource);
+            Assert(!rolledBackProject.Contains("Il2cpp_Client", StringComparison.Ordinal), "Rollback should remove scaffolded Il2cpp_Client config.");
+            Assert(!rolledBackProject.Contains("S1Interop.GlobalUsings.g.cs", StringComparison.Ordinal), "Rollback should remove the generated facade Compile include.");
+            Assert(rolledBackClientSource.Contains("using ScheduleOne.PlayerScripts;", StringComparison.Ordinal), "Rollback should restore the unconditional ScheduleOne using.");
+            Assert(!rolledBackClientSource.Contains("using Il2CppScheduleOne.PlayerScripts;", StringComparison.Ordinal), "Rollback should remove the generated IL2CPP using.");
+            Assert(!File.Exists(generatedFacade), "Rollback should remove the generated SDK facade.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationAddsGeneratedMonoGuardDefines()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceDirectory = Path.Combine(workspaceRoot, @"DedicatedServerAddons\SeparateOrganisations.POC");
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "SeparateOrganisations.csproj");
+            string tempModelSource = Path.Combine(tempRoot, "SeparateOrgs.Models.cs");
+            string generatedFacade = Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Mono_Client"),
+                "Dual-runtime source guard generation should plan MONO for Mono_Client.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "missing_runtime_define" &&
+                    operation.Configuration == "Mono_Server"),
+                "Dual-runtime source guard generation should plan MONO for Mono_Server.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Count(operation => operation.RuleId == "missing_runtime_define") == 2,
+                "Dual-runtime apply should add MONO to both existing Mono configurations.");
+            string projectText = File.ReadAllText(tempProject);
+            Assert(
+                projectText.Contains(@"<Compile Include=""S1Interop.Generated\S1Interop.GlobalUsings.g.cs""", StringComparison.Ordinal),
+                "SeparateOrganisations should explicitly compile the generated facade because default compile items are disabled.");
+            AssertHasUnconditionedCompileInclude(tempProject, @"S1Interop.Generated\S1Interop.GlobalUsings.g.cs");
+
+            IReadOnlyList<string> clientDefines = ConfigurationDefines(tempProject, "Mono_Client");
+            IReadOnlyList<string> serverDefines = ConfigurationDefines(tempProject, "Mono_Server");
+            Assert(clientDefines.Contains("CLIENT"), "Mono_Client should retain CLIENT.");
+            Assert(clientDefines.Contains("MONO"), "Mono_Client should define MONO after migration.");
+            Assert(serverDefines.Contains("SERVER"), "Mono_Server should retain SERVER.");
+            Assert(serverDefines.Contains("MONO"), "Mono_Server should define MONO after migration.");
+
+            string modelSource = File.ReadAllText(tempModelSource);
+            Assert(
+                !modelSource.Contains("using ScheduleOne.DevUtilities;", StringComparison.Ordinal) &&
+                !modelSource.Contains("using ScheduleOne.Persistence;", StringComparison.Ordinal),
+                "Ordinary ScheduleOne usings should move out of SeparateOrgs.Models.cs when the facade owns them.");
+            Assert(File.Exists(generatedFacade), "Dual-runtime migration should generate a facade for SeparateOrganisations.");
+            string facadeSource = File.ReadAllText(generatedFacade);
+            Assert(
+                facadeSource.Contains("global using ScheduleOne.DevUtilities;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using Il2CppScheduleOne.DevUtilities;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using ScheduleOne.Persistence;", StringComparison.Ordinal) &&
+                facadeSource.Contains("global using Il2CppScheduleOne.Persistence;", StringComparison.Ordinal),
+                "Generated facade should contain Mono and IL2CPP imports for SeparateOrganisations ScheduleOne namespaces.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
+                "Migrated SeparateOrganisations fixture should not retain missing runtime define diagnostics.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the SeparateOrganisations project file.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempModelSource), "Rollback did not restore the SeparateOrganisations model source file.");
+            string rolledBackProjectText = File.ReadAllText(tempProject);
+            Assert(
+                !rolledBackProjectText.Contains("S1Interop.GlobalUsings.g.cs", StringComparison.Ordinal),
+                "Rollback should remove the SeparateOrganisations generated facade Compile include.");
+            Assert(
+                !ConfigurationDefines(tempProject, "Mono_Client").Contains("MONO"),
+                "Rollback should remove generated MONO from Mono_Client.");
+            Assert(
+                !ConfigurationDefines(tempProject, "Mono_Server").Contains("MONO"),
+                "Rollback should remove generated MONO from Mono_Server.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private ProjectAnalysis AnalyzeProject(string relativePath)
+    {
+        string path = Path.Combine(workspaceRoot, relativePath);
+        WorkspaceAnalysis analysis = analyzer.Analyze(path);
+        Assert(analysis.Projects.Count == 1, $"Expected one project for {relativePath}, found {analysis.Projects.Count}.");
+        return analysis.Projects[0];
+    }
+
+    private static void AssertHasRuntime(ProjectAnalysis project, string configName, RuntimeKind runtime)
+    {
+        ConfigurationAnalysis resolved = GetConfiguration(project, configName);
+        Assert(resolved.Runtime == runtime, $"Expected {configName} to infer {runtime}, got {resolved.Runtime}.");
+    }
+
+    private static void AssertHasTargetFramework(ProjectAnalysis project, string configName, string targetFramework)
+    {
+        ConfigurationAnalysis configuration = GetConfiguration(project, configName);
+        Assert(
+            string.Equals(configuration.TargetFramework, targetFramework, StringComparison.OrdinalIgnoreCase),
+            $"Expected {configName} to target {targetFramework}, got {configuration.TargetFramework ?? "<missing>"}.");
+    }
+
+    private static ConfigurationAnalysis GetConfiguration(ProjectAnalysis project, string configName)
+    {
+        ConfigurationAnalysis? configuration = project.Configurations.FirstOrDefault(config =>
+            string.Equals(config.Name, configName, StringComparison.OrdinalIgnoreCase));
+        Assert(configuration is not null, $"Missing configuration {configName} in {project.ProjectPath}.");
+        return configuration!;
+    }
+
+    private static void AssertHasDiagnostic(ProjectAnalysis project, string ruleId, string? configuration)
+    {
+        bool found = project.Diagnostics.Any(diagnostic =>
+            diagnostic.RuleId == ruleId &&
+            string.Equals(diagnostic.Configuration, configuration, StringComparison.OrdinalIgnoreCase));
+        Assert(found, $"Expected diagnostic {ruleId} for {configuration} in {project.ProjectPath}.");
+    }
+
+    private static void AssertHasUnconditionedCompileInclude(string projectPath, string include)
+    {
+        XDocument document = XDocument.Load(projectPath);
+        bool found = document.Descendants()
+            .Where(element => element.Name.LocalName == "Compile")
+            .Any(element =>
+                element.Parent?.Attribute("Condition") is null &&
+                string.Equals(element.Attribute("Include")?.Value, include, StringComparison.OrdinalIgnoreCase));
+        Assert(found, $"Expected unconditioned Compile Include={include} in {projectPath}.");
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
+    }
+
+    private static int CountProjectImports(string projectPath, string importPath)
+    {
+        return XDocument.Load(projectPath).Root!.Elements()
+            .Count(element =>
+                string.Equals(element.Name.LocalName, "Import", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(element.Attribute("Project")?.Value, importPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ContainsPath(IEnumerable<string> paths, string expectedPath)
+    {
+        string fullExpectedPath = Path.GetFullPath(expectedPath);
+        return paths.Any(path => string.Equals(Path.GetFullPath(path), fullExpectedPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FormatDiagnostics(IEnumerable<InteropDiagnostic> diagnostics)
+    {
+        return string.Join(
+            "; ",
+            diagnostics.Select(diagnostic =>
+                $"{diagnostic.RuleId}/{diagnostic.Configuration ?? "project"}: {diagnostic.Evidence ?? diagnostic.Message}"));
+    }
+
+    private static string FormatBuildResults(IEnumerable<MigrationBuildResult>? buildResults)
+    {
+        if (buildResults is null)
+        {
+            return "<none>";
+        }
+
+        return string.Join(
+            "; ",
+            buildResults.Select(result =>
+                $"{result.Configuration}/{result.Runtime}: exit={result.ExitCode}, success={result.Success}, timedOut={result.TimedOut}, readiness={result.ReadinessStatus}, attribution={result.Attribution}, kind={result.FailureKind}, summary={result.Summary}, issues={string.Join("|", result.Issues.Select(issue => $"{issue.Kind}:{issue.Include}:{issue.Path}"))}, output={result.Output}"));
+    }
+
+    private static string ComputeSha256(string path)
+    {
+        using FileStream stream = File.OpenRead(path);
+        byte[] hash = SHA256.HashData(stream);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static ProcessResult RunDotNet(params string[] arguments)
+    {
+        using var process = new Process();
+        process.StartInfo.FileName = "dotnet";
+        foreach (string argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.Start();
+
+        string output = process.StandardOutput.ReadToEnd();
+        string error = process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(milliseconds: 120_000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException($"dotnet {string.Join(' ', arguments)} timed out.");
+        }
+
+        return new ProcessResult(process.ExitCode, output + error);
+    }
+
+    private static IReadOnlyList<string> ConfigurationDefines(string projectPath, string configuration)
+    {
+        XElement propertyGroup = GetConfigurationPropertyGroup(projectPath, configuration);
+        XElement defineConstants = propertyGroup.Elements()
+            .First(element => string.Equals(element.Name.LocalName, "DefineConstants", StringComparison.OrdinalIgnoreCase));
+        return defineConstants.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static string GetConditionedDefineConstants(XDocument document, string configurationPlatform)
+    {
+        XElement propertyGroup = document.Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "PropertyGroup", StringComparison.OrdinalIgnoreCase))
+            .First(element => (element.Attribute("Condition")?.Value ?? string.Empty).Contains(configurationPlatform, StringComparison.OrdinalIgnoreCase));
+        return propertyGroup.Elements()
+            .First(element => string.Equals(element.Name.LocalName, "DefineConstants", StringComparison.OrdinalIgnoreCase))
+            .Value;
+    }
+
+    private static XElement GetConfigurationPropertyGroup(string projectPath, string configuration)
+    {
+        XDocument document = XDocument.Load(projectPath);
+        return document.Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "PropertyGroup", StringComparison.OrdinalIgnoreCase))
+            .First(element => (element.Attribute("Condition")?.Value ?? string.Empty).Contains(configuration, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FindWorkspaceRoot()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "AlwaysJackpot")) &&
+                Directory.Exists(Path.Combine(current.FullName, "GunsAlwaysAccurate")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate ScheduleOne workspace root.");
+    }
+
+    private static void CopyFixtureDirectory(string sourceDirectory, string targetDirectory)
+    {
+        foreach (string directory in Directory.EnumerateDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            if (ShouldSkipFixturePath(sourceDirectory, directory))
+            {
+                continue;
+            }
+
+            string relativePath = Path.GetRelativePath(sourceDirectory, directory);
+            Directory.CreateDirectory(Path.Combine(targetDirectory, relativePath));
+        }
+
+        foreach (string file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            if (ShouldSkipFixturePath(sourceDirectory, file))
+            {
+                continue;
+            }
+
+            string relativePath = Path.GetRelativePath(sourceDirectory, file);
+            string destination = Path.Combine(targetDirectory, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+    }
+
+    private static void DeleteDirectoryIfExists(string directory)
+    {
+        if (!Directory.Exists(directory))
+        {
+            return;
+        }
+
+        foreach (string file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        foreach (string childDirectory in Directory.EnumerateDirectories(directory, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(childDirectory, FileAttributes.Normal);
+        }
+
+        File.SetAttributes(directory, FileAttributes.Normal);
+        Directory.Delete(directory, recursive: true);
+    }
+
+    private static bool ShouldSkipFixturePath(string sourceDirectory, string path)
+    {
+        string relativePath = Path.GetRelativePath(sourceDirectory, path);
+        string[] parts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return parts.Any(part =>
+            part.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals(".vs", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("s1interop-runs", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("S1Interop.Generated", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("target", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Il2CppAssemblies", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("cpp2il_out", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("AssetRipper", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("AssetRipperExport", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("UnityExplorer", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("UniverseLib", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Cpp2IL", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Il2CppInterop", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("MelonLoader", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record ProcessResult(int ExitCode, string Output);
+}

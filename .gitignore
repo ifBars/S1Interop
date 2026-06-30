@@ -1,0 +1,13 @@
+bin/
+obj/
+**/bin/
+**/obj/
+*.user
+*.suo
+local.build.props
+Directory.Build.user.props
+s1interop-runs/
+s1interop-cache/
+demo
+demo-projects
+demo-real
