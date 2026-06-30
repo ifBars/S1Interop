@@ -12,3 +12,6 @@ artifacts/
 demo
 demo-projects
 demo-real
+.internal/
+docs/internal/
+*.internal.md
