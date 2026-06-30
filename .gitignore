@@ -8,6 +8,7 @@ local.build.props
 Directory.Build.user.props
 s1interop-runs/
 s1interop-cache/
+artifacts/
 demo
 demo-projects
 demo-real

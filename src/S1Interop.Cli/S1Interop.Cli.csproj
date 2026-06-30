@@ -9,6 +9,20 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>s1interop</ToolCommandName>
+    <PackageId>S1Interop</PackageId>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>ifBars</Authors>
+    <Description>Schedule One Mono-to-IL2CPP mod migration toolchain.</Description>
+    <PackageTags>schedule-one;il2cpp;melonloader;modding;dotnet</PackageTags>
+    <RepositoryUrl>https://github.com/ifBars/S1Interop</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ifBars/S1Interop</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>

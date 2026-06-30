@@ -53,6 +53,16 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --portabl
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --integration
 ```
 
+Install the CLI from a local package while the tool is still prerelease:
+
+```powershell
+dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
+dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
+.\.tools\s1interop --help
+```
+
+After that, replace `dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- ...` with `.\.tools\s1interop ...` from this checkout, or install it globally with `dotnet tool install -g S1Interop --add-source .\artifacts\packages --version 0.1.0-alpha.1`.
+
 The solution should build from a normal clone with `dotnet build S1Interop.sln`. `--portable` runs the public CI-safe synthetic tests. `--integration` runs the local real-mod fixture suite and expects this repository to live inside the broader Schedule One modding workspace used during development. Running the test project without arguments runs portable tests first, then runs integration fixtures only when that workspace is detected.
 
 `sdkgen --apply` writes `S1Interop.Generated/S1Interop.GlobalUsings.g.cs`.
