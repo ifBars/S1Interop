@@ -4,83 +4,196 @@ using System.Xml.Linq;
 using S1Interop.Core;
 
 var tests = new S1InteropFixtureTests();
-tests.RunAll();
-Console.WriteLine("S1Interop fixture tests passed.");
+string mode = args.FirstOrDefault() ?? "--all";
+int count = mode switch
+{
+    "--portable" => tests.RunPortable(),
+    "--integration" => tests.RunIntegration(requireWorkspace: true),
+    "--all" => tests.RunAll(),
+    _ => throw new ArgumentException($"Unknown test mode '{mode}'. Expected --all, --portable, or --integration.")
+};
+Console.WriteLine($"S1Interop fixture tests passed ({count} executed).");
 
 internal sealed class S1InteropFixtureTests
 {
     private readonly WorkspaceAnalyzer analyzer = new();
-    private readonly string workspaceRoot = FindWorkspaceRoot();
+    private string? workspaceRoot;
 
-    public void RunAll()
+    private string WorkspaceRoot
     {
-        AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic();
-        JackpotEveryTimeReportsManagedIl2CppSurface();
-        GunsAlwaysAccurateIsRecognizedAsCleanDualRuntimeBaseline();
-        DedicatedServerModEffectiveConfigurationConditionsAreEvaluated();
-        OverTheCounterStartsWithConditionsAreEvaluated();
-        OverTheCounterReportsHarmonyTranspilerRisk();
+        get
+        {
+            if (!TryGetWorkspaceRoot(out string? root) || root is null)
+            {
+                throw new DirectoryNotFoundException("Could not locate the broader ScheduleOne workspace required by integration tests.");
+            }
+
+            return root;
+        }
+    }
+
+    public int RunAll()
+    {
+        int count = RunPortable();
+        count += RunIntegration(requireWorkspace: false);
+        return count;
+    }
+
+    public int RunPortable()
+    {
+        int count = 0;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
+        count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
+        count++;
         MigrationApplyAndRollbackRewritesUnityEventListeners();
+        count++;
         MigrationApplyAndRollbackGeneratesSourceRiskReport();
+        count++;
         VerifyMigrationCanIncludeSourceMigrationsInSandbox();
-        EmployeeTweaksPackageReferencesAreRuntimeEvidence();
+        count++;
         MsBuildOsPlatformConditionsAreEvaluated();
+        count++;
         MigrationPreservesLocalPropsUnderOsConditionedGameDir();
+        count++;
         MigrationApplyAndRollbackScaffoldsLocalReferenceProperties();
-        VerifyMigrationSupportsLegacyConfigurationPlatformConditions();
-        BetterJukeboxReportsMissingRuntimeDefines();
+        count++;
         RuntimeDefineMigrationUsesDiagnosticDefineEvidenceForLegacyPlatformGroups();
+        count++;
         DualRuntimeGeneratedUsingGuardsAddMonoDefinesForLegacyNames();
-        S1FuelModInjectedTypesAreAnalyzed();
-        MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
-        VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
-        VerifyMigrationCleansBigWillyPropertyBasedReferences();
-        VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths();
-        VerifyMigrationPreservesBguiMixedConfigurationPaths();
-        VerifyMigrationMovesGameRootModDependencyHintPaths();
-        VerifyMigrationHandlesIterativeRuntimeDefineFixes();
-        S1DockExportsCrossCompatIsNotForcedToIl2CppFramework();
-        VerifyMigrationMovesAbsoluteSiblingDllHintPaths();
-        VerifyMigrationSupportsWorkspaceDirectories();
-        WorkspaceAnalysisSkipsEditorMetadataDirectories();
-        VerifyMigrationBuildGateBuildsSandboxConfigurations();
-        VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
-        VerifyMigrationBuildGateClassifiesExternalReferenceSurfaceFailures();
-        VerifyMigrationBuildGateReportsMissingHintPathReadiness();
-        VerifyMigrationBuildGateClassifiesExternalMemberSurfaceFailures();
-        VerifyMigrationBuildGateClassifiesSiblingBinReferencesAsModDependencies();
-        VerifyMigrationBuildGatePreservesProjectLocalDependencyDlls();
-        VerifyMigrationBuildGateReportsUnsetLocalReferenceProperties();
-        VerifyMigrationBuildGateClassifiesMissingTransitiveExternalAssembly();
-        VerifyMigrationBuildGatePassesRuntimeGameRootsToMsBuild();
-        VerifyMigrationBuildGateHydratesModDependencyProperties();
-        VerifyMigrationBuildGateStagesConfigurationScopedFileDependencyProperties();
-        VerifyMigrationBuildGateStagesProjectLocalRuntimeReferenceFolders();
-        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
-        MigrationVerifierSkipsWindowsReservedDeviceNames();
-        MigrationApplyReplacesStalePublicizedReferenceWithPublicizer();
-        MigrationApplyAddsIntPtrConstructorToMonoBehaviourInjectedType();
-        VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType();
-        BuildHookInstallsReversibleValidationTarget();
-        BuildHookFailsBuildForResidualInteropDiagnostics();
-        BuildHookValidatesOnlyActiveConfiguration();
-        SourceInteropAnalyzerIgnoresGeneratedAndToolDirectories();
-        ScheduleOneUsingRewriterGroupsAdjacentUsings();
-        ScheduleOneUsingRewriterCanPreferGlobalFacade();
-        SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
-        MigrationApplyAndRollbackRewritesFullyQualifiedScheduleOneTypes();
-        HideFromIl2CppMigrationHandlesMultipleTargetsAndOverloads();
-        SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
-        SdkFacadeMigrationRequiresCSharp10ForDefaultLangVersionProjects();
-        MigrationPlannerCreatesOperationsForBrokenFixture();
-        MigrationApplyAndRollbackWorkOnCopiedFixture();
-        MigrationApplyAndRollbackFixRuntimeDefinesOnCopiedFixture();
-        DualRuntimeMigrationScaffoldsS1DsPlayerListFixture();
-        DualRuntimeMigrationAddsGeneratedMonoGuardDefines();
+        count++;
         ExplicitIl2CppConfigurationNameWinsOverSharedMonoReferences();
+        count++;
         MigrationTargetFrameworkOverrideWinsAfterImportedProps();
+        count++;
+        VerifyMigrationSupportsWorkspaceDirectories();
+        count++;
+        WorkspaceAnalysisSkipsEditorMetadataDirectories();
+        count++;
+        VerifyMigrationBuildGateBuildsSandboxConfigurations();
+        count++;
+        VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
+        count++;
+        VerifyMigrationBuildGateReportsMissingHintPathReadiness();
+        count++;
+        VerifyMigrationBuildGateClassifiesExternalReferenceSurfaceFailures();
+        count++;
+        VerifyMigrationBuildGateClassifiesExternalMemberSurfaceFailures();
+        count++;
+        VerifyMigrationBuildGateReportsUnsetLocalReferenceProperties();
+        count++;
+        VerifyMigrationBuildGateClassifiesSiblingBinReferencesAsModDependencies();
+        count++;
+        VerifyMigrationBuildGatePreservesProjectLocalDependencyDlls();
+        count++;
+        VerifyMigrationBuildGateClassifiesMissingTransitiveExternalAssembly();
+        count++;
+        VerifyMigrationBuildGatePassesRuntimeGameRootsToMsBuild();
+        count++;
+        VerifyMigrationBuildGateHydratesModDependencyProperties();
+        count++;
+        VerifyMigrationBuildGateStagesConfigurationScopedFileDependencyProperties();
+        count++;
+        VerifyMigrationBuildGateStagesProjectLocalRuntimeReferenceFolders();
+        count++;
+        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
+        count++;
+        MigrationVerifierSkipsWindowsReservedDeviceNames();
+        count++;
+        VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType();
+        count++;
+        MigrationApplyAddsIntPtrConstructorToMonoBehaviourInjectedType();
+        count++;
+        BuildHookInstallsReversibleValidationTarget();
+        count++;
+        BuildHookFailsBuildForResidualInteropDiagnostics();
+        count++;
+        BuildHookValidatesOnlyActiveConfiguration();
+        count++;
+        SourceInteropAnalyzerIgnoresGeneratedAndToolDirectories();
+        count++;
+        ScheduleOneUsingRewriterGroupsAdjacentUsings();
+        count++;
+        ScheduleOneUsingRewriterCanPreferGlobalFacade();
+        count++;
+        SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
+        count++;
+        MigrationApplyAndRollbackRewritesFullyQualifiedScheduleOneTypes();
+        count++;
+        HideFromIl2CppMigrationHandlesMultipleTargetsAndOverloads();
+        count++;
+        return count;
+    }
+
+    public int RunIntegration(bool requireWorkspace)
+    {
+        if (!TryGetWorkspaceRoot(out _))
+        {
+            if (requireWorkspace)
+            {
+                throw new DirectoryNotFoundException("Could not locate the broader ScheduleOne workspace required by --integration tests.");
+            }
+
+            Console.WriteLine("Skipping local integration fixtures because the broader ScheduleOne workspace was not found.");
+            return 0;
+        }
+
+        int count = 0;
+        AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic();
+        count++;
+        JackpotEveryTimeReportsManagedIl2CppSurface();
+        count++;
+        GunsAlwaysAccurateIsRecognizedAsCleanDualRuntimeBaseline();
+        count++;
+        DedicatedServerModEffectiveConfigurationConditionsAreEvaluated();
+        count++;
+        OverTheCounterStartsWithConditionsAreEvaluated();
+        count++;
+        OverTheCounterReportsHarmonyTranspilerRisk();
+        count++;
+        EmployeeTweaksPackageReferencesAreRuntimeEvidence();
+        count++;
+        VerifyMigrationSupportsLegacyConfigurationPlatformConditions();
+        count++;
+        BetterJukeboxReportsMissingRuntimeDefines();
+        count++;
+        S1FuelModInjectedTypesAreAnalyzed();
+        count++;
+        MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
+        count++;
+        VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
+        count++;
+        VerifyMigrationCleansBigWillyPropertyBasedReferences();
+        count++;
+        VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths();
+        count++;
+        VerifyMigrationPreservesBguiMixedConfigurationPaths();
+        count++;
+        VerifyMigrationMovesGameRootModDependencyHintPaths();
+        count++;
+        VerifyMigrationHandlesIterativeRuntimeDefineFixes();
+        count++;
+        S1DockExportsCrossCompatIsNotForcedToIl2CppFramework();
+        count++;
+        VerifyMigrationMovesAbsoluteSiblingDllHintPaths();
+        count++;
+        MigrationApplyReplacesStalePublicizedReferenceWithPublicizer();
+        count++;
+        SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
+        count++;
+        SdkFacadeMigrationRequiresCSharp10ForDefaultLangVersionProjects();
+        count++;
+        MigrationPlannerCreatesOperationsForBrokenFixture();
+        count++;
+        MigrationApplyAndRollbackWorkOnCopiedFixture();
+        count++;
+        MigrationApplyAndRollbackFixRuntimeDefinesOnCopiedFixture();
+        count++;
+        DualRuntimeMigrationScaffoldsS1DsPlayerListFixture();
+        count++;
+        DualRuntimeMigrationAddsGeneratedMonoGuardDefines();
+        count++;
+        return count;
     }
 
     private void AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic()
@@ -819,7 +932,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationSupportsLegacyConfigurationPlatformConditions()
     {
-        string projectPath = Path.Combine(workspaceRoot, @"MrsMingsAuthenticPets\Mrs_Mings_Authentic_Pets\Mrs_Mings_Authentic_Pets.csproj");
+        string projectPath = Path.Combine(WorkspaceRoot, @"MrsMingsAuthenticPets\Mrs_Mings_Authentic_Pets\Mrs_Mings_Authentic_Pets.csproj");
         ProjectAnalysis project = AnalyzeProject(@"MrsMingsAuthenticPets\Mrs_Mings_Authentic_Pets\Mrs_Mings_Authentic_Pets.csproj");
 
         AssertHasRuntime(project, "Debug", RuntimeKind.Il2Cpp);
@@ -1031,7 +1144,7 @@ internal sealed class S1InteropFixtureTests
 
     private void S1FuelModInjectedTypesAreAnalyzed()
     {
-        string projectPath = Path.Combine(workspaceRoot, @"S1FuelMod\S1FuelMod.csproj");
+        string projectPath = Path.Combine(WorkspaceRoot, @"S1FuelMod\S1FuelMod.csproj");
         SourceInteropAnalysis source = new SourceInteropAnalyzer().Analyze(projectPath);
 
         string[] expectedInjectedTypes =
@@ -1229,7 +1342,7 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceDirectory = Path.Combine(workspaceRoot, "S1FuelMod");
+            string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "S1FuelMod.csproj");
             string tempFuelVehicleData = Path.Combine(tempRoot, "Systems", "FuelVehicleData.cs");
@@ -1302,7 +1415,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource()
     {
-        string sourceDirectory = Path.Combine(workspaceRoot, "S1FuelMod");
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
         string sourceProject = Path.Combine(sourceDirectory, "S1FuelMod.csproj");
         string sourceFuelVehicleData = Path.Combine(sourceDirectory, "Systems", "FuelVehicleData.cs");
         string originalProjectHash = ComputeSha256(sourceProject);
@@ -1343,7 +1456,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationCleansBigWillyPropertyBasedReferences()
     {
-        string sourceDirectory = Path.Combine(workspaceRoot, "BigWillyMod");
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "BigWillyMod");
         string sourceProject = Path.Combine(sourceDirectory, "BigWillyMod.csproj");
         string originalProjectHash = ComputeSha256(sourceProject);
         string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
@@ -1376,7 +1489,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths()
     {
-        string sourceDirectory = Path.Combine(workspaceRoot, "BetterJukebox");
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "BetterJukebox");
         string sourceProject = Path.Combine(sourceDirectory, "BetterJukebox.csproj");
         string originalProjectHash = ComputeSha256(sourceProject);
         string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
@@ -1409,7 +1522,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationPreservesBguiMixedConfigurationPaths()
     {
-        string sourceDirectory = Path.Combine(workspaceRoot, "bGUI");
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "bGUI");
         string sourceProject = Path.Combine(sourceDirectory, "bGUI.csproj");
         string originalProjectHash = ComputeSha256(sourceProject);
         string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
@@ -1436,7 +1549,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationMovesGameRootModDependencyHintPaths()
     {
-        string sourceDirectory = Path.Combine(workspaceRoot, "CasinoDirectDeposit");
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "CasinoDirectDeposit");
         string sourceProject = Path.Combine(sourceDirectory, "CasinoDirectDeposit.csproj");
         string originalProjectHash = ComputeSha256(sourceProject);
 
@@ -1461,7 +1574,7 @@ internal sealed class S1InteropFixtureTests
 
         foreach (string projectRelativePath in projectRelativePaths)
         {
-            string sourceProject = Path.Combine(workspaceRoot, projectRelativePath);
+            string sourceProject = Path.Combine(WorkspaceRoot, projectRelativePath);
             string originalProjectHash = ComputeSha256(sourceProject);
 
             MigrationVerificationResult result = new MigrationVerifier().Verify(
@@ -1492,7 +1605,7 @@ internal sealed class S1InteropFixtureTests
 
     private void VerifyMigrationMovesAbsoluteSiblingDllHintPaths()
     {
-        string projectPath = Path.Combine(workspaceRoot, @"NPCPack\NPCPack.csproj");
+        string projectPath = Path.Combine(WorkspaceRoot, @"NPCPack\NPCPack.csproj");
 
         MigrationVerificationResult result = new MigrationVerifier().Verify(projectPath, new MigrationVerifierOptions(DualRuntime: true));
 
@@ -2688,7 +2801,7 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceDirectory = Path.Combine(workspaceRoot, "BiggerLobbies");
+            string sourceDirectory = Path.Combine(WorkspaceRoot, "BiggerLobbies");
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "BiggerLobbies.csproj");
             string originalProject = File.ReadAllText(tempProject);
@@ -3467,7 +3580,7 @@ internal sealed class S1InteropFixtureTests
 
     private void MigrationPlannerCreatesOperationsForBrokenFixture()
     {
-        string path = Path.Combine(workspaceRoot, @"JackpotEveryTime\JackpotEveryTime.csproj");
+        string path = Path.Combine(WorkspaceRoot, @"JackpotEveryTime\JackpotEveryTime.csproj");
         WorkspaceAnalysis analysis = analyzer.Analyze(path);
         MigrationPlan plan = new MigrationPlanner().Plan(analysis);
         ProjectMigrationPlan projectPlan = plan.Projects.Single();
@@ -3530,7 +3643,7 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceDirectory = Path.Combine(workspaceRoot, "JackpotEveryTime");
+            string sourceDirectory = Path.Combine(WorkspaceRoot, "JackpotEveryTime");
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "JackpotEveryTime.csproj");
             string generatedFacade = Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
@@ -3583,8 +3696,8 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceProject = Path.Combine(workspaceRoot, @"BetterJukebox\BetterJukebox.csproj");
-            string sourceCore = Path.Combine(workspaceRoot, @"BetterJukebox\Core.cs");
+            string sourceProject = Path.Combine(WorkspaceRoot, @"BetterJukebox\BetterJukebox.csproj");
+            string sourceCore = Path.Combine(WorkspaceRoot, @"BetterJukebox\Core.cs");
             string tempProject = Path.Combine(tempRoot, "BetterJukebox.csproj");
             string tempCore = Path.Combine(tempRoot, "Core.cs");
             File.Copy(sourceProject, tempProject);
@@ -3637,7 +3750,7 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceDirectory = Path.Combine(workspaceRoot, @"DedicatedServerAddons\S1DS-PlayerList");
+            string sourceDirectory = Path.Combine(WorkspaceRoot, @"DedicatedServerAddons\S1DS-PlayerList");
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "S1DS-PlayerList.csproj");
             string tempClientSource = Path.Combine(tempRoot, "S1DSPlayerListClientMod.cs");
@@ -3715,7 +3828,7 @@ internal sealed class S1InteropFixtureTests
         Directory.CreateDirectory(tempRoot);
         try
         {
-            string sourceDirectory = Path.Combine(workspaceRoot, @"DedicatedServerAddons\SeparateOrganisations.POC");
+            string sourceDirectory = Path.Combine(WorkspaceRoot, @"DedicatedServerAddons\SeparateOrganisations.POC");
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "SeparateOrganisations.csproj");
             string tempModelSource = Path.Combine(tempRoot, "SeparateOrgs.Models.cs");
@@ -3794,7 +3907,7 @@ internal sealed class S1InteropFixtureTests
 
     private ProjectAnalysis AnalyzeProject(string relativePath)
     {
-        string path = Path.Combine(workspaceRoot, relativePath);
+        string path = Path.Combine(WorkspaceRoot, relativePath);
         WorkspaceAnalysis analysis = analyzer.Analyze(path);
         Assert(analysis.Projects.Count == 1, $"Expected one project for {relativePath}, found {analysis.Projects.Count}.");
         return analysis.Projects[0];
@@ -3955,7 +4068,20 @@ internal sealed class S1InteropFixtureTests
             .First(element => (element.Attribute("Condition")?.Value ?? string.Empty).Contains(configuration, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string FindWorkspaceRoot()
+    private bool TryGetWorkspaceRoot(out string? root)
+    {
+        if (workspaceRoot is not null)
+        {
+            root = workspaceRoot;
+            return true;
+        }
+
+        workspaceRoot = TryFindWorkspaceRoot();
+        root = workspaceRoot;
+        return root is not null;
+    }
+
+    private static string? TryFindWorkspaceRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);
         while (current is not null)
@@ -3969,7 +4095,7 @@ internal sealed class S1InteropFixtureTests
             current = current.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not locate ScheduleOne workspace root.");
+        return null;
     }
 
     private static void CopyFixtureDirectory(string sourceDirectory, string targetDirectory)

@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and portable tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore S1Interop.sln
+
+      - name: Build
+        run: dotnet build S1Interop.sln --no-restore --configuration Release
+
+      - name: Portable tests
+        run: dotnet run --project tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable

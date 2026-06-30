@@ -49,10 +49,11 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migratio
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration ..\DedicatedServerAddons --dual-runtime
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate <copied-fixture.csproj> --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate rollback <manifest.json>
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --portable
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --integration
 ```
 
-The solution should build from a normal clone with `dotnet build S1Interop.sln`. The full `S1Interop.Tests` runner is currently a local integration fixture suite and expects this repository to live inside the broader Schedule One modding workspace used during development.
+The solution should build from a normal clone with `dotnet build S1Interop.sln`. `--portable` runs the public CI-safe synthetic tests. `--integration` runs the local real-mod fixture suite and expects this repository to live inside the broader Schedule One modding workspace used during development. Running the test project without arguments runs portable tests first, then runs integration fixtures only when that workspace is detected.
 
 `sdkgen --apply` writes `S1Interop.Generated/S1Interop.GlobalUsings.g.cs`.
 `build-hook --apply` writes portable `S1Interop.Build.targets`, ignored `S1Interop.Build.local.props`, and a `.gitignore` entry for the local props file. The target runs `s1interop lint` before reference resolution/compilation and can be disabled with `/p:S1InteropBuildValidationEnabled=false`.
