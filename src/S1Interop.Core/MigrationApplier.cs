@@ -104,7 +104,7 @@ public sealed class MigrationApplier
                 "missing_local_reference_properties" => ApplyLocalReferencePropertyScaffold(projectPath, document, backupRoot, fileChanges),
                 "missing_il2cppinterop_reference" => ApplyMissingIl2CppInteropReference(document, operation.Configuration),
                 "missing_runtime_define" => ApplyMissingRuntimeDefine(document, operation),
-                "add_il2cpp_configuration" => ApplyDualRuntimeScaffold(projectPath, document, backupRoot, fileChanges),
+                "add_il2cpp_configuration" => ApplyDualRuntimeScaffold(projectPath, document, operation, backupRoot, fileChanges),
                 "conditionalize_scheduleone_usings" => ApplyScheduleOneUsingConditionalization(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_fully_qualified_scheduleone_types" => ApplyFullyQualifiedScheduleOneTypeRewrite(projectPath, operation.FilePath, backupRoot, fileChanges),
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
@@ -134,13 +134,32 @@ public sealed class MigrationApplier
     private static bool ApplyDualRuntimeScaffold(
         string projectPath,
         XDocument document,
+        MigrationOperation operation,
         string backupRoot,
         List<MigrationFileChange> fileChanges)
     {
-        bool projectChanged = DualRuntimeProjectScaffolder.Apply(document);
+        bool projectChanged = DualRuntimeProjectScaffolder.Apply(document, GetMonoConfigurationsFromEvidence(operation.Evidence));
         EnsureDualRuntimeLocalProps(projectPath, backupRoot, fileChanges);
         ApplySolutionConfigurationScaffold(projectPath, document, backupRoot, fileChanges);
         return projectChanged;
+    }
+
+    private static IReadOnlyList<string>? GetMonoConfigurationsFromEvidence(string? evidence)
+    {
+        if (string.IsNullOrWhiteSpace(evidence))
+        {
+            return null;
+        }
+
+        const string marker = "mono_configurations=";
+        int index = evidence.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        string value = evidence[(index + marker.Length)..].Trim();
+        return value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static int GetApplyPriority(MigrationOperation operation) =>

@@ -10,14 +10,23 @@ public static class DualRuntimeProjectScaffolder
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static bool NeedsIl2CppConfigurations(ProjectAnalysis project) =>
-        project.Configurations.Any(configuration => configuration.Runtime == RuntimeKind.Mono) &&
-        project.Configurations.All(configuration => configuration.Runtime != RuntimeKind.Il2Cpp);
+        project.Configurations.Any(IsSourceMonoConfiguration) &&
+        project.Configurations.All(configuration =>
+            configuration.Runtime != RuntimeKind.Il2Cpp &&
+            !IsIl2CppConfiguration(configuration.Name));
 
-    public static bool Apply(XDocument document)
+    public static bool IsSourceMonoConfiguration(ConfigurationAnalysis configuration) =>
+        configuration.Runtime == RuntimeKind.Mono &&
+        !IsIl2CppConfiguration(configuration.Name);
+
+    public static bool Apply(XDocument document) =>
+        Apply(document, monoConfigurations: null);
+
+    public static bool Apply(XDocument document, IReadOnlyList<string>? monoConfigurations)
     {
         IReadOnlyList<string> configurations = GetConfigurationNames(document);
-        string[] monoConfigurations = configurations.Where(IsMonoConfiguration).ToArray();
-        string[] newIl2CppConfigurations = monoConfigurations
+        string[] sourceMonoConfigurations = GetSourceMonoConfigurations(configurations, monoConfigurations);
+        string[] newIl2CppConfigurations = sourceMonoConfigurations
             .Select(ToIl2CppConfigurationName)
             .Where(name => !configurations.Contains(name, StringComparer.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -31,7 +40,7 @@ public static class DualRuntimeProjectScaffolder
         EnsureConfigurationsElement(document, configurations.Concat(newIl2CppConfigurations));
         EnsureIl2CppPathDefaults(document);
 
-        foreach (string monoConfiguration in monoConfigurations)
+        foreach (string monoConfiguration in sourceMonoConfigurations)
         {
             string il2CppConfiguration = ToIl2CppConfigurationName(monoConfiguration);
             if (!newIl2CppConfigurations.Contains(il2CppConfiguration, StringComparer.OrdinalIgnoreCase))
@@ -44,6 +53,19 @@ public static class DualRuntimeProjectScaffolder
         }
 
         return true;
+    }
+
+    private static string[] GetSourceMonoConfigurations(
+        IReadOnlyList<string> projectConfigurations,
+        IReadOnlyList<string>? analyzedMonoConfigurations)
+    {
+        string[] explicitMonoConfigurations = analyzedMonoConfigurations?
+            .Where(configuration => projectConfigurations.Contains(configuration, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+        return explicitMonoConfigurations.Length > 0
+            ? explicitMonoConfigurations
+            : projectConfigurations.Where(IsMonoConfiguration).ToArray();
     }
 
     private static IReadOnlyList<string> GetConfigurationNames(XDocument document)
@@ -364,6 +386,9 @@ public static class DualRuntimeProjectScaffolder
 
     private static bool IsMonoConfiguration(string configuration) =>
         configuration.Contains("mono", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsIl2CppConfiguration(string configuration) =>
+        configuration.Contains("il2cpp", StringComparison.OrdinalIgnoreCase);
 
     private static string GetRoleSymbol(string configuration)
     {

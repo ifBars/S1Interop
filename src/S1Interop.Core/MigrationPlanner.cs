@@ -119,13 +119,21 @@ public sealed class MigrationPlanner
 
         if (options.DualRuntime && DualRuntimeProjectScaffolder.NeedsIl2CppConfigurations(project))
         {
+            string monoConfigurations = string.Join(
+                ";",
+                project.Configurations
+                    .Where(DualRuntimeProjectScaffolder.IsSourceMonoConfiguration)
+                    .Select(configuration => configuration.Name)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
             operations.Add(new MigrationOperation(
                 "add_il2cpp_configuration",
                 project.ProjectPath,
                 null,
                 "medium",
                 true,
-                "Add IL2CPP build configurations mirrored from existing Mono configurations, including net6.0, IL2CPP defines, and generated-wrapper reference paths."));
+                "Add IL2CPP build configurations mirrored from existing Mono configurations, including net6.0, IL2CPP defines, and generated-wrapper reference paths.",
+                $"mono_configurations={monoConfigurations}"));
 
             string[] scheduleOneUsingFiles = ScheduleOneUsingRewriter
                 .FindFilesWithUnconditionalScheduleOneUsings(project.ProjectPath)

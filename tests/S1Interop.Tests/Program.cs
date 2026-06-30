@@ -62,6 +62,10 @@ internal sealed class S1InteropFixtureTests
         count++;
         DualRuntimeGeneratedUsingGuardsAddMonoDefinesForLegacyNames();
         count++;
+        DualRuntimeMigrationScaffoldsAnalyzerInferredDebugReleaseMonoProject();
+        count++;
+        DualRuntimeMigrationDoesNotReprefixExistingIl2CppNamedConfigurations();
+        count++;
         ExplicitIl2CppConfigurationNameWinsOverSharedMonoReferences();
         count++;
         MigrationTargetFrameworkOverrideWinsAfterImportedProps();
@@ -1135,6 +1139,179 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 after.Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_runtime_define"),
                 "Generated using guard migration should not leave missing runtime define diagnostics.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationScaffoldsAnalyzerInferredDebugReleaseMonoProject()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MonoOnlyMod.csproj");
+            string tempSolution = Path.Combine(tempRoot, "MonoOnlyMod.sln");
+            const string projectGuid = "{11111111-2222-3333-4444-555555555555}";
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Configurations>Debug;Release</Configurations>
+                    <GamePath>$(MonoGamePath)</GamePath>
+                    <DefineConstants>$(DefineConstants);MONO</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="MelonLoader">
+                      <HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="UnityEngine.CoreModule">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                using ScheduleOne.PlayerScripts;
+
+                namespace MonoOnlyMod;
+
+                public static class Core
+                {
+                    public static Player? Current;
+                }
+                """);
+            File.WriteAllText(
+                tempSolution,
+                $$"""
+                Microsoft Visual Studio Solution File, Format Version 12.00
+                # Visual Studio Version 17
+                Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonoOnlyMod", "MonoOnlyMod.csproj", "{{projectGuid}}"
+                EndProject
+                Global
+                	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                		Debug|Any CPU = Debug|Any CPU
+                		Release|Any CPU = Release|Any CPU
+                	EndGlobalSection
+                	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+                		{{projectGuid}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                		{{projectGuid}}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                		{{projectGuid}}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                		{{projectGuid}}.Release|Any CPU.Build.0 = Release|Any CPU
+                	EndGlobalSection
+                EndGlobal
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectAnalysis beforeProject = before.Projects.Single();
+            AssertHasRuntime(beforeProject, "Debug", RuntimeKind.Mono);
+            AssertHasRuntime(beforeProject, "Release", RuntimeKind.Mono);
+
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            MigrationOperation addIl2Cpp = projectPlan.Operations.Single(operation => operation.RuleId == "add_il2cpp_configuration");
+            Assert(
+                addIl2Cpp.Evidence?.Contains("mono_configurations=Debug;Release", StringComparison.Ordinal) == true,
+                $"Dual-runtime plan should carry analyzer-inferred Mono config names, got {addIl2Cpp.Evidence ?? "<none>"}.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "add_il2cpp_configuration"),
+                "Migration apply should scaffold IL2CPP configs for analyzer-inferred Debug/Release Mono projects.");
+
+            string projectText = File.ReadAllText(tempProject);
+            string localPropsPath = Path.Combine(tempRoot, "local.build.props");
+            string examplePropsPath = Path.Combine(tempRoot, "local.build.props.example");
+            Assert(File.Exists(localPropsPath), "Dual-runtime migration should create local.build.props for runtime game paths.");
+            Assert(File.Exists(examplePropsPath), "Dual-runtime migration should create local.build.props.example for runtime game paths.");
+            string localPropsText = File.ReadAllText(localPropsPath);
+            string examplePropsText = File.ReadAllText(examplePropsPath);
+            Assert(localPropsText.Contains("<MonoGamePath>", StringComparison.Ordinal), "local.build.props should contain a MonoGamePath slot.");
+            Assert(localPropsText.Contains("<Il2CppGamePath>", StringComparison.Ordinal), "local.build.props should contain an Il2CppGamePath slot.");
+            Assert(examplePropsText.Contains("<MonoGamePath>", StringComparison.Ordinal), "local.build.props.example should show where MonoGamePath belongs.");
+            Assert(examplePropsText.Contains("<Il2CppGamePath>", StringComparison.Ordinal), "local.build.props.example should show where Il2CppGamePath belongs.");
+            Assert(projectText.Contains("<Configurations>Debug;Release;Il2cpp_Debug;Il2cpp_Release</Configurations>", StringComparison.Ordinal), "Project configurations should include inferred IL2CPP Debug/Release configs.");
+            Assert(projectText.Contains("Condition=\"'$(Configuration)'=='Il2cpp_Debug'\"", StringComparison.Ordinal), "Project should include Il2cpp_Debug property group.");
+            Assert(projectText.Contains("Condition=\"'$(Configuration)'=='Il2cpp_Release'\"", StringComparison.Ordinal), "Project should include Il2cpp_Release property group.");
+            Assert(projectText.Contains("<TargetFramework>net6.0</TargetFramework>", StringComparison.Ordinal), "Generated IL2CPP configs should target net6.0.");
+            Assert(projectText.Contains("<GamePath>$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal), "Generated IL2CPP configs should use the IL2CPP game path property.");
+            Assert(projectText.Contains("<ManagedPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal), "Generated IL2CPP configs should use generated wrapper references.");
+            Assert(projectText.Contains("Il2CppInterop.Runtime", StringComparison.Ordinal), "Generated IL2CPP configs should reference Il2CppInterop.Runtime.");
+
+            string solutionText = File.ReadAllText(tempSolution);
+            Assert(solutionText.Contains("Il2cpp_Debug|Any CPU = Il2cpp_Debug|Any CPU", StringComparison.Ordinal), "Solution should expose Il2cpp_Debug for Visual Studio builds.");
+            Assert(solutionText.Contains("Il2cpp_Release|Any CPU = Il2cpp_Release|Any CPU", StringComparison.Ordinal), "Solution should expose Il2cpp_Release for Visual Studio builds.");
+            Assert(solutionText.Contains($"{projectGuid}.Il2cpp_Debug|Any CPU.Build.0 = Il2cpp_Debug|Any CPU", StringComparison.Ordinal), "Solution should build Il2cpp_Debug for the migrated project.");
+            Assert(solutionText.Contains($"{projectGuid}.Il2cpp_Release|Any CPU.Build.0 = Il2cpp_Release|Any CPU", StringComparison.Ordinal), "Solution should build Il2cpp_Release for the migrated project.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            AssertHasRuntime(after.Projects.Single(), "Il2cpp_Debug", RuntimeKind.Il2Cpp);
+            AssertHasRuntime(after.Projects.Single(), "Il2cpp_Release", RuntimeKind.Il2Cpp);
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore Debug/Release mono-only project file.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSolution), "Rollback should restore Debug/Release mono-only solution file.");
+            Assert(!File.ReadAllText(tempProject).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from project.");
+            Assert(!File.ReadAllText(tempSolution).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from solution.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationDoesNotReprefixExistingIl2CppNamedConfigurations()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MixedNamedConfigs.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Configurations>MonoDebug;MonoRelease;Il2cppDebug;Il2cppRelease</Configurations>
+                    <GamePath>$(MonoGamePath)</GamePath>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="MelonLoader">
+                      <HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            ProjectAnalysis project = analyzer.Analyze(tempProject).Projects.Single();
+            Assert(
+                !DualRuntimeProjectScaffolder.NeedsIl2CppConfigurations(project),
+                "Projects that already expose Il2cpp-named configurations should not be treated as Mono-only.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(
+                new WorkspaceAnalysis(tempProject, [project]),
+                new MigrationPlannerOptions(DualRuntime: true));
+            Assert(
+                plan.Projects.Single().Operations.All(operation => operation.RuleId != "add_il2cpp_configuration"),
+                "Dual-runtime migration should not create Il2cpp_Il2cpp... configurations for mixed named projects.");
         }
         finally
         {
