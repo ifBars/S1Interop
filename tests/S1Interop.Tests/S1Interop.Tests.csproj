@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\S1Interop.Cli\S1Interop.Cli.csproj" />
     <ProjectReference Include="..\..\src\S1Interop.Core\S1Interop.Core.csproj" />
     <ProjectReference Include="..\..\src\S1Interop.Generators\S1Interop.Generators.csproj" />
   </ItemGroup>

@@ -96,6 +96,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGatePreservesAncestorNuGetConfig();
         count++;
+        CliReporterPrintsPackageRestoreSources();
+        count++;
         VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
         count++;
         VerifyMigrationBuildGateReportsMissingHintPathReadiness();
@@ -2780,6 +2782,65 @@ internal sealed class S1InteropFixtureTests
         {
             DeleteDirectoryIfExists(tempRoot);
         }
+    }
+
+    private void CliReporterPrintsPackageRestoreSources()
+    {
+        var result = new MigrationVerificationResult(
+            SourceProjectPath: @"C:\Mods\PackageSourceMod\PackageSourceMod.csproj",
+            SandboxProjectPath: @"C:\Temp\S1Interop.Verify.abc\PackageSourceMod.csproj",
+            Success: false,
+            SandboxDeleted: true,
+            PlannedOperations: 0,
+            AppliedOperations: 0,
+            ManifestPath: null,
+            BeforeDiagnostics: Array.Empty<InteropDiagnostic>(),
+            AfterDiagnostics: Array.Empty<InteropDiagnostic>(),
+            BuildResults:
+            [
+                new MigrationBuildResult(
+                    "Debug",
+                    RuntimeKind.Unknown,
+                    Success: false,
+                    TimedOut: false,
+                    ExitCode: 1,
+                    ReadinessStatus: "BlockedByPackageRestore",
+                    Attribution: "DependencyNotReady",
+                    FailureKind: "PackageFeedMissing",
+                    Summary: "Package 'Missing.ScheduleOne.Package 1.2.3' is not available from the configured NuGet sources for Debug.",
+                    Issues:
+                    [
+                        new MigrationBuildIssue(
+                            "PackageFeedMissing",
+                            "Package 'Missing.ScheduleOne.Package 1.2.3' is not available from the configured NuGet sources for Debug.",
+                            Include: "Missing.ScheduleOne.Package",
+                            Remediation: "Add the NuGet source that provides Missing.ScheduleOne.Package 1.2.3 and run restore again. Current restore sources: LocalFixtureFeed, NuGet.org.",
+                            Version: "1.2.3",
+                            RestoreSources: ["LocalFixtureFeed", "NuGet.org"])
+                    ],
+                    Command: "dotnet msbuild PackageSourceMod.csproj -restore",
+                    Output: string.Empty)
+            ]);
+
+        TextWriter originalOut = Console.Out;
+        using var writer = new StringWriter();
+        try
+        {
+            Console.SetOut(writer);
+            CliReporter.PrintVerificationResult(result);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        string output = writer.ToString();
+        Assert(
+            output.Contains("restore sources: LocalFixtureFeed, NuGet.org", StringComparison.Ordinal),
+            $"Text reporter should print structured package restore sources. Output:{Environment.NewLine}{output}");
+        Assert(
+            output.Contains("fix: Add the NuGet source", StringComparison.Ordinal),
+            $"Text reporter should preserve package remediation. Output:{Environment.NewLine}{output}");
     }
 
     private void VerifyMigrationBuildGateFailsCompilerBrokenSandbox()

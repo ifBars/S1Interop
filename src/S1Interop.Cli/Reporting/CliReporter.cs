@@ -1,6 +1,6 @@
 using S1Interop.Core;
 
-internal static class CliReporter
+public static class CliReporter
 {
     public static void PrintTextReport(WorkspaceAnalysis analysis)
     {
@@ -190,7 +190,12 @@ internal static class CliReporter
                 Console.WriteLine($"{indent}    issue: {issue.Kind}{include}{version}{path}");
                 if (!string.IsNullOrWhiteSpace(issue.Remediation))
                 {
-                    Console.WriteLine($"{indent}      fix: {issue.Remediation}");
+                    Console.WriteLine($"{indent}      fix: {FormatRemediation(issue)}");
+                }
+
+                if (issue.RestoreSources is { Count: > 0 })
+                {
+                    Console.WriteLine($"{indent}      restore sources: {string.Join(", ", issue.RestoreSources)}");
                 }
             }
 
@@ -215,4 +220,18 @@ internal static class CliReporter
 
     private static string FormatEvidence(string? evidence) =>
         string.IsNullOrWhiteSpace(evidence) ? string.Empty : $" Evidence: {evidence}";
+
+    private static string FormatRemediation(MigrationBuildIssue issue)
+    {
+        string remediation = issue.Remediation ?? string.Empty;
+        if (issue.RestoreSources is not { Count: > 0 })
+        {
+            return remediation;
+        }
+
+        int restoreSourcesIndex = remediation.IndexOf(" Current restore sources:", StringComparison.OrdinalIgnoreCase);
+        return restoreSourcesIndex < 0
+            ? remediation
+            : remediation[..restoreSourcesIndex].TrimEnd();
+    }
 }
