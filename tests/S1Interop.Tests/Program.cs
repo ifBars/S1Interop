@@ -2766,8 +2766,14 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 result.BuildResults!.All(build =>
                     build.FailureKind == "PackageFeedMissing" &&
-                    build.Output.Contains("LocalFixtureFeed", StringComparison.OrdinalIgnoreCase)),
-                $"Sandbox restore should preserve the ancestor NuGet.config package source. Build output: {FormatBuildResults(result.BuildResults)}");
+                    build.Issues.Any(issue =>
+                        issue.RestoreSources?.Contains("LocalFixtureFeed", StringComparer.OrdinalIgnoreCase) == true)),
+                $"Sandbox restore should preserve the ancestor NuGet.config package source as structured issue data. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.Issues.Any(issue =>
+                        issue.Remediation?.Contains("Current restore sources:", StringComparison.OrdinalIgnoreCase) == true)),
+                $"Package feed remediation should include current restore sources. Build output: {FormatBuildResults(result.BuildResults)}");
             Assert(result.SandboxDeleted, "Ancestor NuGet.config verification should delete its sandbox.");
         }
         finally

@@ -190,7 +190,8 @@ public sealed record MigrationBuildIssue(
     string? SourcePath = null,
     bool Imported = false,
     string? Remediation = null,
-    string? Version = null);
+    string? Version = null,
+    IReadOnlyList<string>? RestoreSources = null);
 
 public sealed record WorkspaceMigrationVerificationResult(
     string RootPath,

@@ -17,6 +17,10 @@ public sealed class MigrationVerifier
         @"Unable to find package (?<id>.+?)\. No packages exist",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly Regex MissingPackageSourcesRegex = new(
+        @"No packages exist with this id in source\(s\):\s*(?<sources>.+)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
     private static readonly string[] KnownExternalNamespaceHints =
     [
         "Il2CppScheduleOne",
@@ -1480,6 +1484,7 @@ public sealed class MigrationVerifier
         string kind = classifiedKind;
         string? include = null;
         string? remediation = null;
+        IReadOnlyList<string>? restoreSources = null;
         if (classifiedKind.Equals("MissingPackage", StringComparison.OrdinalIgnoreCase))
         {
             Match match = MissingPackageRegex.Match(classifiedSummary);
@@ -1488,6 +1493,7 @@ public sealed class MigrationVerifier
                 include = match.Groups["id"].Value.Trim();
             }
 
+            restoreSources = ExtractRestoreSources(output);
             kind = "PackageFeedMissing";
             remediation = include is null
                 ? "Add the NuGet source that provides the missing package and run restore again."
@@ -1512,8 +1518,25 @@ public sealed class MigrationVerifier
                     ? FirstOutputLine(output) ?? "Build failed without a recognized error line."
                     : classifiedSummary,
                 include,
-                Remediation: remediation)
+                Remediation: remediation,
+                RestoreSources: restoreSources)
         ];
+    }
+
+    private static IReadOnlyList<string>? ExtractRestoreSources(string output)
+    {
+        Match match = MissingPackageSourcesRegex.Match(output);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        string[] sources = match.Groups["sources"].Value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(source => !string.IsNullOrWhiteSpace(source))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return sources.Length == 0 ? null : sources;
     }
 
     private static MigrationBuildIssue[] EnrichPackageIssues(
@@ -1545,7 +1568,9 @@ public sealed class MigrationVerifier
                     SourcePath = package.SourcePath,
                     Imported = package.Imported,
                     Version = package.Version,
-                    Remediation = $"Add the NuGet source that provides {package.Include}{versionSuffix} and run restore again."
+                    Remediation = issue.RestoreSources is { Count: > 0 }
+                        ? $"Add the NuGet source that provides {package.Include}{versionSuffix} and run restore again. Current restore sources: {string.Join(", ", issue.RestoreSources)}."
+                        : $"Add the NuGet source that provides {package.Include}{versionSuffix} and run restore again."
                 };
             })
             .ToArray();
