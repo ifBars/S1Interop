@@ -181,6 +181,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
         count++;
+        VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy();
+        count++;
         VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch();
         count++;
         VerifyMigrationMovesGameRootModDependencyHintPaths();
@@ -1335,6 +1337,10 @@ internal sealed class S1InteropFixtureTests
                       <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
                       <Private>false</Private>
                     </Reference>
+                    <Reference Include="FishNet.Runtime">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\FishNet.Runtime.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
                     <Reference Include="UnityEngine.CoreModule">
                       <HintPath>$(GamePath)\Schedule I_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
                       <Private>false</Private>
@@ -1408,8 +1414,12 @@ internal sealed class S1InteropFixtureTests
             Assert(projectText.Contains("Condition=\"'$(Configuration)'=='Il2cpp_Release'\"", StringComparison.Ordinal), "Project should include Il2cpp_Release property group.");
             Assert(projectText.Contains("<TargetFramework>net6.0</TargetFramework>", StringComparison.Ordinal), "Generated IL2CPP configs should target net6.0.");
             Assert(projectText.Contains("<GamePath>$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal), "Generated IL2CPP configs should use the IL2CPP game path property.");
+            Assert(projectText.Contains("<S1Dir>$(GamePath)</S1Dir>", StringComparison.Ordinal), "Generated IL2CPP configs should preserve common S1Dir game-root aliases used by real mods.");
             Assert(projectText.Contains("<ManagedPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal), "Generated IL2CPP configs should use generated wrapper references.");
             Assert(projectText.Contains("Il2CppInterop.Runtime", StringComparison.Ordinal), "Generated IL2CPP configs should reference Il2CppInterop.Runtime.");
+            Assert(projectText.Contains("<Reference Include=\"Il2CppFishNet.Runtime\">", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime references to Il2CppFishNet.Runtime.");
+            Assert(projectText.Contains("<HintPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies\\Il2CppFishNet.Runtime.dll</HintPath>", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime hint paths without double-prefixing Il2Cpp.");
+            Assert(!projectText.Contains("Il2CppIl2CppFishNet.Runtime.dll", StringComparison.Ordinal), "Generated IL2CPP configs should not double-prefix FishNet.Runtime hint paths.");
 
             string solutionText = File.ReadAllText(tempSolution);
             Assert(solutionText.Contains("Il2cpp_Debug|Any CPU = Il2cpp_Debug|Any CPU", StringComparison.Ordinal), "Solution should expose Il2cpp_Debug for Visual Studio builds.");
@@ -1921,6 +1931,71 @@ internal sealed class S1InteropFixtureTests
         Assert(
             File.Exists(localProps) == hadLocalProps,
             "Hoverboard verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "BotanistFix");
+        string sourceProject = Path.Combine(sourceDirectory, "BotanistFix.csproj");
+        string il2CppRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppAssembly = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll");
+        string monoAssembly = Path.Combine(monoRoot, "Schedule I_Data", "Managed", "Assembly-CSharp.dll");
+        if (!File.Exists(sourceProject) || !File.Exists(il2CppAssembly) || !File.Exists(monoAssembly))
+        {
+            Console.WriteLine("Skipping BotanistFix Mono-only build-gated integration because local game roots are not available.");
+            return;
+        }
+
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "BotanistFix.csproj");
+            ReduceBotanistFixCopyToMonoOnly(tempProject);
+            string monoOnlyProjectHash = ComputeSha256(tempProject);
+
+            ProjectAnalysis monoOnlyProject = analyzer.Analyze(tempProject).Projects.Single();
+            AssertHasRuntime(monoOnlyProject, "Mono", RuntimeKind.Mono);
+            AssertHasRuntime(monoOnlyProject, "MonoRelease", RuntimeKind.Mono);
+            Assert(
+                monoOnlyProject.Configurations.All(configuration => configuration.Runtime != RuntimeKind.Il2Cpp),
+                "The BotanistFix test fixture must start as Mono-only before migration.");
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: true,
+                    Build: true,
+                    BuildTimeoutSeconds: 180,
+                    Il2CppGamePath: il2CppRoot,
+                    MonoGamePath: monoRoot));
+
+            Assert(
+                result.Success,
+                $"Mono-only BotanistFix copy should migrate to dual runtime and build for both runtimes. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "BotanistFix build-gated verification should delete its sandbox.");
+            Assert(result.AfterDiagnostics.Count == 0, $"BotanistFix migration should leave no analyzer diagnostics. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.BuildResults is not null && result.BuildResults.Count == 4, $"BotanistFix should build-check four configurations. Build output: {FormatBuildResults(result.BuildResults)}");
+            IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults!;
+            Assert(buildResults.All(build => build.Success), $"Every BotanistFix migrated build should pass. Build output: {FormatBuildResults(buildResults)}");
+            Assert(buildResults.Any(build => build.Configuration == "Mono" && build.Runtime == RuntimeKind.Mono), "BotanistFix build results should include Mono.");
+            Assert(buildResults.Any(build => build.Configuration == "MonoRelease" && build.Runtime == RuntimeKind.Mono), "BotanistFix build results should include MonoRelease.");
+            Assert(buildResults.Any(build => build.Configuration == "Il2cpp" && build.Runtime == RuntimeKind.Il2Cpp), "BotanistFix build results should include generated Il2cpp.");
+            Assert(buildResults.Any(build => build.Configuration == "Il2cppRelease" && build.Runtime == RuntimeKind.Il2Cpp), "BotanistFix build results should include generated Il2cppRelease.");
+            Assert(
+                string.Equals(ComputeSha256(tempProject), monoOnlyProjectHash, StringComparison.Ordinal),
+                "verify-migration should not mutate the Mono-only fixture project.");
+            Assert(
+                string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+                "BotanistFix verify-migration should not mutate the real project file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
     }
 
     private void VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch()
@@ -4608,6 +4683,37 @@ internal sealed class S1InteropFixtureTests
             .Value;
     }
 
+    private static void ReduceBotanistFixCopyToMonoOnly(string projectPath)
+    {
+        XDocument document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement element in document.Root!.Elements().ToArray())
+        {
+            string condition = element.Attribute("Condition")?.Value ?? string.Empty;
+            if ((element.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase) ||
+                 element.Name.LocalName.Equals("ItemGroup", StringComparison.OrdinalIgnoreCase)) &&
+                condition.Contains("Il2cpp", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Remove();
+            }
+        }
+
+        XElement configurations = document.Descendants()
+            .First(element => element.Name.LocalName.Equals("Configurations", StringComparison.OrdinalIgnoreCase));
+        configurations.Value = "Mono;MonoRelease";
+
+        const string monoReferenceCondition = "'$(Configuration)'=='Mono' Or '$(Configuration)'=='MonoRelease'";
+        foreach (XElement itemGroup in document.Root.Elements()
+                     .Where(element =>
+                         element.Name.LocalName.Equals("ItemGroup", StringComparison.OrdinalIgnoreCase) &&
+                         element.Attribute("Condition") is null &&
+                         element.Elements().Any(child => child.Name.LocalName.Equals("Reference", StringComparison.OrdinalIgnoreCase))))
+        {
+            itemGroup.SetAttributeValue("Condition", monoReferenceCondition);
+        }
+
+        document.Save(projectPath);
+    }
+
     private static XElement GetConfigurationPropertyGroup(string projectPath, string configuration)
     {
         XDocument document = XDocument.Load(projectPath);
@@ -4701,6 +4807,7 @@ internal sealed class S1InteropFixtureTests
         return parts.Any(part =>
             part.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
             part.Equals(".vs", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals(".agent", StringComparison.OrdinalIgnoreCase) ||
             part.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
             part.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
             part.Equals("s1interop-runs", StringComparison.OrdinalIgnoreCase) ||

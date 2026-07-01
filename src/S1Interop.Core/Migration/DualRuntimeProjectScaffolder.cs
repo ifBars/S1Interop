@@ -39,6 +39,7 @@ public static class DualRuntimeProjectScaffolder
 
         EnsureConfigurationsElement(document, configurations.Concat(newIl2CppConfigurations));
         EnsureIl2CppPathDefaults(document);
+        ConditionUnconditionedReferenceGroups(document, sourceMonoConfigurations);
 
         foreach (string monoConfiguration in sourceMonoConfigurations)
         {
@@ -53,6 +54,49 @@ public static class DualRuntimeProjectScaffolder
         }
 
         return true;
+    }
+
+    private static void ConditionUnconditionedReferenceGroups(XDocument document, IReadOnlyList<string> monoConfigurations)
+    {
+        if (monoConfigurations.Count == 0)
+        {
+            return;
+        }
+
+        string monoCondition = string.Join(
+            " Or ",
+            monoConfigurations.Select(configuration => $"'$(Configuration)'=='{configuration}'"));
+        Func<XElement, bool> isReference = IsNamed("Reference");
+        foreach (XElement itemGroup in document.Root!.Elements()
+                     .Where(IsNamed("ItemGroup"))
+                     .Where(group => group.Attribute("Condition") is null)
+                     .ToArray())
+        {
+            XElement[] references = itemGroup.Elements()
+                .Where(isReference)
+                .ToArray();
+            if (references.Length == 0)
+            {
+                continue;
+            }
+
+            if (itemGroup.Elements().All(isReference))
+            {
+                itemGroup.SetAttributeValue("Condition", monoCondition);
+                continue;
+            }
+
+            var conditionedReferences = new XElement(
+                "ItemGroup",
+                new XAttribute("Condition", monoCondition),
+                references.Select(reference => new XElement(reference)));
+            foreach (XElement reference in references)
+            {
+                reference.Remove();
+            }
+
+            itemGroup.AddAfterSelf(conditionedReferences);
+        }
     }
 
     private static string[] GetSourceMonoConfigurations(
@@ -143,6 +187,7 @@ public static class DualRuntimeProjectScaffolder
         };
 
         group.Add(new XElement("GamePath", gamePathProperty));
+        group.Add(new XElement("S1Dir", "$(GamePath)"));
         group.Add(new XElement("ManagedPath", @"$(GamePath)\MelonLoader\Il2CppAssemblies"));
         group.Add(new XElement("MelonLoaderPath", @"$(GamePath)\MelonLoader\net6"));
         group.Add(new XElement("ModsPath", @"$(GamePath)\Mods"));
@@ -246,7 +291,8 @@ public static class DualRuntimeProjectScaffolder
             .Replace("Mono", "Il2cpp", StringComparison.OrdinalIgnoreCase)
             .Replace($"{originalInclude}.dll", $"{rewrittenInclude}.dll", StringComparison.OrdinalIgnoreCase);
 
-        if (originalInclude.Equals("FishNet.Runtime", StringComparison.OrdinalIgnoreCase))
+        if (originalInclude.Equals("FishNet.Runtime", StringComparison.OrdinalIgnoreCase) &&
+            !rewritten.Contains("Il2CppFishNet.Runtime.dll", StringComparison.OrdinalIgnoreCase))
         {
             rewritten = rewritten.Replace("FishNet.Runtime.dll", "Il2CppFishNet.Runtime.dll", StringComparison.OrdinalIgnoreCase);
         }

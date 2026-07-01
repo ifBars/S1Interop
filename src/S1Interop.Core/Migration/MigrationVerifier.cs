@@ -1709,12 +1709,12 @@ public sealed class MigrationVerifier
         RuntimeKind runtime,
         MigrationVerifierOptions options)
     {
-        foreach (KeyValuePair<string, string> property in GetBuildProperties(runtime, options))
+        foreach (KeyValuePair<string, string> property in GetLocalBuildProperties(projectPath))
         {
             yield return $"-p:{property.Key}={property.Value}";
         }
 
-        foreach (KeyValuePair<string, string> property in GetLocalBuildProperties(projectPath))
+        foreach (KeyValuePair<string, string> property in GetBuildProperties(runtime, options))
         {
             yield return $"-p:{property.Key}={property.Value}";
         }
