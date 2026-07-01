@@ -304,6 +304,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             builder.AppendLine($"        public const string {member.Alias}Name = \"{Escape(member.MemberName)}\";");
             if (member.Kind == S1InteropMemberKind.Method)
             {
+                builder.AppendLine($"        public static System.Reflection.MethodInfo? {member.Alias}Method => ResolveMethod(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)});");
                 if (member.IsStatic)
                 {
                     builder.AppendLine($"        public static object? Invoke{member.Alias}(params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)}, null, args);");
@@ -366,9 +367,14 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("        public static object? Invoke(string ownerTypeName, string memberName, string[]? parameterTypeNames, object? instance, params object?[] args)");
         builder.AppendLine("        {");
-        builder.AppendLine("            return ResolveMember(ownerTypeName, memberName, parameterTypeNames, preferMethod: true) is System.Reflection.MethodInfo method");
+        builder.AppendLine("            return ResolveMethod(ownerTypeName, memberName, parameterTypeNames) is System.Reflection.MethodInfo method");
         builder.AppendLine("                ? method.Invoke(instance, args)");
         builder.AppendLine("                : null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static System.Reflection.MethodInfo? ResolveMethod(string ownerTypeName, string memberName, string[]? parameterTypeNames)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            return ResolveMember(ownerTypeName, memberName, parameterTypeNames, preferMethod: true) as System.Reflection.MethodInfo;");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static System.Reflection.MemberInfo? ResolveMember(string ownerTypeName, string memberName, string[]? parameterTypeNames, bool preferMethod)");

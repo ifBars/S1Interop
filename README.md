@@ -91,7 +91,7 @@ The generator emits `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName`
 
 Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberRegistry.GetNoticeContainer(...)`, `TrySetNoticeContainer(...)`, and static helpers such as `GetPlayerCameraInstance()`. These helpers intentionally check both properties and fields, which covers a common Schedule One migration case where a value is a field on Mono but a property on IL2CPP.
 
-Method declarations can also include `ParameterTypeNames` for overload-specific binding. Use registered type aliases for game types and `&` for by-ref parameters.
+Method declarations can also include `ParameterTypeNames` for overload-specific binding. Use registered type aliases for game types and `&` for by-ref parameters. The generator emits both an invoker and a `MethodInfo` property, so Harmony patch targets can use the same generated overload binding instead of repeating `AccessTools.Method(...)` parameter arrays.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
 

@@ -4151,6 +4151,7 @@ internal sealed class S1InteropFixtureTests
             $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static System.Reflection.MethodInfo? StartUpdateVolumeMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
@@ -4159,6 +4160,7 @@ internal sealed class S1InteropFixtureTests
             $"Generated member registry should include static method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string MoveItemBehaviourName = \"Il2CppScheduleOne.NPCs.Behaviour.MoveItemBehaviour\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeIsDestinationValid(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" }, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include overload-specific method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
