@@ -101,7 +101,6 @@ public sealed class MigrationVerifier
         ".obj",
         ".ogg",
         ".pdb",
-        ".png",
         ".prefab",
         ".psd",
         ".rar",
@@ -150,14 +149,16 @@ public sealed class MigrationVerifier
         WorkspaceAnalysis sourceAnalysis = analyzer.Analyze(projectPath);
         ProjectAnalysis sourceProject = RequireSingleProject(sourceAnalysis, projectPath);
         string sourceProjectDirectory = Path.GetDirectoryName(sourceProject.ProjectPath)!;
+        string sourceRoot = FindSandboxSourceRoot(sourceProject.ProjectPath);
+        string relativeProjectPath = Path.GetRelativePath(sourceRoot, sourceProject.ProjectPath);
         string sandboxRoot = CreateSandboxRoot();
-        string sandboxProjectPath = Path.Combine(sandboxRoot, Path.GetFileName(sourceProject.ProjectPath));
+        string sandboxProjectPath = Path.Combine(sandboxRoot, relativeProjectPath);
 
         MigrationVerificationResult? result = null;
         bool sandboxDeleted = false;
         try
         {
-            CopyProjectDirectory(sourceProjectDirectory, sandboxRoot);
+            CopyProjectDirectory(sourceRoot, sandboxRoot);
 
             WorkspaceAnalysis before = analyzer.Analyze(sandboxProjectPath);
             WorkspaceAnalysis after = before;
@@ -293,7 +294,7 @@ public sealed class MigrationVerifier
             "msbuild",
             projectPath,
             "-restore",
-            "-t:Compile",
+            "-t:Build",
             $"-p:Configuration={configuration.Name}",
             "--nologo",
             "-v:minimal",
@@ -303,6 +304,11 @@ public sealed class MigrationVerifier
             "-p:DeployOnBuild=false",
             "-p:BuildProjectReferences=false"
         ];
+        if (!string.IsNullOrWhiteSpace(configuration.TargetFramework))
+        {
+            arguments.Add($"-p:TargetFramework={configuration.TargetFramework}");
+        }
+
         arguments.AddRange(GetBuildPropertyArguments(projectPath, configuration.Runtime, options));
         string command = $"dotnet {string.Join(' ', arguments.Select(QuoteArgument))}";
         if (readinessIssues.Length > 0)
@@ -403,7 +409,7 @@ public sealed class MigrationVerifier
             outputIssues,
             classifiedKind);
         string failureKind = success ? "None" : issues.FirstOrDefault()?.Kind ?? classifiedKind;
-        string summary = success ? "Compile target succeeded." : issues.FirstOrDefault()?.Message ?? classifiedSummary;
+        string summary = success ? "Build target succeeded." : issues.FirstOrDefault()?.Message ?? classifiedSummary;
         return new MigrationBuildResult(
             configuration.Name,
             configuration.Runtime,
@@ -687,15 +693,17 @@ public sealed class MigrationVerifier
             return false;
         }
 
-        Dictionary<string, ReferencePropertyBinding> propertyBindings = GetReferencePropertyBindings(sandboxProjectPath);
         var overrides = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        string stagingRoot = Path.Combine(projectDirectory, ExternalReferenceStagingDirectoryName, "ConfigurationReferences");
         foreach (ConfigurationAnalysis configuration in project.Configurations)
         {
             foreach (ReferenceInfo reference in configuration.References)
             {
                 if (string.IsNullOrWhiteSpace(reference.HintPath) ||
-                    !propertyBindings.TryGetValue(reference.Include, out ReferencePropertyBinding? binding))
+                    !TryGetReferencePropertyBinding(
+                        sandboxProjectPath,
+                        reference,
+                        configuration.Name,
+                        out ReferencePropertyBinding binding))
                 {
                     continue;
                 }
@@ -715,14 +723,9 @@ public sealed class MigrationVerifier
                     continue;
                 }
 
-                string stageDirectory = Path.Combine(stagingRoot, SanitizePathPart(configuration.Name), binding.PropertyName);
-                Directory.CreateDirectory(stageDirectory);
-                string stagedFile = Path.Combine(stageDirectory, expectedFile);
-                File.Copy(sourceFile, stagedFile, overwrite: true);
-
                 string propertyValue = binding.Kind == ReferencePropertyBindingKind.File
-                    ? stagedFile
-                    : stageDirectory;
+                    ? sourceFile
+                    : Path.GetDirectoryName(sourceFile)!;
                 if (!overrides.TryGetValue(configuration.Name, out Dictionary<string, string>? configurationOverrides))
                 {
                     configurationOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -758,30 +761,84 @@ public sealed class MigrationVerifier
             }
 
             string hintPath = hintPathElement.Value.Trim();
-            Match match = Regex.Match(
-                hintPath,
-                @"^\$\((?<property>[A-Za-z_][A-Za-z0-9_.-]*)\)(?<suffix>(?:[\\/][^<>:""|?*]+\.dll)?)$",
-                RegexOptions.IgnoreCase);
-            if (!match.Success)
+            if (!TryGetReferencePropertyBinding(hintPath, out ReferencePropertyBinding binding))
             {
                 continue;
             }
 
-            string propertyName = match.Groups["property"].Value;
-            if (!IsModDependencyProperty(propertyName))
-            {
-                continue;
-            }
-
-            string suffix = match.Groups["suffix"].Value;
-            ReferencePropertyBindingKind kind = string.IsNullOrWhiteSpace(suffix)
-                ? ReferencePropertyBindingKind.File
-                : ReferencePropertyBindingKind.Directory;
-            string? fileName = string.IsNullOrWhiteSpace(suffix) ? null : Path.GetFileName(suffix);
-            bindings[include] = new ReferencePropertyBinding(propertyName, kind, fileName);
+            bindings[include] = binding;
         }
 
         return bindings;
+    }
+
+    private static bool TryGetReferencePropertyBinding(string hintPath, out ReferencePropertyBinding binding)
+    {
+        binding = null!;
+        Match match = Regex.Match(
+            hintPath.Trim(),
+            @"^\$\((?<property>[A-Za-z_][A-Za-z0-9_.-]*)\)(?<suffix>(?:[\\/][^<>:""|?*]+\.dll)?)$",
+            RegexOptions.IgnoreCase);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string propertyName = match.Groups["property"].Value;
+        if (!IsModDependencyProperty(propertyName))
+        {
+            return false;
+        }
+
+        string suffix = match.Groups["suffix"].Value;
+        ReferencePropertyBindingKind kind = string.IsNullOrWhiteSpace(suffix)
+            ? ReferencePropertyBindingKind.File
+            : ReferencePropertyBindingKind.Directory;
+        string? fileName = string.IsNullOrWhiteSpace(suffix) ? null : Path.GetFileName(suffix);
+        binding = new ReferencePropertyBinding(propertyName, kind, fileName);
+        return true;
+    }
+
+    private static bool TryGetReferencePropertyBinding(
+        string projectPath,
+        ReferenceInfo reference,
+        string configurationName,
+        out ReferencePropertyBinding binding)
+    {
+        if (!string.IsNullOrWhiteSpace(reference.HintPath) &&
+            TryGetReferencePropertyBinding(reference.HintPath, out binding))
+        {
+            return true;
+        }
+
+        XDocument document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement referenceElement in document.Descendants().Where(IsNamed("Reference")))
+        {
+            if (!string.Equals(referenceElement.Attribute("Include")?.Value, reference.Include, StringComparison.OrdinalIgnoreCase) ||
+                !ElementAppliesToConfiguration(referenceElement, configurationName))
+            {
+                continue;
+            }
+
+            XElement? hintPath = referenceElement.Elements().FirstOrDefault(IsNamed("HintPath"));
+            if (hintPath is not null &&
+                TryGetReferencePropertyBinding(hintPath.Value, out binding))
+            {
+                return true;
+            }
+        }
+
+        binding = null!;
+        return false;
+    }
+
+    private static bool ElementAppliesToConfiguration(XElement element, string configurationName)
+    {
+        string condition = element.Attribute("Condition")?.Value
+            ?? element.Parent?.Attribute("Condition")?.Value
+            ?? string.Empty;
+        return string.IsNullOrWhiteSpace(condition) ||
+               condition.Contains(configurationName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetExpectedReferenceFile(
@@ -1718,6 +1775,11 @@ public sealed class MigrationVerifier
         {
             yield return $"-p:{property.Key}={property.Value}";
         }
+
+        foreach (KeyValuePair<string, string> property in GetWorkspaceDependencyBuildProperties(projectPath, runtime, options))
+        {
+            yield return $"-p:{property.Key}={property.Value}";
+        }
     }
 
     private static IEnumerable<KeyValuePair<string, string>> GetLocalBuildProperties(string projectPath)
@@ -1776,17 +1838,50 @@ public sealed class MigrationVerifier
             properties["MonoManagedDllPath"] = managedPath;
             properties["MonoManagedPath"] = managedPath;
             properties["MonoMelonLoaderPath"] = melonLoaderPath;
+            properties["MelonLoaderNet35Path"] = melonLoaderPath;
             properties["MonoModOutputPath"] = Path.Combine(gameRoot, "Mods");
             AddMonoModDependencyProperties(properties, gameRoot);
         }
         else if (runtime == RuntimeKind.Il2Cpp)
         {
             properties["Il2CppGamePath"] = gameRoot;
+            properties["Il2CppAssembliesPath"] = managedPath;
             properties["Il2CppManagedDllPath"] = managedPath;
             properties["Il2CppManagedPath"] = managedPath;
             properties["ManagedDllPath"] = managedPath;
             properties["MelonLoaderNet6Path"] = melonLoaderPath;
             AddIl2CppModDependencyProperties(properties, gameRoot);
+        }
+
+        return properties;
+    }
+
+    private static SortedDictionary<string, string> GetWorkspaceDependencyBuildProperties(
+        string projectPath,
+        RuntimeKind runtime,
+        MigrationVerifierOptions options)
+    {
+        var properties = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (runtime is not (RuntimeKind.Mono or RuntimeKind.Il2Cpp))
+        {
+            return properties;
+        }
+
+        string projectDirectory = Path.GetDirectoryName(projectPath)!;
+        string[] searchRoots = GetWorkspaceDependencySearchRoots(projectDirectory);
+        if (!TryFindWorkspaceDependency("SteamNetworkLib.dll", searchRoots, options, runtime, out string? steamNetworkLibPath) ||
+            steamNetworkLibPath is null)
+        {
+            return properties;
+        }
+
+        if (runtime == RuntimeKind.Mono)
+        {
+            properties["SteamNetworkLibMonoAssemblyPath"] = steamNetworkLibPath;
+        }
+        else
+        {
+            properties["SteamNetworkLibIl2CppAssemblyPath"] = steamNetworkLibPath;
         }
 
         return properties;
@@ -1839,8 +1934,10 @@ public sealed class MigrationVerifier
             string root = Path.GetFullPath(options.MonoGamePath);
             properties["MonoGamePath"] = root;
             properties["MonoGameRoot"] = root;
+            properties["MonoAssembliesPath"] = Path.Combine(root, "Schedule I_Data", "Managed");
             properties["MonoManagedDllPath"] = Path.Combine(root, "Schedule I_Data", "Managed");
             properties["MonoManagedPath"] = Path.Combine(root, "Schedule I_Data", "Managed");
+            properties["MelonLoaderNet35Path"] = Path.Combine(root, "MelonLoader", "net35");
             properties["MonoMelonLoaderPath"] = Path.Combine(root, "MelonLoader", "net35");
             AddMonoModDependencyProperties(properties, root);
         }
@@ -1858,7 +1955,8 @@ public sealed class MigrationVerifier
             !string.IsNullOrWhiteSpace(options.MonoGamePath))
         {
             string root = Path.GetFullPath(options.MonoGamePath);
-            if (propertyName.Contains("Managed", StringComparison.OrdinalIgnoreCase))
+            if (propertyName.Contains("Managed", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("Assemblies", StringComparison.OrdinalIgnoreCase))
             {
                 return Path.Combine(root, "Schedule I_Data", "Managed");
             }
@@ -2033,12 +2131,12 @@ public sealed class MigrationVerifier
     {
         if (success)
         {
-            return ("None", "Compile target succeeded.");
+            return ("None", "Build target succeeded.");
         }
 
         if (timedOut)
         {
-            return ("Timeout", "Compile target exceeded the configured timeout.");
+            return ("Timeout", "Build target exceeded the configured timeout.");
         }
 
         string[] lines = output
@@ -2095,7 +2193,7 @@ public sealed class MigrationVerifier
         string? firstError = lines.FirstOrDefault(line => line.Contains("error ", StringComparison.OrdinalIgnoreCase));
         return firstError is not null
             ? ("UnknownError", firstError)
-            : ("UnknownError", "Compile target failed without a recognized error line.");
+            : ("UnknownError", "Build target failed without a recognized error line.");
     }
 
     private static void AppendBoundedLine(StringBuilder output, string line)
@@ -2131,6 +2229,34 @@ public sealed class MigrationVerifier
         string sandboxRoot = Path.Combine(Path.GetTempPath(), $"{SandboxPrefix}{Guid.NewGuid():N}");
         Directory.CreateDirectory(sandboxRoot);
         return sandboxRoot;
+    }
+
+    private static string FindSandboxSourceRoot(string projectPath)
+    {
+        string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
+        string? bestStructuredRoot = null;
+        foreach (string ancestor in EnumerateAncestors(projectDirectory).Take(6))
+        {
+            if (Directory.Exists(Path.Combine(ancestor, ".git")))
+            {
+                return ancestor;
+            }
+
+            bool hasRepoMarker =
+                File.Exists(Path.Combine(ancestor, ".gitignore")) ||
+                File.Exists(Path.Combine(ancestor, "README.md")) ||
+                File.Exists(Path.Combine(ancestor, "readme.md"));
+            bool hasSourceLayout =
+                Directory.Exists(Path.Combine(ancestor, "src")) &&
+                Path.GetRelativePath(Path.Combine(ancestor, "src"), projectPath).StartsWith("..", StringComparison.Ordinal) is false;
+            bool hasProjectAssets = Directory.Exists(Path.Combine(ancestor, "assets"));
+            if ((hasRepoMarker || hasProjectAssets) && hasSourceLayout)
+            {
+                bestStructuredRoot = ancestor;
+            }
+        }
+
+        return bestStructuredRoot ?? projectDirectory;
     }
 
     private static void CopyProjectDirectory(string sourceDirectory, string targetDirectory)

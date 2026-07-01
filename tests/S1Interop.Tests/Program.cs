@@ -183,6 +183,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy();
         count++;
+        VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy();
+        count++;
         VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch();
         count++;
         VerifyMigrationMovesGameRootModDependencyHintPaths();
@@ -1998,6 +2000,68 @@ internal sealed class S1InteropFixtureTests
         }
     }
 
+    private void VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1-VoiceChat");
+        string sourceProject = Path.Combine(sourceDirectory, "src", "S1VoiceChat", "S1VoiceChat.csproj");
+        string il2CppRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppAssembly = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll");
+        string monoAssembly = Path.Combine(monoRoot, "Schedule I_Data", "Managed", "Assembly-CSharp.dll");
+        if (!File.Exists(sourceProject) || !File.Exists(il2CppAssembly) || !File.Exists(monoAssembly))
+        {
+            Console.WriteLine("Skipping S1-VoiceChat Mono-only build-gated integration because local game roots are not available.");
+            return;
+        }
+
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "src", "S1VoiceChat", "S1VoiceChat.csproj");
+            ReduceS1VoiceChatCopyToMonoOnly(tempProject);
+            string monoOnlyProjectHash = ComputeSha256(tempProject);
+
+            ProjectAnalysis monoOnlyProject = analyzer.Analyze(tempProject).Projects.Single();
+            AssertHasRuntime(monoOnlyProject, "MonoMelon", RuntimeKind.Mono);
+            Assert(
+                monoOnlyProject.Configurations.All(configuration => !configuration.Name.Contains("Il2Cpp", StringComparison.OrdinalIgnoreCase)),
+                "The S1-VoiceChat test fixture must start without IL2CPP build configurations before migration.");
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: true,
+                    Build: true,
+                    BuildTimeoutSeconds: 180,
+                    Il2CppGamePath: il2CppRoot,
+                    MonoGamePath: monoRoot));
+
+            Assert(
+                result.Success,
+                $"Mono-only S1-VoiceChat copy should migrate to dual runtime and build for both runtimes. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "S1-VoiceChat build-gated verification should delete its sandbox.");
+            Assert(result.AfterDiagnostics.Count == 0, $"S1-VoiceChat migration should leave no analyzer diagnostics. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.BuildResults is not null && result.BuildResults.Count == 2, $"S1-VoiceChat should build-check two configurations. Build output: {FormatBuildResults(result.BuildResults)}");
+            IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults!;
+            Assert(buildResults.All(build => build.Success), $"Every S1-VoiceChat migrated build should pass. Build output: {FormatBuildResults(buildResults)}");
+            Assert(buildResults.Any(build => build.Configuration == "MonoMelon" && build.Runtime == RuntimeKind.Mono), "S1-VoiceChat build results should include MonoMelon.");
+            Assert(buildResults.Any(build => build.Configuration == "Il2cppMelon" && build.Runtime == RuntimeKind.Il2Cpp), "S1-VoiceChat build results should include generated Il2cppMelon.");
+            Assert(
+                string.Equals(ComputeSha256(tempProject), monoOnlyProjectHash, StringComparison.Ordinal),
+                "verify-migration should not mutate the Mono-only S1-VoiceChat fixture project.");
+            Assert(
+                string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+                "S1-VoiceChat verify-migration should not mutate the real project file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch()
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "BarsGraphics");
@@ -2970,11 +3034,15 @@ internal sealed class S1InteropFixtureTests
             MigrationBuildResult il2CppBuild = result.BuildResults!.Single(build => build.Configuration == "IL2CPP");
             Assert(
                 monoBuild.Command.Contains($"-p:S1Dir={monoRoot}", StringComparison.Ordinal) &&
-                monoBuild.Command.Contains($"-p:GamePath={monoRoot}", StringComparison.Ordinal),
+                monoBuild.Command.Contains($"-p:GamePath={monoRoot}", StringComparison.Ordinal) &&
+                monoBuild.Command.Contains($"-p:MonoAssembliesPath={Path.Combine(monoRoot, "Schedule I_Data", "Managed")}", StringComparison.Ordinal) &&
+                monoBuild.Command.Contains($"-p:MelonLoaderNet35Path={Path.Combine(monoRoot, "MelonLoader", "net35")}", StringComparison.Ordinal),
                 $"Mono build command should receive Mono game roots. Command: {monoBuild.Command}");
             Assert(
                 il2CppBuild.Command.Contains($"-p:S1Dir={il2CppRoot}", StringComparison.Ordinal) &&
-                il2CppBuild.Command.Contains($"-p:GamePath={il2CppRoot}", StringComparison.Ordinal),
+                il2CppBuild.Command.Contains($"-p:GamePath={il2CppRoot}", StringComparison.Ordinal) &&
+                il2CppBuild.Command.Contains($"-p:Il2CppAssembliesPath={Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies")}", StringComparison.Ordinal) &&
+                il2CppBuild.Command.Contains($"-p:MelonLoaderNet6Path={Path.Combine(il2CppRoot, "MelonLoader", "net6")}", StringComparison.Ordinal),
                 $"IL2CPP build command should receive IL2CPP game roots. Command: {il2CppBuild.Command}");
         }
         finally
@@ -4630,7 +4698,7 @@ internal sealed class S1InteropFixtureTests
         return string.Join(
             "; ",
             buildResults.Select(result =>
-                $"{result.Configuration}/{result.Runtime}: exit={result.ExitCode}, success={result.Success}, timedOut={result.TimedOut}, readiness={result.ReadinessStatus}, attribution={result.Attribution}, kind={result.FailureKind}, summary={result.Summary}, issues={string.Join("|", result.Issues.Select(issue => $"{issue.Kind}:{issue.Include}:{issue.Path}"))}, output={result.Output}"));
+                $"{result.Configuration}/{result.Runtime}: exit={result.ExitCode}, success={result.Success}, timedOut={result.TimedOut}, readiness={result.ReadinessStatus}, attribution={result.Attribution}, kind={result.FailureKind}, summary={result.Summary}, issues={string.Join("|", result.Issues.Select(issue => $"{issue.Kind}:{issue.Include}:{issue.Path}"))}, command={result.Command}, output={result.Output}"));
     }
 
     private static string ComputeSha256(string path)
@@ -4696,7 +4764,6 @@ internal sealed class S1InteropFixtureTests
                 element.Remove();
             }
         }
-
         XElement configurations = document.Descendants()
             .First(element => element.Name.LocalName.Equals("Configurations", StringComparison.OrdinalIgnoreCase));
         configurations.Value = "Mono;MonoRelease";
@@ -4709,6 +4776,44 @@ internal sealed class S1InteropFixtureTests
                          element.Elements().Any(child => child.Name.LocalName.Equals("Reference", StringComparison.OrdinalIgnoreCase))))
         {
             itemGroup.SetAttributeValue("Condition", monoReferenceCondition);
+        }
+
+        document.Save(projectPath);
+    }
+
+    private static void ReduceS1VoiceChatCopyToMonoOnly(string projectPath)
+    {
+        XDocument document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement element in document.Root!.Elements().ToArray())
+        {
+            string condition = element.Attribute("Condition")?.Value ?? string.Empty;
+            if ((element.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase) ||
+                 element.Name.LocalName.Equals("ItemGroup", StringComparison.OrdinalIgnoreCase)) &&
+                (condition.Contains("Il2CppMelon", StringComparison.OrdinalIgnoreCase) ||
+                 condition.Contains("IL2CPPMELON", StringComparison.OrdinalIgnoreCase)))
+            {
+                element.Remove();
+            }
+        }
+        foreach (XElement element in document.Descendants().ToArray())
+        {
+            string condition = element.Attribute("Condition")?.Value ?? string.Empty;
+            if (condition.Contains("Il2CppMelon", StringComparison.OrdinalIgnoreCase) ||
+                condition.Contains("IL2CPPMELON", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Remove();
+            }
+        }
+
+        XElement configurations = document.Descendants()
+            .First(element => element.Name.LocalName.Equals("Configurations", StringComparison.OrdinalIgnoreCase));
+        configurations.Value = "MonoMelon";
+
+        XElement? targetFrameworks = document.Descendants()
+            .FirstOrDefault(element => element.Name.LocalName.Equals("TargetFrameworks", StringComparison.OrdinalIgnoreCase));
+        if (targetFrameworks is not null)
+        {
+            targetFrameworks.Value = "netstandard2.1";
         }
 
         document.Save(projectPath);

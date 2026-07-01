@@ -1665,7 +1665,12 @@ public sealed class MigrationApplier
                text.Contains("$(LocalMonoDeploymentPath)", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("$(LocalIl2CppDeploymentPath)", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("0Harmony", StringComparison.OrdinalIgnoreCase) ||
-               text.Contains("Il2CppInterop", StringComparison.OrdinalIgnoreCase);
+               text.Contains("Il2CppInterop", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("SteamNetworkLib", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("S1API", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("S1MAPI", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("bGUI", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("MeshVault", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAbsoluteWindowsPath(string value) =>

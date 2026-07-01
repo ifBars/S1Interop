@@ -38,6 +38,7 @@ public static class DualRuntimeProjectScaffolder
         }
 
         EnsureConfigurationsElement(document, configurations.Concat(newIl2CppConfigurations));
+        EnsureIl2CppTargetFrameworks(document);
         EnsureIl2CppPathDefaults(document);
         ConditionUnconditionedReferenceGroups(document, sourceMonoConfigurations);
 
@@ -54,6 +55,21 @@ public static class DualRuntimeProjectScaffolder
         }
 
         return true;
+    }
+
+    private static void EnsureIl2CppTargetFrameworks(XDocument document)
+    {
+        XElement? targetFrameworks = document.Descendants().FirstOrDefault(IsNamed("TargetFrameworks"));
+        if (targetFrameworks is null)
+        {
+            return;
+        }
+
+        string[] frameworks = SplitMsBuildList(targetFrameworks.Value)
+            .Append("net6.0")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        targetFrameworks.Value = string.Join(";", frameworks);
     }
 
     private static void ConditionUnconditionedReferenceGroups(XDocument document, IReadOnlyList<string> monoConfigurations)
@@ -266,6 +282,11 @@ public static class DualRuntimeProjectScaffolder
             return "Il2CppFishNet.Runtime";
         }
 
+        if (include.Equals("com.rlabrecque.steamworks.net", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Il2Cppcom.rlabrecque.steamworks.net";
+        }
+
         if (include.StartsWith("ScheduleOne", StringComparison.OrdinalIgnoreCase))
         {
             return $"Il2Cpp{include}";
@@ -286,9 +307,17 @@ public static class DualRuntimeProjectScaffolder
         string rewritten = hintPath
             .Replace(@"Schedule I_Data\Managed", @"MelonLoader\Il2CppAssemblies", StringComparison.OrdinalIgnoreCase)
             .Replace(@"/Schedule I_Data/Managed", @"/MelonLoader/Il2CppAssemblies", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MonoAssembliesPath)", "$(ManagedPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MonoManagedPath)", "$(ManagedPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MonoManagedDllPath)", "$(ManagedPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(SteamworksManagedPath)", "$(ManagedPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MelonLoaderMonoAssembliesPath)", "$(MelonLoaderPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MonoMelonLoaderPath)", "$(MelonLoaderPath)", StringComparison.OrdinalIgnoreCase)
+            .Replace("$(MelonLoaderNet35Path)", "$(MelonLoaderPath)", StringComparison.OrdinalIgnoreCase)
             .Replace("net35", "net6", StringComparison.OrdinalIgnoreCase)
             .Replace(monoConfiguration, il2CppConfiguration, StringComparison.OrdinalIgnoreCase)
             .Replace("Mono", "Il2cpp", StringComparison.OrdinalIgnoreCase)
+            .Replace("Il2cppAssemblyPath", "Il2CppAssemblyPath", StringComparison.OrdinalIgnoreCase)
             .Replace($"{originalInclude}.dll", $"{rewrittenInclude}.dll", StringComparison.OrdinalIgnoreCase);
 
         if (originalInclude.Equals("FishNet.Runtime", StringComparison.OrdinalIgnoreCase) &&
