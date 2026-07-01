@@ -4099,7 +4099,9 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
             [assembly: S1Interop.S1InteropType("ScheduleOne.UI.Phone.Phone", Alias = "Phone", Il2CppTypeName = "Il2CppScheduleOne.UI.Phone.Phone")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
+            [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("Phone", "StartUpdateVolume", Alias = "StartUpdateVolume", Kind = S1Interop.S1InteropMemberKind.Method)]
+            [assembly: S1Interop.S1InteropMember("Phone", "Open", Alias = "OpenPhone", Kind = S1Interop.S1InteropMemberKind.Method, IsStatic = true)]
 
             namespace SyntheticMod
             {
@@ -4139,9 +4141,18 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value);", StringComparison.Ordinal),
             $"Generated member registry should include field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
+            il2CppGenerated.Contains("public const string PlayerCameraInstanceName = \"Instance\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetPlayerCameraInstance() => GetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TrySetPlayerCameraInstance(object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, value);", StringComparison.Ordinal),
+            $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const string OpenPhoneName = \"Open\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? InvokeOpenPhone(params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, OpenPhoneName, null, args);", StringComparison.Ordinal),
+            $"Generated member registry should include static method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("ownerType.GetProperty(memberName, AllBindings)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ownerType.GetField(memberName, AllBindings)", StringComparison.Ordinal) &&

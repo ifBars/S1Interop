@@ -80,11 +80,12 @@ Example:
 ```csharp
 [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
 [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
+[assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
 ```
 
 The generator emits `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName` and a cached `PlayerCamera` resolver. In a Mono build the name resolves to `ScheduleOne.PlayerScripts.PlayerCamera`; in an IL2CPP build it resolves to `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
 
-Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberRegistry.GetNoticeContainer(...)` and `TrySetNoticeContainer(...)`. These helpers intentionally check both properties and fields, which covers a common Schedule One migration case where a value is a field on Mono but a property on IL2CPP.
+Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberRegistry.GetNoticeContainer(...)`, `TrySetNoticeContainer(...)`, and static helpers such as `GetPlayerCameraInstance()`. These helpers intentionally check both properties and fields, which covers a common Schedule One migration case where a value is a field on Mono but a property on IL2CPP.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
 

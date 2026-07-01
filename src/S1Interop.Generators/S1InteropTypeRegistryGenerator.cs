@@ -193,6 +193,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
         string? alias = null;
         S1InteropMemberKind kind = S1InteropMemberKind.FieldOrProperty;
+        bool isStatic = false;
         foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
         {
             if (argument.Key == "Alias" && argument.Value.Value is string aliasValue && !string.IsNullOrWhiteSpace(aliasValue))
@@ -205,13 +206,18 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                     ? S1InteropMemberKind.Method
                     : S1InteropMemberKind.FieldOrProperty;
             }
+            else if (argument.Key == "IsStatic" && argument.Value.Value is bool isStaticValue)
+            {
+                isStatic = isStaticValue;
+            }
         }
 
         return new S1InteropMemberEntry(
             SanitizeIdentifier(alias ?? memberName),
             SanitizeIdentifier(ownerAlias),
             memberName,
-            kind);
+            kind,
+            isStatic);
     }
 
     private static string GenerateRegistrySource(
@@ -284,18 +290,33 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             builder.AppendLine($"        public const string {member.Alias}Name = \"{Escape(member.MemberName)}\";");
             if (member.Kind == S1InteropMemberKind.Method)
             {
-                builder.AppendLine($"        public static object? Invoke{member.Alias}(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, args);");
+                if (member.IsStatic)
+                {
+                    builder.AppendLine($"        public static object? Invoke{member.Alias}(params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, args);");
+                }
+                else
+                {
+                    builder.AppendLine($"        public static object? Invoke{member.Alias}(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, args);");
+                }
             }
             else
             {
-                builder.AppendLine($"        public static object? Get{member.Alias}(object instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance);");
-                builder.AppendLine($"        public static bool TrySet{member.Alias}(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, value);");
+                if (member.IsStatic)
+                {
+                    builder.AppendLine($"        public static object? Get{member.Alias}() => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null);");
+                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, value);");
+                }
+                else
+                {
+                    builder.AppendLine($"        public static object? Get{member.Alias}(object instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance);");
+                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, value);");
+                }
             }
 
             builder.AppendLine();
         }
 
-        builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object instance)");
+        builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object? instance)");
         builder.AppendLine("        {");
         builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, preferMethod: false);");
         builder.AppendLine("            if (member is System.Reflection.PropertyInfo property)");
@@ -311,7 +332,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            return null;");
         builder.AppendLine("        }");
         builder.AppendLine();
-        builder.AppendLine("        public static bool TrySetValue(string ownerTypeName, string memberName, object instance, object? value)");
+        builder.AppendLine("        public static bool TrySetValue(string ownerTypeName, string memberName, object? instance, object? value)");
         builder.AppendLine("        {");
         builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, preferMethod: false);");
         builder.AppendLine("            if (member is System.Reflection.PropertyInfo property && property.CanWrite)");
@@ -401,6 +422,8 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                 public string? Alias { get; set; }
 
                 public S1InteropMemberKind Kind { get; set; }
+
+                public bool IsStatic { get; set; }
             }
         }
         """;
@@ -476,12 +499,13 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
     private readonly struct S1InteropMemberEntry
     {
-        public S1InteropMemberEntry(string alias, string ownerAlias, string memberName, S1InteropMemberKind kind)
+        public S1InteropMemberEntry(string alias, string ownerAlias, string memberName, S1InteropMemberKind kind, bool isStatic)
         {
             Alias = alias;
             OwnerAlias = ownerAlias;
             MemberName = memberName;
             Kind = kind;
+            IsStatic = isStatic;
         }
 
         public string Alias { get; }
@@ -491,6 +515,8 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         public string MemberName { get; }
 
         public S1InteropMemberKind Kind { get; }
+
+        public bool IsStatic { get; }
     }
 
     private sealed class S1InteropTypeEntryComparer : IEqualityComparer<S1InteropTypeEntry>
@@ -523,7 +549,8 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             string.Equals(x.Alias, y.Alias, StringComparison.Ordinal) &&
             string.Equals(x.OwnerAlias, y.OwnerAlias, StringComparison.Ordinal) &&
             string.Equals(x.MemberName, y.MemberName, StringComparison.Ordinal) &&
-            x.Kind == y.Kind;
+            x.Kind == y.Kind &&
+            x.IsStatic == y.IsStatic;
 
         public int GetHashCode(S1InteropMemberEntry obj)
         {
@@ -534,6 +561,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                 hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.OwnerAlias);
                 hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.MemberName);
                 hash = (hash * 31) + (int)obj.Kind;
+                hash = (hash * 31) + (obj.IsStatic ? 1 : 0);
                 return hash;
             }
         }
