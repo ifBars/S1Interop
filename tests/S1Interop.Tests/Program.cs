@@ -52,6 +52,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
         count++;
+        SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
+        count++;
         MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
         count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
@@ -468,6 +470,107 @@ internal sealed class S1InteropFixtureTests
                     operation.RuleId == "rewrite_harmony_overload_bindings" &&
                     operation.Automatic),
                 "Migration plan should rewrite safely parsed Harmony overload bindings.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ReflectionFallbackMod.csproj");
+            string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "ReflectionFallback.cs"),
+                """
+                using System.Reflection;
+
+                namespace ReflectionFallbackMod;
+
+                public static class ReflectionFallback
+                {
+                    public static object? ReadContainer(object notice)
+                    {
+                        FieldInfo? field = notice.GetType().GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            return field.GetValue(notice);
+                        }
+
+                        PropertyInfo? property = notice.GetType().GetProperty("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return property?.GetValue(notice);
+                    }
+
+                    public static object? ReadRenderScale(object pipeline)
+                    {
+                        PropertyInfo? property = pipeline.GetType().GetProperty("renderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (property != null)
+                        {
+                            return property.GetValue(pipeline);
+                        }
+
+                        FieldInfo? field = pipeline.GetType().GetField("m_RenderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return field?.GetValue(pipeline);
+                    }
+
+                    public static object? RuntimeSpecific(object notice)
+                    {
+                #if IL2CPP
+                        FieldInfo? field = notice.GetType().GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        PropertyInfo? property = notice.GetType().GetProperty("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return property?.GetValue(notice) ?? field?.GetValue(notice);
+                #else
+                        return null;
+                #endif
+                    }
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
+            Assert(
+                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 2,
+                "Source analyzer should report field-first and property-first reflection fallbacks while ignoring the runtime-guarded fallback.");
+            Assert(
+                risks.Where(risk => risk.Kind == "FieldPropertyReflectionFallback").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
+                "Reflection fallback risk should point developers toward generated S1InteropMember accessors.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "source_risk_field_property_reflection_fallback" &&
+                    !operation.Automatic),
+                "Migration plan should surface field/property reflection fallback as manual generated-accessor guidance.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
+                "Migration apply should create a source-risk report for reflection fallback guidance.");
+            Assert(File.Exists(reportPath), "Source-risk report was not written for reflection fallback guidance.");
+
+            string report = File.ReadAllText(reportPath);
+            Assert(
+                report.Contains("Field Property Reflection Fallback", StringComparison.Ordinal) &&
+                report.Contains("S1InteropMember", StringComparison.Ordinal),
+                "Source-risk report should include field/property reflection fallback guidance.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
         }
         finally
         {

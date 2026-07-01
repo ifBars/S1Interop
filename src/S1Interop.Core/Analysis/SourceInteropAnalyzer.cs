@@ -28,6 +28,14 @@ public sealed class SourceInteropAnalyzer
         @"\.(?:AddListener|RemoveListener)\(\s*(?<listener>[A-Za-z_][A-Za-z0-9_]*)\s*\)",
         RegexOptions.Compiled);
 
+    private static readonly Regex ReflectionFieldLookupRegex = new(
+        @"\.GetField\s*\(",
+        RegexOptions.Compiled);
+
+    private static readonly Regex ReflectionPropertyLookupRegex = new(
+        @"\.GetProperty\s*\(",
+        RegexOptions.Compiled);
+
     public SourceInteropAnalysis Analyze(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -228,6 +236,18 @@ public sealed class SourceInteropAnalyzer
                 $"{relativePath}:{index + 1}: {trimmed}",
                 "Prefer a generated S1InteropMember method target with ParameterTypeNames so backend-specific type names and by-ref parameters stay centralized."));
         }
+
+        if (IsFieldPropertyReflectionFallbackLine(lines, index))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "FieldPropertyReflectionFallback",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Manual reflection fallback between fields and properties is a common Mono/IL2CPP member-shape drift point.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer generated S1InteropMember field/property accessors so the member name, owner type, cache, and get/set behavior stay centralized across runtimes."));
+        }
     }
 
     private static bool IsHarmonyTranspilerLine(string line) =>
@@ -279,6 +299,20 @@ public sealed class SourceInteropAnalyzer
                 sourceWindow.Contains("new Type[]", StringComparison.Ordinal) ||
                 sourceWindow.Contains("new System.Type[]", StringComparison.Ordinal) ||
                 ContainsCollectionExpressionParameterList(sourceWindow));
+    }
+
+    private static bool IsFieldPropertyReflectionFallbackLine(IReadOnlyList<string> lines, int index)
+    {
+        string line = lines[index];
+        if (!ReflectionFieldLookupRegex.IsMatch(line))
+        {
+            return false;
+        }
+
+        string forwardWindow = GetSourceWindow(lines, index, maxLineCount: 16);
+        string backwardWindow = GetSourceWindow(lines, Math.Max(0, index - 15), Math.Min(16, index + 1));
+        return ReflectionPropertyLookupRegex.IsMatch(forwardWindow) ||
+               ReflectionPropertyLookupRegex.IsMatch(backwardWindow);
     }
 
     private static string GetSourceWindow(IReadOnlyList<string> lines, int startIndex, int maxLineCount)
