@@ -235,6 +235,9 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticHarmonyOverloadRisks = project.SourceInterop.SourceRisks
                 .Where(HarmonyOverloadBindingRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticMemberAccessRisks = project.SourceInterop.SourceRisks
+                .Where(MemberAccessFallbackRewriter.CanRewrite)
+                .ToArray();
             bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
                 .Any(risk => risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase)) &&
                 new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count > 0;
@@ -242,6 +245,7 @@ public sealed class MigrationPlanner
                 .Except(automaticUnityEventRisks)
                 .Except(automaticDelegateRisks)
                 .Except(automaticHarmonyOverloadRisks)
+                .Except(automaticMemberAccessRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -350,6 +354,20 @@ public sealed class MigrationPlanner
                     "low",
                     true,
                     "Generate S1InteropMember declarations for typed field/property reflection fallback targets."));
+
+                foreach (string sourceFile in automaticMemberAccessRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_member_access_fallbacks",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple typed field/property reflection fallback getters through generated S1InteropMemberRegistry accessors."));
+                }
             }
 
             if (manualRisks.Length > 0)

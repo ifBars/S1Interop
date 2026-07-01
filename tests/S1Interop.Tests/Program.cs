@@ -52,6 +52,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
         count++;
+        MemberAccessFallbackRewriterRewritesSimpleTypedGetter();
+        count++;
         SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
         count++;
         MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
@@ -484,6 +486,7 @@ internal sealed class S1InteropFixtureTests
         try
         {
             string tempProject = Path.Combine(tempRoot, "ReflectionFallbackMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "ReflectionFallback.cs");
             string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
             string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
             File.WriteAllText(
@@ -496,7 +499,7 @@ internal sealed class S1InteropFixtureTests
                 </Project>
                 """);
             File.WriteAllText(
-                Path.Combine(tempRoot, "ReflectionFallback.cs"),
+                tempSource,
                 """
                 using System.Reflection;
 
@@ -504,16 +507,16 @@ internal sealed class S1InteropFixtureTests
 
                 public static class ReflectionFallback
                 {
-                    public static object? ReadTypedNotice()
+                    public static GameObject? GetNoticeContainer(GameOffenceNotice notice)
                     {
                         FieldInfo? field = typeof(GameOffenceNotice).GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (field != null)
+                        if (field != null && field.GetValue(notice) is GameObject fieldValue)
                         {
-                            return field.GetValue(null);
+                            return fieldValue;
                         }
 
                         PropertyInfo? property = typeof(GameOffenceNotice).GetProperty("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        return property?.GetValue(null);
+                        return property == null ? null : property.GetValue(notice) as GameObject;
                     }
 
                     public static object? ReadContainer(object notice)
@@ -576,6 +579,11 @@ internal sealed class S1InteropFixtureTests
                 "Migration plan should generate member-access target attributes for typed field/property reflection fallbacks.");
             Assert(
                 projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "rewrite_member_access_fallbacks" &&
+                    operation.Automatic),
+                "Migration plan should rewrite simple typed field/property fallback getters.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
                     operation.RuleId == "install_s1interop_generator_package" &&
                     operation.Automatic),
                 "Migration plan should install the S1Interop generator package when member-access target attributes are generated.");
@@ -584,6 +592,9 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "generate_member_access_targets"),
                 "Migration apply should create generated member-access target declarations.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_member_access_fallbacks"),
+                "Migration apply should rewrite simple typed member-access fallback getters.");
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
                 "Migration apply should create a source-risk report for reflection fallback guidance.");
@@ -596,6 +607,12 @@ internal sealed class S1InteropFixtureTests
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"GameOffenceNotice\", \"container\", Alias = \"container\")]", StringComparison.Ordinal),
                 "Generated member-access targets should include typed owner/member declarations.");
 
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer(notice) as GameObject;", StringComparison.Ordinal) &&
+                !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
+                "Simple typed fallback getter should be rewritten through S1InteropMemberRegistry.");
+
             string report = File.ReadAllText(reportPath);
             Assert(
                 report.Contains("Field Property Reflection Fallback", StringComparison.Ordinal) &&
@@ -604,6 +621,7 @@ internal sealed class S1InteropFixtureTests
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the generator package reference change.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
         }
@@ -611,6 +629,45 @@ internal sealed class S1InteropFixtureTests
         {
             DeleteDirectoryIfExists(tempRoot);
         }
+    }
+
+    private void MemberAccessFallbackRewriterRewritesSimpleTypedGetter()
+    {
+        string source =
+            """
+            using System.Reflection;
+
+            namespace ReflectionFallbackMod;
+
+            public static class ReflectionFallback
+            {
+                public static GameObject? GetNoticeContainer(GameOffenceNotice notice)
+                {
+                    FieldInfo? field = typeof(GameOffenceNotice).GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (field != null && field.GetValue(notice) is GameObject fieldValue)
+                    {
+                        return fieldValue;
+                    }
+
+                    PropertyInfo? property = typeof(GameOffenceNotice).GetProperty("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    return property == null ? null : property.GetValue(notice) as GameObject;
+                }
+            }
+            """;
+        string sourcePath = Path.Combine(Path.GetTempPath(), "ReflectionFallback.cs");
+        var target = new MemberAccessTarget(
+            sourcePath,
+            9,
+            "GameOffenceNotice",
+            "GameOffenceNotice",
+            "container",
+            "container",
+            IsStatic: false);
+
+        string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
+        Assert(
+            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer(notice) as GameObject;", StringComparison.Ordinal),
+            $"Simple typed fallback getter should rewrite through the generated member registry. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MigrationApplyAndRollbackRewritesHarmonyOverloadBindings()
