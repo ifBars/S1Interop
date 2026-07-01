@@ -702,8 +702,8 @@ internal sealed class S1InteropFixtureTests
 
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", IsStatic = true)]", StringComparison.Ordinal),
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\", Kind = S1Interop.S1InteropMemberKind.Field)]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal),
                 "Generated member-access targets should include direct member reflection declarations and static metadata.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
@@ -4808,8 +4808,10 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
+            [assembly: S1Interop.S1InteropMember("PlayerCamera", "_homeScreenInstance", Alias = "HomeScreenField", Kind = S1Interop.S1InteropMemberKind.Field)]
             [assembly: S1Interop.S1InteropMember("Phone", "StartUpdateVolume", Alias = "StartUpdateVolume", Kind = S1Interop.S1InteropMemberKind.Method)]
             [assembly: S1Interop.S1InteropMember("Phone", "Open", Alias = "OpenPhone", Kind = S1Interop.S1InteropMemberKind.Method, IsStatic = true)]
+            [assembly: S1Interop.S1InteropMember("Phone", "deviceUniqueIdentifier", Alias = "DeviceIdProperty", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
 
             namespace SyntheticMod
@@ -4851,18 +4853,22 @@ internal sealed class S1InteropFixtureTests
             "Generated type registry should fall back to cached loaded-assembly lookup for simple generated migration type names.");
         Assert(
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainer<T>(object instance) where T : class => GetNoticeContainer(instance) as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainerValue<T>(object instance) where T : struct => GetNoticeContainer(instance) is T value ? value : (T?)null;", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value);", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal),
             $"Generated member registry should include field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string PlayerCameraInstanceName = \"Instance\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static object? GetPlayerCameraInstance() => GetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetPlayerCameraInstance() => GetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetPlayerCameraInstance<T>() where T : class => GetPlayerCameraInstance() as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetPlayerCameraInstanceValue<T>() where T : struct => GetPlayerCameraInstance() is T value ? value : (T?)null;", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static bool TrySetPlayerCameraInstance(object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, value);", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static bool TrySetPlayerCameraInstance(object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, value, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal),
             $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public static object? GetHomeScreenField(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, HomeScreenFieldName, instance, S1InteropMemberKind.Field);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetDeviceIdProperty() => GetValue(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, null, S1InteropMemberKind.Property);", StringComparison.Ordinal),
+            $"Generated member registry should honor exact field/property member kinds. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static System.Reflection.MethodInfo? StartUpdateVolumeMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null);", StringComparison.Ordinal) &&
@@ -4878,6 +4884,8 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public static object? InvokeIsDestinationValid(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" }, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include overload-specific method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
+            il2CppGenerated.Contains("case S1InteropMemberKind.Field:", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("case S1InteropMemberKind.Property:", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ownerType.GetProperty(memberName, AllBindings)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ownerType.GetField(memberName, AllBindings)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ownerType.GetMethod(memberName, AllBindings, binder: null, types: parameterTypes, modifiers: null)", StringComparison.Ordinal) &&

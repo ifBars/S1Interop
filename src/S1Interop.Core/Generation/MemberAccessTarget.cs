@@ -1,5 +1,12 @@
 namespace S1Interop.Core;
 
+public enum MemberAccessKind
+{
+    FieldOrProperty = 0,
+    Field = 1,
+    Property = 2
+}
+
 public sealed record MemberAccessTarget(
     string SourceFilePath,
     int Line,
@@ -7,4 +14,5 @@ public sealed record MemberAccessTarget(
     string OwnerTypeName,
     string MemberName,
     string MemberAlias,
-    bool IsStatic);
+    bool IsStatic,
+    MemberAccessKind Kind = MemberAccessKind.FieldOrProperty);

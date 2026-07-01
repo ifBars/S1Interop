@@ -32,6 +32,15 @@ public sealed class MemberAccessTargetGenerator
             builder.Append($"\"{Escape(target.OwnerAlias)}\", ");
             builder.Append($"\"{Escape(target.MemberName)}\", ");
             builder.Append($"Alias = \"{Escape(target.MemberAlias)}\"");
+            if (target.Kind == MemberAccessKind.Field)
+            {
+                builder.Append(", Kind = S1Interop.S1InteropMemberKind.Field");
+            }
+            else if (target.Kind == MemberAccessKind.Property)
+            {
+                builder.Append(", Kind = S1Interop.S1InteropMemberKind.Property");
+            }
+
             if (target.IsStatic)
             {
                 builder.Append(", IsStatic = true");

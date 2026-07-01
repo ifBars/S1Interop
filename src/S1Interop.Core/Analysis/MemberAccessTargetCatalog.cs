@@ -60,11 +60,17 @@ public sealed class MemberAccessTargetCatalog
                 ownerTypeName,
                 memberName,
                 SanitizeAlias(memberName),
-                IsStatic: IsStaticMemberLookup(lines, index)));
+                IsStatic: IsStaticMemberLookup(lines, index),
+                Kind: GetMemberAccessKind(match.Groups["kind"].Value)));
         }
 
         return CreateUniqueAliases(targets);
     }
+
+    private static MemberAccessKind GetMemberAccessKind(string kind) =>
+        kind.Equals("Field", StringComparison.Ordinal)
+            ? MemberAccessKind.Field
+            : MemberAccessKind.Property;
 
     private static bool IsStaticMemberLookup(IReadOnlyList<string> lines, int startIndex)
     {
@@ -95,7 +101,8 @@ public sealed class MemberAccessTargetCatalog
         var results = new List<MemberAccessTarget>(targets.Count);
 
         foreach (MemberAccessTarget target in targets
-                     .DistinctBy(target => (target.OwnerTypeName, target.MemberName, target.IsStatic))
+                     .GroupBy(target => (target.OwnerTypeName, target.MemberName, target.IsStatic))
+                     .Select(group => MergeMemberAccessKinds(group.ToArray()))
                      .OrderBy(target => target.SourceFilePath, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(target => target.Line))
         {
@@ -116,6 +123,15 @@ public sealed class MemberAccessTargetCatalog
         }
 
         return results;
+    }
+
+    private static MemberAccessTarget MergeMemberAccessKinds(IReadOnlyList<MemberAccessTarget> targets)
+    {
+        MemberAccessTarget first = targets.OrderBy(target => target.Line).First();
+        MemberAccessKind kind = targets.Select(target => target.Kind).Distinct().Count() == 1
+            ? first.Kind
+            : MemberAccessKind.FieldOrProperty;
+        return first with { Kind = kind };
     }
 
     private static Dictionary<string, string> DiscoverScheduleOneUsings(IEnumerable<string> lines)

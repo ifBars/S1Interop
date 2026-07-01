@@ -235,9 +235,13 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             }
             else if (argument.Key == "Kind" && argument.Value.Value is int kindValue)
             {
-                kind = kindValue == (int)S1InteropMemberKind.Method
-                    ? S1InteropMemberKind.Method
-                    : S1InteropMemberKind.FieldOrProperty;
+                kind = kindValue switch
+                {
+                    (int)S1InteropMemberKind.Method => S1InteropMemberKind.Method,
+                    (int)S1InteropMemberKind.Field => S1InteropMemberKind.Field,
+                    (int)S1InteropMemberKind.Property => S1InteropMemberKind.Property,
+                    _ => S1InteropMemberKind.FieldOrProperty
+                };
             }
             else if (argument.Key == "IsStatic" && argument.Value.Value is bool isStaticValue)
             {
@@ -403,19 +407,20 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             }
             else
             {
+                string memberKind = $"S1InteropMemberKind.{member.Kind}";
                 if (member.IsStatic)
                 {
-                    builder.AppendLine($"        public static object? Get{member.Alias}() => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null);");
+                    builder.AppendLine($"        public static object? Get{member.Alias}() => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, {memberKind});");
                     builder.AppendLine($"        public static T? Get{member.Alias}<T>() where T : class => Get{member.Alias}() as T;");
                     builder.AppendLine($"        public static T? Get{member.Alias}Value<T>() where T : struct => Get{member.Alias}() is T value ? value : (T?)null;");
-                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, value);");
+                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, value, {memberKind});");
                 }
                 else
                 {
-                    builder.AppendLine($"        public static object? Get{member.Alias}(object instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance);");
+                    builder.AppendLine($"        public static object? Get{member.Alias}(object instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, {memberKind});");
                     builder.AppendLine($"        public static T? Get{member.Alias}<T>(object instance) where T : class => Get{member.Alias}(instance) as T;");
                     builder.AppendLine($"        public static T? Get{member.Alias}Value<T>(object instance) where T : struct => Get{member.Alias}(instance) is T value ? value : (T?)null;");
-                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, value);");
+                    builder.AppendLine($"        public static bool TrySet{member.Alias}(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, value, {memberKind});");
                 }
             }
 
@@ -424,7 +429,12 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
         builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object? instance)");
         builder.AppendLine("        {");
-        builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, preferMethod: false);");
+        builder.AppendLine("            return GetValue(ownerTypeName, memberName, instance, S1InteropMemberKind.FieldOrProperty);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object? instance, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, kind);");
         builder.AppendLine("            if (member is System.Reflection.PropertyInfo property)");
         builder.AppendLine("            {");
         builder.AppendLine("                return property.GetValue(instance, null);");
@@ -440,7 +450,12 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("        public static bool TrySetValue(string ownerTypeName, string memberName, object? instance, object? value)");
         builder.AppendLine("        {");
-        builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, preferMethod: false);");
+        builder.AppendLine("            return TrySetValue(ownerTypeName, memberName, instance, value, S1InteropMemberKind.FieldOrProperty);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static bool TrySetValue(string ownerTypeName, string memberName, object? instance, object? value, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, kind);");
         builder.AppendLine("            if (member is System.Reflection.PropertyInfo property && property.CanWrite)");
         builder.AppendLine("            {");
         builder.AppendLine("                property.SetValue(instance, value, null);");
@@ -465,24 +480,37 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("        public static System.Reflection.MethodInfo? ResolveMethod(string ownerTypeName, string memberName, string[]? parameterTypeNames)");
         builder.AppendLine("        {");
-        builder.AppendLine("            return ResolveMember(ownerTypeName, memberName, parameterTypeNames, preferMethod: true) as System.Reflection.MethodInfo;");
+        builder.AppendLine("            return ResolveMember(ownerTypeName, memberName, parameterTypeNames, S1InteropMemberKind.Method) as System.Reflection.MethodInfo;");
         builder.AppendLine("        }");
         builder.AppendLine();
-        builder.AppendLine("        private static System.Reflection.MemberInfo? ResolveMember(string ownerTypeName, string memberName, string[]? parameterTypeNames, bool preferMethod)");
+        builder.AppendLine("        private static System.Reflection.MemberInfo? ResolveMember(string ownerTypeName, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)");
         builder.AppendLine("        {");
-        builder.AppendLine("            string cacheKey = ownerTypeName + \"::\" + memberName + \"::\" + preferMethod.ToString() + \"::\" + (parameterTypeNames is null ? string.Empty : string.Join(\"|\", parameterTypeNames));");
+        builder.AppendLine("            string cacheKey = ownerTypeName + \"::\" + memberName + \"::\" + ((int)kind).ToString() + \"::\" + (parameterTypeNames is null ? string.Empty : string.Join(\"|\", parameterTypeNames));");
         builder.AppendLine("            if (!Cache.TryGetValue(cacheKey, out System.Reflection.MemberInfo? member))");
         builder.AppendLine("            {");
         builder.AppendLine("                System.Type? ownerType = S1InteropTypeRegistry.Resolve(ownerTypeName);");
         builder.AppendLine("                member = ownerType is null");
         builder.AppendLine("                    ? null");
-        builder.AppendLine("                    : preferMethod");
-        builder.AppendLine("                        ? (System.Reflection.MemberInfo?)ResolveMethod(ownerType, memberName, parameterTypeNames)");
-        builder.AppendLine("                        : ownerType.GetProperty(memberName, AllBindings) ?? (System.Reflection.MemberInfo?)ownerType.GetField(memberName, AllBindings);");
+        builder.AppendLine("                    : ResolveMember(ownerType, memberName, parameterTypeNames, kind);");
         builder.AppendLine("                Cache[cacheKey] = member;");
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            return member;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MemberInfo? ResolveMember(System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            switch (kind)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                case S1InteropMemberKind.Method:");
+        builder.AppendLine("                    return ResolveMethod(ownerType, memberName, parameterTypeNames);");
+        builder.AppendLine("                case S1InteropMemberKind.Field:");
+        builder.AppendLine("                    return ownerType.GetField(memberName, AllBindings);");
+        builder.AppendLine("                case S1InteropMemberKind.Property:");
+        builder.AppendLine("                    return ownerType.GetProperty(memberName, AllBindings);");
+        builder.AppendLine("                default:");
+        builder.AppendLine("                    return ownerType.GetProperty(memberName, AllBindings) ?? (System.Reflection.MemberInfo?)ownerType.GetField(memberName, AllBindings);");
+        builder.AppendLine("            }");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static System.Reflection.MethodInfo? ResolveMethod(System.Type ownerType, string memberName, string[]? parameterTypeNames)");
@@ -620,7 +648,9 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             internal enum S1InteropMemberKind
             {
                 FieldOrProperty = 0,
-                Method = 1
+                Method = 1,
+                Field = 2,
+                Property = 3
             }
 
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -871,7 +901,9 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
     private enum S1InteropMemberKind
     {
         FieldOrProperty,
-        Method
+        Method,
+        Field,
+        Property
     }
 
     private readonly struct S1InteropBridgeRequests
