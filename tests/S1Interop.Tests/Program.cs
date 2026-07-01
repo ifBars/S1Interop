@@ -146,6 +146,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
+        S1InteropGeneratorProducesCompileTimeEventBridges();
+        count++;
         SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
         count++;
         DuplicateLangVersionUsesEffectiveLastValueForSdkFacadeSupport();
@@ -1682,7 +1684,8 @@ internal sealed class S1InteropFixtureTests
             File.WriteAllText(
                 Path.Combine(tempRoot, "GeneratorHints.cs"),
                 """
-                [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+                [assembly: S1Interop.S1InteropGenerateUnityEventBridge]
+                [assembly: S1Interop.S1InteropGenerateDelegateEventBridge]
 
                 namespace GeneratorAwareMod
                 {
@@ -1697,12 +1700,12 @@ internal sealed class S1InteropFixtureTests
             ProjectMigrationPlan projectPlan = plan.Projects.Single();
             Assert(
                 projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
-                "Projects declaring S1Interop generator attributes should plan private generator package installation.");
+                "Projects declaring S1Interop bridge generator attributes should plan private generator package installation.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
-                "Projects declaring S1Interop generator attributes should install the generator package during migration.");
+                "Projects declaring S1Interop bridge generator attributes should install the generator package during migration.");
 
             string projectText = File.ReadAllText(tempProject);
             Assert(
@@ -4560,6 +4563,78 @@ internal sealed class S1InteropFixtureTests
             "Generated member registry should cache property, field, method overload, and by-ref lookup paths.");
     }
 
+    private void S1InteropGeneratorProducesCompileTimeEventBridges()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropGenerateUnityEventBridge]
+            [assembly: S1Interop.S1InteropGenerateDelegateEventBridge]
+
+            namespace UnityEngine.Events
+            {
+                public delegate void UnityAction();
+                public delegate void UnityAction<T0>(T0 value);
+
+                public sealed class UnityEvent
+                {
+                    public void AddListener(UnityAction listener) { }
+                    public void AddListener(System.Action listener) { }
+                    public void RemoveListener(UnityAction listener) { }
+                    public void RemoveListener(System.Action listener) { }
+                }
+
+                public sealed class UnityEvent<T0>
+                {
+                    public void AddListener(UnityAction<T0> listener) { }
+                    public void AddListener(System.Action<T0> listener) { }
+                    public void RemoveListener(UnityAction<T0> listener) { }
+                    public void RemoveListener(System.Action<T0> listener) { }
+                }
+            }
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+            """;
+
+        IReadOnlyDictionary<string, string> monoGenerated = RunS1InteropGenerator(source, "MONO");
+        IReadOnlyDictionary<string, string> il2CppGenerated = RunS1InteropGenerator(source, "IL2CPP");
+
+        bool hasMonoUnityBridge = monoGenerated.TryGetValue("S1Interop.UnityEventBridge.g.cs", out string? monoUnityBridge);
+        bool hasMonoDelegateBridge = monoGenerated.TryGetValue("S1Interop.DelegateEventBridge.g.cs", out string? monoDelegateBridge);
+        bool hasIl2CppUnityBridge = il2CppGenerated.TryGetValue("S1Interop.UnityEventBridge.g.cs", out string? il2CppUnityBridge);
+        bool hasIl2CppDelegateBridge = il2CppGenerated.TryGetValue("S1Interop.DelegateEventBridge.g.cs", out string? il2CppDelegateBridge);
+
+        Assert(
+            hasMonoUnityBridge && hasMonoDelegateBridge,
+            "Generator should emit requested event bridges for Mono builds.");
+        Assert(
+            hasIl2CppUnityBridge && hasIl2CppDelegateBridge,
+            "Generator should emit requested event bridges for IL2CPP builds.");
+
+        monoUnityBridge ??= string.Empty;
+        monoDelegateBridge ??= string.Empty;
+        il2CppUnityBridge ??= string.Empty;
+        il2CppDelegateBridge ??= string.Empty;
+
+        Assert(
+            monoUnityBridge.Contains("S1InteropUnityEventBridge", StringComparison.Ordinal) &&
+            monoUnityBridge.Contains("UnityEngine.Events.UnityAction wrapped = new UnityEngine.Events.UnityAction(listener);", StringComparison.Ordinal),
+            "Compile-time UnityEvent bridge should include Mono UnityAction wrapping.");
+        Assert(
+            il2CppUnityBridge.Contains("#if IL2CPP", StringComparison.Ordinal) &&
+            il2CppUnityBridge.Contains("System.Action wrapped = new System.Action(listener);", StringComparison.Ordinal),
+            "Compile-time UnityEvent bridge should include IL2CPP System.Action wrapping.");
+        Assert(
+            monoDelegateBridge.Contains("S1InteropDelegateEventBridge", StringComparison.Ordinal) &&
+            il2CppDelegateBridge.Contains("System.Delegate.Combine", StringComparison.Ordinal) &&
+            il2CppDelegateBridge.Contains("System.Delegate.Remove", StringComparison.Ordinal),
+            "Compile-time delegate bridge should include Combine and Remove helpers.");
+    }
+
     private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
@@ -5255,6 +5330,12 @@ internal sealed class S1InteropFixtureTests
 
     private static string RunTypeRegistryGenerator(string source, params string[] symbols)
     {
+        IReadOnlyDictionary<string, string> generatedSources = RunS1InteropGenerator(source, symbols);
+        return generatedSources.Single(pair => pair.Key.Contains("S1Interop.TypeRegistry.g.cs", StringComparison.Ordinal)).Value;
+    }
+
+    private static IReadOnlyDictionary<string, string> RunS1InteropGenerator(string source, params string[] symbols)
+    {
         CSharpParseOptions parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Latest)
             .WithPreprocessorSymbols(symbols);
@@ -5274,11 +5355,14 @@ internal sealed class S1InteropFixtureTests
             $"S1Interop type registry generator reported errors: {string.Join(Environment.NewLine, generatorDiagnostics)}");
         Assert(
             outputCompilation.GetDiagnostics().All(diagnostic => diagnostic.Severity != RoslynDiagnosticSeverity.Error),
-            $"Generated type registry compilation reported errors: {string.Join(Environment.NewLine, outputCompilation.GetDiagnostics())}");
+            $"S1Interop generated compilation reported errors: {string.Join(Environment.NewLine, outputCompilation.GetDiagnostics())}");
 
-        SyntaxTree generatedTree = outputCompilation.SyntaxTrees.Single(tree =>
-            (tree.FilePath ?? string.Empty).Contains("S1Interop.TypeRegistry.g.cs", StringComparison.Ordinal));
-        return generatedTree.GetText().ToString();
+        return outputCompilation.SyntaxTrees
+            .Where(tree => (tree.FilePath ?? string.Empty).Contains("S1Interop.Generators", StringComparison.Ordinal))
+            .ToDictionary(
+                tree => Path.GetFileName(tree.FilePath),
+                tree => tree.GetText().ToString(),
+                StringComparer.Ordinal);
     }
 
     private static IReadOnlyList<MetadataReference> GetTrustedPlatformReferences()
