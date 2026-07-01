@@ -92,6 +92,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateBuildsSandboxConfigurations();
         count++;
+        VerifyMigrationBuildGateStagesLocalS1InteropGeneratorPackage();
+        count++;
         VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
         count++;
         VerifyMigrationBuildGateReportsMissingHintPathReadiness();
@@ -2649,6 +2651,58 @@ internal sealed class S1InteropFixtureTests
                 buildResults.Select(build => build.Configuration).OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .SequenceEqual(["Debug", "Release"], StringComparer.OrdinalIgnoreCase),
                 "Build verification should report Debug and Release configuration builds.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateStagesLocalS1InteropGeneratorPackage()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "GeneratorPackageMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.1" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                [assembly: S1Interop.S1InteropType("System.String", Alias = "StringType")]
+
+                namespace GeneratorPackageMod
+                {
+                    internal static class Core
+                    {
+                        internal static bool HasStringType => S1Interop.Generated.S1InteropTypeRegistry.StringType is not null;
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 120));
+
+            Assert(result.Success, $"Generator package staging should let a sandbox build restore and compile. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.Command.Contains("RestoreAdditionalProjectSources", StringComparison.Ordinal) &&
+                    build.Command.Contains("S1Interop.ExternalReferences", StringComparison.Ordinal)),
+                $"Build commands should include sandbox-local S1Interop package source. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Generator package staging verification should delete its sandbox.");
         }
         finally
         {

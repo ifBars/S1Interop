@@ -278,15 +278,17 @@ public sealed class MigrationVerifier
             ];
         }
 
+        string? s1InteropPackageSource = StageS1InteropGeneratorPackageSource(sandboxProjectPath, project);
         return configurations
-            .Select(configuration => BuildConfiguration(sandboxProjectPath, configuration, options))
+            .Select(configuration => BuildConfiguration(sandboxProjectPath, configuration, options, s1InteropPackageSource))
             .ToArray();
     }
 
     private static MigrationBuildResult BuildConfiguration(
         string projectPath,
         ConfigurationAnalysis configuration,
-        MigrationVerifierOptions options)
+        MigrationVerifierOptions options,
+        string? additionalRestoreSource)
     {
         MigrationBuildIssue[] readinessIssues = AnalyzeBuildReadiness(projectPath, configuration, options);
         List<string> arguments =
@@ -304,6 +306,11 @@ public sealed class MigrationVerifier
             "-p:DeployOnBuild=false",
             "-p:BuildProjectReferences=false"
         ];
+        if (!string.IsNullOrWhiteSpace(additionalRestoreSource))
+        {
+            arguments.Add($"-p:RestoreAdditionalProjectSources={additionalRestoreSource}");
+        }
+
         if (!string.IsNullOrWhiteSpace(configuration.TargetFramework))
         {
             arguments.Add($"-p:TargetFramework={configuration.TargetFramework}");
@@ -423,6 +430,98 @@ public sealed class MigrationVerifier
             issues,
             command,
             capturedOutput);
+    }
+
+    private static string? StageS1InteropGeneratorPackageSource(string sandboxProjectPath, ProjectAnalysis project)
+    {
+        if (!project.Configurations.Any(configuration =>
+                configuration.PackageReferences.Any(package =>
+                    string.Equals(package.Include, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase))))
+        {
+            return null;
+        }
+
+        string? generatorProjectPath = FindS1InteropGeneratorProject(Path.GetDirectoryName(sandboxProjectPath)!);
+        if (generatorProjectPath is null)
+        {
+            return null;
+        }
+
+        string packageSource = Path.Combine(
+            Path.GetDirectoryName(sandboxProjectPath)!,
+            ExternalReferenceStagingDirectoryName,
+            "NuGet");
+        Directory.CreateDirectory(packageSource);
+        if (Directory.EnumerateFiles(packageSource, "S1Interop.Generators.*.nupkg").Any())
+        {
+            return packageSource;
+        }
+
+        using var process = new Process();
+        process.StartInfo.FileName = "dotnet";
+        process.StartInfo.ArgumentList.Add("pack");
+        process.StartInfo.ArgumentList.Add(generatorProjectPath);
+        process.StartInfo.ArgumentList.Add("--configuration");
+        process.StartInfo.ArgumentList.Add("Debug");
+        process.StartInfo.ArgumentList.Add("--output");
+        process.StartInfo.ArgumentList.Add(packageSource);
+        process.StartInfo.ArgumentList.Add("-v:minimal");
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        if (!process.WaitForExit(60000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Build verification will still report the package restore failure if staging failed.
+            }
+
+            return null;
+        }
+
+        return process.ExitCode == 0 &&
+               Directory.EnumerateFiles(packageSource, "S1Interop.Generators.*.nupkg").Any()
+            ? packageSource
+            : null;
+    }
+
+    private static string? FindS1InteropGeneratorProject(string sandboxProjectDirectory)
+    {
+        foreach (string anchor in GetS1InteropSearchAnchors(sandboxProjectDirectory))
+        {
+            string candidate = Path.Combine(anchor, "src", "S1Interop.Generators", "S1Interop.Generators.csproj");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetS1InteropSearchAnchors(string sandboxProjectDirectory)
+    {
+        foreach (string ancestor in EnumerateAncestors(Directory.GetCurrentDirectory()).Take(8))
+        {
+            yield return ancestor;
+        }
+
+        foreach (string ancestor in EnumerateAncestors(AppContext.BaseDirectory).Take(8))
+        {
+            yield return ancestor;
+        }
+
+        foreach (string ancestor in EnumerateAncestors(sandboxProjectDirectory).Take(4))
+        {
+            yield return ancestor;
+        }
     }
 
     private static MigrationBuildIssue[] AnalyzeBuildReadiness(
