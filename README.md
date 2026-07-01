@@ -13,6 +13,7 @@ It is an alpha tool. It can already inspect real mod projects, scaffold dual-run
 - Update a sibling `.sln` so generated configurations appear in Visual Studio.
 - Move machine-specific game paths into ignored `local.build.props` scaffolding.
 - Rewrite simple ScheduleOne using directives, generated type facades, UnityEvent listener calls, and other handled source patterns.
+- Generate opt-in Roslyn compile-time helpers for backend-specific type-name/reflection caches.
 - Generate a source-risk report for cases that still need deliberate review, such as Harmony transpilers or unsafe delegate surfaces.
 - Run the migration in a throwaway sandbox with `verify-migration` before touching the real project.
 
@@ -63,8 +64,32 @@ src/S1Interop.Core/
   Rewriting/     source rewrite helpers
   Utilities/     shared low-level helpers
 
+src/S1Interop.Generators/
+  Roslyn source generators for opt-in compile-time compatibility helpers
+
 tests/S1Interop.Tests/
   Portable and local integration coverage
+```
+
+## Compile-time generators
+
+S1Interop also ships an experimental analyzer/source-generator package, `S1Interop.Generators`. It is for cases where a mod wants compile-time generated helpers instead of hand-maintained backend strings and reflection caches.
+
+Example:
+
+```csharp
+[assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+```
+
+The generator emits `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName` and a cached `PlayerCamera` resolver. In a Mono build the name resolves to `ScheduleOne.PlayerScripts.PlayerCamera`; in an IL2CPP build it resolves to `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
+
+This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
+
+Until `S1Interop.Generators` is published, projects that opt into generator attributes need a local package source:
+
+```powershell
+dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
+dotnet restore .\YourMod.csproj --source .\artifacts\packages --source https://api.nuget.org/v3/index.json
 ```
 
 ## Run from source

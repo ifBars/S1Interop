@@ -1,7 +1,13 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Xml.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using S1Interop.Core;
+using S1Interop.Generators;
+using CoreDiagnosticSeverity = S1Interop.Core.DiagnosticSeverity;
+using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
 var tests = new S1InteropFixtureTests();
 string mode = args.FirstOrDefault() ?? "--all";
@@ -68,6 +74,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         DualRuntimeMigrationScaffoldsAnalyzerInferredDebugReleaseMonoProject();
         count++;
+        DualRuntimeMigrationInstallsGeneratorPackageWhenAttributesAreDeclared();
+        count++;
         DualRuntimeMigrationDoesNotReprefixExistingIl2CppNamedConfigurations();
         count++;
         ExplicitIl2CppConfigurationNameWinsOverSharedMonoReferences();
@@ -125,6 +133,8 @@ internal sealed class S1InteropFixtureTests
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
         PlayerCameraCompatBridgeRewritesCloseInterfaceCalls();
+        count++;
+        S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
         SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
         count++;
@@ -249,7 +259,7 @@ internal sealed class S1InteropFixtureTests
         bool hasIl2CppFrameworkError = project.Diagnostics.Any(diagnostic =>
             diagnostic.RuleId == "wrong_target_framework" &&
             diagnostic.Configuration == "IL2CPP" &&
-            diagnostic.Severity == DiagnosticSeverity.Error);
+            diagnostic.Severity == CoreDiagnosticSeverity.Error);
         Assert(!hasIl2CppFrameworkError, "GunsAlwaysAccurate IL2CPP config should not report wrong_target_framework.");
     }
 
@@ -1396,7 +1406,6 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 addIl2Cpp.Evidence?.Contains("mono_configurations=Debug;Release", StringComparison.Ordinal) == true,
                 $"Dual-runtime plan should carry analyzer-inferred Mono config names, got {addIl2Cpp.Evidence ?? "<none>"}.");
-
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "add_il2cpp_configuration"),
@@ -1420,6 +1429,8 @@ internal sealed class S1InteropFixtureTests
             Assert(projectText.Contains("<GamePath>$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal), "Generated IL2CPP configs should use the IL2CPP game path property.");
             Assert(projectText.Contains("<S1Dir>$(GamePath)</S1Dir>", StringComparison.Ordinal), "Generated IL2CPP configs should preserve common S1Dir game-root aliases used by real mods.");
             Assert(projectText.Contains("<ManagedPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal), "Generated IL2CPP configs should use generated wrapper references.");
+            Assert(projectText.Contains("<S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>", StringComparison.Ordinal), "Mono configs should stamp the S1Interop generator runtime property.");
+            Assert(projectText.Contains("<S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>", StringComparison.Ordinal), "Generated IL2CPP configs should stamp the S1Interop generator runtime property.");
             Assert(projectText.Contains("Il2CppInterop.Runtime", StringComparison.Ordinal), "Generated IL2CPP configs should reference Il2CppInterop.Runtime.");
             Assert(projectText.Contains("<Reference Include=\"Il2CppFishNet.Runtime\">", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime references to Il2CppFishNet.Runtime.");
             Assert(projectText.Contains("<HintPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies\\Il2CppFishNet.Runtime.dll</HintPath>", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime hint paths without double-prefixing Il2Cpp.");
@@ -1440,6 +1451,64 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RestoredFiles.Contains(tempSolution), "Rollback should restore Debug/Release mono-only solution file.");
             Assert(!File.ReadAllText(tempProject).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from project.");
             Assert(!File.ReadAllText(tempSolution).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from solution.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationInstallsGeneratorPackageWhenAttributesAreDeclared()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "GeneratorAwareMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Configurations>Mono</Configurations>
+                    <DefineConstants>MONO</DefineConstants>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "GeneratorHints.cs"),
+                """
+                [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+
+                namespace GeneratorAwareMod
+                {
+                    internal static class Core
+                    {
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Projects declaring S1Interop generator attributes should plan private generator package installation.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Projects declaring S1Interop generator attributes should install the generator package during migration.");
+
+            string projectText = File.ReadAllText(tempProject);
+            Assert(
+                projectText.Contains("<PackageReference Include=\"S1Interop.Generators\" Version=\"0.1.0-alpha.1\" PrivateAssets=\"all\" IncludeAssets=\"runtime; build; native; contentfiles; analyzers; buildtransitive\" />", StringComparison.Ordinal),
+                "Generator-aware migration should install S1Interop.Generators as a private analyzer package.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the generator-aware project file.");
+            Assert(!File.ReadAllText(tempProject).Contains("S1Interop.Generators", StringComparison.Ordinal), "Rollback should remove the generator package reference.");
         }
         finally
         {
@@ -4023,6 +4092,47 @@ internal sealed class S1InteropFixtureTests
             "Generated PlayerCamera bridge should provide an IL2CPP fallback using wrapper-visible camera APIs.");
     }
 
+    private void S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.UI.Phone.Phone", Alias = "Phone", Il2CppTypeName = "Il2CppScheduleOne.UI.Phone.Phone")]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+            """;
+
+        string monoGenerated = RunTypeRegistryGenerator(source, "MONO");
+        string il2CppGenerated = RunTypeRegistryGenerator(source, "IL2CPP");
+
+        Assert(
+            monoGenerated.Contains("public const S1InteropRuntimeBackend Backend = S1InteropRuntimeBackend.Mono;", StringComparison.Ordinal) &&
+            monoGenerated.Contains("public const bool IsMono = true;", StringComparison.Ordinal),
+            $"Mono generator output should expose Mono runtime constants. Generated source:{Environment.NewLine}{monoGenerated}");
+        Assert(
+            monoGenerated.Contains("public const string PlayerCameraName = \"ScheduleOne.PlayerScripts.PlayerCamera\";", StringComparison.Ordinal),
+            $"Mono generator output should keep Mono ScheduleOne type names. Generated source:{Environment.NewLine}{monoGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const S1InteropRuntimeBackend Backend = S1InteropRuntimeBackend.Il2Cpp;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public const bool IsIl2Cpp = true;", StringComparison.Ordinal),
+            $"IL2CPP generator output should expose IL2CPP runtime constants. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const string PlayerCameraName = \"Il2CppScheduleOne.PlayerScripts.PlayerCamera\";", StringComparison.Ordinal),
+            $"IL2CPP generator output should rewrite ScheduleOne type names to Il2CppScheduleOne. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const string PhoneName = \"Il2CppScheduleOne.UI.Phone.Phone\";", StringComparison.Ordinal),
+            $"IL2CPP generator output should respect explicit Il2CppTypeName overrides. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("private static readonly System.Collections.Generic.Dictionary<string, System.Type?> Cache", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
+            "Generated type registry should include a compile-time generated reflection cache.");
+    }
+
     private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
@@ -4408,7 +4518,7 @@ internal sealed class S1InteropFixtureTests
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             Assert(
-                !after.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                !after.Diagnostics.Any(diagnostic => diagnostic.Severity == CoreDiagnosticSeverity.Error),
                 "Copied JackpotEveryTime fixture should have no error diagnostics after migration apply.");
             Assert(
                 after.Diagnostics.All(diagnostic => diagnostic.RuleId != "local_path_in_project"),
@@ -4714,6 +4824,44 @@ internal sealed class S1InteropFixtureTests
         }
 
         return count;
+    }
+
+    private static string RunTypeRegistryGenerator(string source, params string[] symbols)
+    {
+        CSharpParseOptions parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Latest)
+            .WithPreprocessorSymbols(symbols);
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            "SyntheticMod",
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new S1InteropTypeRegistryGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation outputCompilation, out ImmutableArray<Diagnostic> generatorDiagnostics);
+
+        Assert(
+            generatorDiagnostics.All(diagnostic => diagnostic.Severity != RoslynDiagnosticSeverity.Error),
+            $"S1Interop type registry generator reported errors: {string.Join(Environment.NewLine, generatorDiagnostics)}");
+        Assert(
+            outputCompilation.GetDiagnostics().All(diagnostic => diagnostic.Severity != RoslynDiagnosticSeverity.Error),
+            $"Generated type registry compilation reported errors: {string.Join(Environment.NewLine, outputCompilation.GetDiagnostics())}");
+
+        SyntaxTree generatedTree = outputCompilation.SyntaxTrees.Single(tree =>
+            (tree.FilePath ?? string.Empty).Contains("S1Interop.TypeRegistry.g.cs", StringComparison.Ordinal));
+        return generatedTree.GetText().ToString();
+    }
+
+    private static IReadOnlyList<MetadataReference> GetTrustedPlatformReferences()
+    {
+        string trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string
+            ?? throw new InvalidOperationException("TRUSTED_PLATFORM_ASSEMBLIES is not available.");
+        return trustedPlatformAssemblies
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(path => MetadataReference.CreateFromFile(path))
+            .ToArray();
     }
 
     private static int CountProjectImports(string projectPath, string importPath)

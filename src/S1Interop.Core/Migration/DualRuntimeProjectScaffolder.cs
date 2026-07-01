@@ -54,6 +54,8 @@ public static class DualRuntimeProjectScaffolder
             AddIl2CppItemGroups(document, monoConfiguration, il2CppConfiguration);
         }
 
+        EnsureRuntimeGeneratorProperties(document, sourceMonoConfigurations, newIl2CppConfigurations);
+
         return true;
     }
 
@@ -207,6 +209,7 @@ public static class DualRuntimeProjectScaffolder
         group.Add(new XElement("ManagedPath", @"$(GamePath)\MelonLoader\Il2CppAssemblies"));
         group.Add(new XElement("MelonLoaderPath", @"$(GamePath)\MelonLoader\net6"));
         group.Add(new XElement("ModsPath", @"$(GamePath)\Mods"));
+        group.Add(new XElement("S1InteropTargetRuntime", "Il2Cpp"));
         group.Add(new XElement("DefineConstants", role.Length == 0 ? "IL2CPP" : $"IL2CPP;{role}"));
         group.Add(new XElement("AssemblyName", GetIl2CppAssemblyName(document, monoConfiguration, il2CppConfiguration)));
         group.Add(new XElement("OutputPath", @"bin\$(Configuration)\"));
@@ -214,6 +217,40 @@ public static class DualRuntimeProjectScaffolder
         AddS1DsSearchPathDefaults(group, role);
 
         document.Root!.Add(group);
+    }
+
+    private static void EnsureRuntimeGeneratorProperties(
+        XDocument document,
+        IReadOnlyList<string> monoConfigurations,
+        IReadOnlyList<string> il2CppConfigurations)
+    {
+        foreach (string monoConfiguration in monoConfigurations)
+        {
+            EnsureConfigurationProperty(document, monoConfiguration, "S1InteropTargetRuntime", "Mono");
+        }
+
+        foreach (string il2CppConfiguration in il2CppConfigurations)
+        {
+            EnsureConfigurationProperty(document, il2CppConfiguration, "S1InteropTargetRuntime", "Il2Cpp");
+        }
+    }
+
+    private static void EnsureConfigurationProperty(
+        XDocument document,
+        string configuration,
+        string propertyName,
+        string value)
+    {
+        XElement? group = document.Root!.Elements()
+            .Where(IsNamed("PropertyGroup"))
+            .FirstOrDefault(group => ConditionMentionsConfiguration(group.Attribute("Condition")?.Value, configuration));
+        if (group is null)
+        {
+            group = new XElement("PropertyGroup", new XAttribute("Condition", $"'$(Configuration)'=='{configuration}'"));
+            document.Root.Add(group);
+        }
+
+        AddPropertyIfMissing(group, propertyName, value);
     }
 
     private static void AddIl2CppItemGroups(XDocument document, string monoConfiguration, string il2CppConfiguration)

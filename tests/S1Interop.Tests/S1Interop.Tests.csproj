@@ -2,6 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\S1Interop.Core\S1Interop.Core.csproj" />
+    <ProjectReference Include="..\..\src\S1Interop.Generators\S1Interop.Generators.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>

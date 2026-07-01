@@ -134,6 +134,16 @@ public sealed class MigrationPlanner
                 true,
                 "Add IL2CPP build configurations mirrored from existing Mono configurations, including net6.0, IL2CPP defines, and generated-wrapper reference paths.",
                 $"mono_configurations={monoConfigurations}"));
+            if (S1InteropGeneratorDetector.ProjectUsesGeneratorAttributes(project.ProjectPath))
+            {
+                operations.Add(new MigrationOperation(
+                    "install_s1interop_generator_package",
+                    project.ProjectPath,
+                    null,
+                    "low",
+                    true,
+                    "Install the private S1Interop Roslyn generator package so backend-specific reflection and facade helpers can be generated at compile time."));
+            }
 
             string[] scheduleOneUsingFiles = ScheduleOneUsingRewriter
                 .FindFilesWithUnconditionalScheduleOneUsings(project.ProjectPath)

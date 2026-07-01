@@ -108,6 +108,7 @@ public sealed class MigrationApplier
                 "missing_il2cppinterop_reference" => ApplyMissingIl2CppInteropReference(document, operation.Configuration),
                 "missing_runtime_define" => ApplyMissingRuntimeDefine(document, operation),
                 "add_il2cpp_configuration" => ApplyDualRuntimeScaffold(projectPath, document, operation, backupRoot, fileChanges),
+                "install_s1interop_generator_package" => ApplyS1InteropGeneratorPackageReference(document),
                 "conditionalize_scheduleone_usings" => ApplyScheduleOneUsingConditionalization(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_fully_qualified_scheduleone_types" => ApplyFullyQualifiedScheduleOneTypeRewrite(projectPath, operation.FilePath, backupRoot, fileChanges),
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
@@ -175,6 +176,7 @@ public sealed class MigrationApplier
             "generate_sdk_facade" => 10,
             "generate_unity_event_bridge" => 10,
             "generate_player_camera_compat_bridge" => 10,
+            "install_s1interop_generator_package" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
             "conditionalize_scheduleone_usings" => 20,
             "rewrite_unity_event_listeners" => 20,
@@ -236,6 +238,58 @@ public sealed class MigrationApplier
         }
 
         propertyGroup.Add(new XElement("LangVersion", "10.0"));
+        return true;
+    }
+
+    private static bool ApplyS1InteropGeneratorPackageReference(XDocument document)
+    {
+        XElement? existing = document.Descendants()
+            .Where(IsNamed("PackageReference"))
+            .FirstOrDefault(package =>
+                string.Equals(package.Attribute("Include")?.Value, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            bool changed = false;
+            changed |= SetAttributeIfDifferent(existing, "Version", "0.1.0-alpha.1");
+            changed |= SetAttributeIfDifferent(existing, "PrivateAssets", "all");
+            changed |= SetAttributeIfDifferent(existing, "IncludeAssets", "runtime; build; native; contentfiles; analyzers; buildtransitive");
+            return changed;
+        }
+
+        XElement itemGroup = document.Root!.Elements()
+            .Where(IsNamed("ItemGroup"))
+            .FirstOrDefault(group => group.Attribute("Condition") is null && group.Elements().Any(IsNamed("PackageReference")))
+            ?? new XElement("ItemGroup");
+        if (itemGroup.Parent is null)
+        {
+            document.Root.Add(itemGroup);
+        }
+
+        itemGroup.Add(
+            new XElement(
+                "PackageReference",
+                new XAttribute("Include", "S1Interop.Generators"),
+                new XAttribute("Version", "0.1.0-alpha.1"),
+                new XAttribute("PrivateAssets", "all"),
+                new XAttribute("IncludeAssets", "runtime; build; native; contentfiles; analyzers; buildtransitive")));
+        return true;
+    }
+
+    private static bool SetAttributeIfDifferent(XElement element, string name, string value)
+    {
+        XAttribute? attribute = element.Attribute(name);
+        if (attribute is not null)
+        {
+            if (string.Equals(attribute.Value, value, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            attribute.Value = value;
+            return true;
+        }
+
+        element.SetAttributeValue(name, value);
         return true;
     }
 
