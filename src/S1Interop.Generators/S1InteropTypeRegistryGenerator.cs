@@ -408,13 +408,14 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             else
             {
                 string memberKind = $"S1InteropMemberKind.{member.Kind}";
-                if (member.Kind == S1InteropMemberKind.Field)
+                if (member.Kind is S1InteropMemberKind.Field or S1InteropMemberKind.FieldOrProperty)
                 {
-                    builder.AppendLine($"        public static System.Reflection.FieldInfo? {member.Alias}FieldInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, {memberKind}) as System.Reflection.FieldInfo;");
+                    builder.AppendLine($"        public static System.Reflection.FieldInfo? {member.Alias}FieldInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, S1InteropMemberKind.Field) as System.Reflection.FieldInfo;");
                 }
-                else if (member.Kind == S1InteropMemberKind.Property)
+
+                if (member.Kind is S1InteropMemberKind.Property or S1InteropMemberKind.FieldOrProperty)
                 {
-                    builder.AppendLine($"        public static System.Reflection.PropertyInfo? {member.Alias}PropertyInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, {memberKind}) as System.Reflection.PropertyInfo;");
+                    builder.AppendLine($"        public static System.Reflection.PropertyInfo? {member.Alias}PropertyInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, S1InteropMemberKind.Property) as System.Reflection.PropertyInfo;");
                 }
 
                 if (member.IsStatic)

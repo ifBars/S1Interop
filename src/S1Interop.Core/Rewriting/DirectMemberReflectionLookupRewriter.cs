@@ -4,15 +4,14 @@ public sealed class DirectMemberReflectionLookupRewriter
 {
     public static bool CanRewrite(SourceRisk risk)
     {
-        if (!risk.Kind.Equals("DirectMemberReflectionLookup", StringComparison.OrdinalIgnoreCase) ||
-            !File.Exists(risk.FilePath))
+        if (!IsSupportedRiskKind(risk) || !File.Exists(risk.FilePath))
         {
             return false;
         }
 
         MemberAccessTarget[] targets = new MemberAccessTargetCatalog()
             .DiscoverFileTargets(risk.FilePath)
-            .Where(HasExactTypedAccessor)
+            .Where(HasTypedAccessor)
             .ToArray();
         string source = File.ReadAllText(risk.FilePath);
         return CanRewriteLine(source, risk.Line, targets);
@@ -32,13 +31,13 @@ public sealed class DirectMemberReflectionLookupRewriter
         string fullSourcePath = Path.GetFullPath(sourcePath);
         MemberAccessTarget[] sourceTargets = projectTargets
             .Where(target => string.Equals(Path.GetFullPath(target.SourceFilePath), fullSourcePath, StringComparison.OrdinalIgnoreCase))
-            .Where(HasExactTypedAccessor)
+            .Where(HasTypedAccessor)
             .OrderByDescending(target => target.Line)
             .ToArray();
         if (sourceTargets.Length == 0 && projectTargets.Count == 1)
         {
             sourceTargets = projectTargets
-                .Where(HasExactTypedAccessor)
+                .Where(HasTypedAccessor)
                 .OrderByDescending(target => target.Line)
                 .ToArray();
         }
@@ -67,9 +66,9 @@ public sealed class DirectMemberReflectionLookupRewriter
         return hadTrailingNewline ? rewritten + newline : rewritten;
     }
 
-    private static bool TryRewriteLine(List<string> lines, int startIndex, IReadOnlyList<MemberAccessTarget> targets)
+    private static bool TryRewriteLine(List<string> lines, int lineIndex, IReadOnlyList<MemberAccessTarget> targets)
     {
-        if (startIndex < 0 || startIndex >= lines.Count)
+        if (!TryFindStatementStart(lines, lineIndex, out int startIndex))
         {
             return false;
         }
@@ -81,23 +80,51 @@ public sealed class DirectMemberReflectionLookupRewriter
 
         string firstLine = lines[startIndex];
         string statement = string.Join(" ", lines.Skip(startIndex).Take(endIndex - startIndex + 1).Select(line => line.Trim()));
-        MemberAccessTarget? target = targets.FirstOrDefault(target => CanRewriteStatement(statement, target));
+        MemberAccessTarget? target = null;
+        MemberAccessKind lookupKind = MemberAccessKind.FieldOrProperty;
+        foreach (MemberAccessTarget candidate in targets)
+        {
+            if (CanRewriteStatement(statement, candidate, out lookupKind))
+            {
+                target = candidate;
+                break;
+            }
+        }
+
         if (target is null)
         {
             return false;
         }
 
-        int typeOfIndex = firstLine.IndexOf("typeof", StringComparison.Ordinal);
-        if (typeOfIndex < 0)
+        if (!TryGetReplacementPrefix(firstLine, out string prefix))
         {
             return false;
         }
 
-        string prefix = firstLine[..typeOfIndex];
-        string replacement = $"{prefix}S1Interop.Generated.S1InteropMemberRegistry.{target.MemberAlias}{GetAccessorSuffix(target)};";
+        string replacement = $"{prefix}S1Interop.Generated.S1InteropMemberRegistry.{target.MemberAlias}{GetAccessorSuffix(lookupKind)};";
         lines.RemoveRange(startIndex, endIndex - startIndex + 1);
         lines.Insert(startIndex, replacement);
         return true;
+    }
+
+    private static bool TryGetReplacementPrefix(string firstLine, out string prefix)
+    {
+        int typeOfIndex = firstLine.IndexOf("typeof", StringComparison.Ordinal);
+        if (typeOfIndex >= 0)
+        {
+            prefix = firstLine[..typeOfIndex];
+            return true;
+        }
+
+        int equalsIndex = firstLine.IndexOf('=', StringComparison.Ordinal);
+        if (equalsIndex > 0)
+        {
+            prefix = firstLine[..(equalsIndex + 1)] + " ";
+            return true;
+        }
+
+        prefix = string.Empty;
+        return false;
     }
 
     private static bool CanRewriteLine(string source, int line, IReadOnlyList<MemberAccessTarget> targets)
@@ -108,7 +135,11 @@ public sealed class DirectMemberReflectionLookupRewriter
         }
 
         string[] lines = source.Split(["\r\n", "\n"], StringSplitOptions.None);
-        int startIndex = line - 1;
+        if (!TryFindStatementStart(lines, line - 1, out int startIndex))
+        {
+            return false;
+        }
+
         if (startIndex >= lines.Length ||
             !TryFindStatementEnd(lines, startIndex, out int endIndex))
         {
@@ -116,7 +147,51 @@ public sealed class DirectMemberReflectionLookupRewriter
         }
 
         string statement = string.Join(" ", lines.Skip(startIndex).Take(endIndex - startIndex + 1).Select(sourceLine => sourceLine.Trim()));
-        return targets.Any(target => CanRewriteStatement(statement, target));
+        return targets.Any(target => CanRewriteStatement(statement, target, out _));
+    }
+
+    private static bool TryFindStatementStart(IReadOnlyList<string> lines, int lineIndex, out int startIndex)
+    {
+        startIndex = -1;
+        if (lineIndex < 0 || lineIndex >= lines.Count)
+        {
+            return false;
+        }
+
+        if (CanStartStatement(lines[lineIndex]))
+        {
+            startIndex = lineIndex;
+            return true;
+        }
+
+        if (!lines[lineIndex].Contains("typeof", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        int minIndex = Math.Max(0, lineIndex - 3);
+        for (int index = lineIndex - 1; index >= minIndex; index--)
+        {
+            if (lines[index].Contains(';', StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (CanStartStatement(lines[index]))
+            {
+                startIndex = index;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CanStartStatement(string line)
+    {
+        string trimmed = line.TrimStart();
+        return StartsWithSafeStatementPrefix(trimmed) ||
+               IsAssignmentPrefix(trimmed);
     }
 
     private static bool TryFindStatementEnd(IReadOnlyList<string> lines, int startIndex, out int endIndex)
@@ -135,14 +210,19 @@ public sealed class DirectMemberReflectionLookupRewriter
         return false;
     }
 
-    private static bool CanRewriteStatement(string statement, MemberAccessTarget target)
+    private static bool CanRewriteStatement(string statement, MemberAccessTarget target, out MemberAccessKind lookupKind)
     {
-        string methodName = target.Kind == MemberAccessKind.Field ? "GetField" : "GetProperty";
-        return StartsWithSafeStatementPrefix(statement) &&
-               (statement.Contains($"typeof({target.OwnerAlias})", StringComparison.Ordinal) ||
-                statement.Contains($"typeof({target.OwnerTypeName})", StringComparison.Ordinal)) &&
-               statement.Contains($".{methodName}(\"{target.MemberName}\"", StringComparison.Ordinal) &&
-               !statement.Contains("?.", StringComparison.Ordinal);
+        lookupKind = MemberAccessKind.FieldOrProperty;
+        if (!(StartsWithSafeStatementPrefix(statement) || IsAssignmentPrefix(statement)) ||
+            !(statement.Contains($"typeof({target.OwnerAlias})", StringComparison.Ordinal) ||
+              statement.Contains($"typeof({target.OwnerTypeName})", StringComparison.Ordinal)) ||
+            !TryGetLookupKind(statement, target.MemberName, out lookupKind) ||
+            statement.Contains("?.", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return target.Kind == MemberAccessKind.FieldOrProperty || target.Kind == lookupKind;
     }
 
     private static bool StartsWithSafeStatementPrefix(string statement)
@@ -160,9 +240,65 @@ public sealed class DirectMemberReflectionLookupRewriter
                trimmed.StartsWith("System.Reflection.PropertyInfo? ", StringComparison.Ordinal);
     }
 
-    private static bool HasExactTypedAccessor(MemberAccessTarget target) =>
-        target.Kind is MemberAccessKind.Field or MemberAccessKind.Property;
+    private static bool IsAssignmentPrefix(string statement)
+    {
+        int equalsIndex = statement.IndexOf('=', StringComparison.Ordinal);
+        if (equalsIndex <= 0 || statement[..equalsIndex].Contains("==", StringComparison.Ordinal))
+        {
+            return false;
+        }
 
-    private static string GetAccessorSuffix(MemberAccessTarget target) =>
-        target.Kind == MemberAccessKind.Field ? "FieldInfo" : "PropertyInfo";
+        string left = statement[..equalsIndex].Trim();
+        return IsIdentifierOrMemberAccess(left);
+    }
+
+    private static bool IsIdentifierOrMemberAccess(string value)
+    {
+        if (value.Length == 0)
+        {
+            return false;
+        }
+
+        string[] parts = value.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length > 0 && parts.All(IsIdentifier);
+    }
+
+    private static bool IsIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            (!char.IsLetter(value[0]) && value[0] != '_'))
+        {
+            return false;
+        }
+
+        return value.Skip(1).All(character => char.IsLetterOrDigit(character) || character == '_');
+    }
+
+    private static bool IsSupportedRiskKind(SourceRisk risk) =>
+        risk.Kind.Equals("DirectMemberReflectionLookup", StringComparison.OrdinalIgnoreCase) ||
+        risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryGetLookupKind(string statement, string memberName, out MemberAccessKind kind)
+    {
+        if (statement.Contains($".GetField(\"{memberName}\"", StringComparison.Ordinal))
+        {
+            kind = MemberAccessKind.Field;
+            return true;
+        }
+
+        if (statement.Contains($".GetProperty(\"{memberName}\"", StringComparison.Ordinal))
+        {
+            kind = MemberAccessKind.Property;
+            return true;
+        }
+
+        kind = MemberAccessKind.FieldOrProperty;
+        return false;
+    }
+
+    private static bool HasTypedAccessor(MemberAccessTarget target) =>
+        target.Kind is MemberAccessKind.Field or MemberAccessKind.Property or MemberAccessKind.FieldOrProperty;
+
+    private static string GetAccessorSuffix(MemberAccessKind kind) =>
+        kind == MemberAccessKind.Field ? "FieldInfo" : "PropertyInfo";
 }

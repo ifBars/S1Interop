@@ -60,6 +60,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsDirectMemberReflectionLookupRisk();
         count++;
+        DirectMemberReflectionLookupRewriterRewritesSplitAndCachedAssignments();
+        count++;
         MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
         count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
@@ -806,6 +808,56 @@ internal sealed class S1InteropFixtureTests
         Assert(
             rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetrenderScaleValue<float>(asset);", StringComparison.Ordinal),
             $"Nullable value fallback getter should rewrite through the generated member registry value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
+    }
+
+    private void DirectMemberReflectionLookupRewriterRewritesSplitAndCachedAssignments()
+    {
+        string source =
+            """
+            using System.Reflection;
+
+            namespace DirectReflectionMod;
+
+            public sealed class ReflectionCache
+            {
+                private FieldInfo? _cachedFileField;
+
+                public void Initialize()
+                {
+                    var homeScreenField =
+                        typeof(PhoneApp).GetField("_homeScreenInstance", BindingFlags.NonPublic | BindingFlags.Instance);
+                    _cachedFileField = typeof(MelonPreferences_Category).GetField("File",
+                        BindingFlags.NonPublic | BindingFlags.Instance);
+                }
+            }
+            """;
+        string sourcePath = Path.Combine(Path.GetTempPath(), "DirectReflection.cs");
+        var homeScreenTarget = new MemberAccessTarget(
+            sourcePath,
+            11,
+            "PhoneApp",
+            "PhoneApp",
+            "_homeScreenInstance",
+            "_homeScreenInstance",
+            IsStatic: false,
+            MemberAccessKind.Field);
+        var fileTarget = new MemberAccessTarget(
+            sourcePath,
+            13,
+            "MelonPreferences_Category",
+            "MelonPreferences_Category",
+            "File",
+            "File",
+            IsStatic: false,
+            MemberAccessKind.FieldOrProperty);
+
+        string rewritten = new DirectMemberReflectionLookupRewriter().RewriteSource(source, sourcePath, [homeScreenTarget, fileTarget]);
+        Assert(
+            rewritten.Contains("var homeScreenField = S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
+            rewritten.Contains("_cachedFileField = S1Interop.Generated.S1InteropMemberRegistry.FileFieldInfo;", StringComparison.Ordinal) &&
+            !rewritten.Contains(".GetField(\"_homeScreenInstance\"", StringComparison.Ordinal) &&
+            !rewritten.Contains(".GetField(\"File\"", StringComparison.Ordinal),
+            $"Direct member lookup rewriter should handle split assignments and cached FieldInfo assignments. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MigrationApplyAndRollbackRewritesHarmonyOverloadBindings()
@@ -4868,6 +4920,8 @@ internal sealed class S1InteropFixtureTests
             "Generated type registry should fall back to cached loaded-assembly lookup for simple generated migration type names.");
         Assert(
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static System.Reflection.FieldInfo? NoticeContainerFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Field) as System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static System.Reflection.PropertyInfo? NoticeContainerPropertyInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Property) as System.Reflection.PropertyInfo;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainer<T>(object instance) where T : class => GetNoticeContainer(instance) as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainerValue<T>(object instance) where T : struct => GetNoticeContainer(instance) is T value ? value : (T?)null;", StringComparison.Ordinal) &&
