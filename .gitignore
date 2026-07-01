@@ -15,3 +15,7 @@ demo-real
 .internal/
 docs/internal/
 *.internal.md
+*.local.md
+notes/
+plans/
+recordings/

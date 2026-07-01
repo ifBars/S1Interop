@@ -80,10 +80,12 @@ public sealed class MigrationApplier
         {
             bool mutatesProjectDocument =
                 !operation.RuleId.Equals("generate_unity_event_bridge", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("generate_delegate_event_bridge", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_source_risk_report", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("conditionalize_scheduleone_usings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_unity_event_listeners", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("install_build_validation_hook", StringComparison.OrdinalIgnoreCase);
@@ -111,8 +113,10 @@ public sealed class MigrationApplier
                 "injected_member_requires_hidefromil2cpp" => ApplyHideFromIl2CppAttribute(operation, backupRoot, fileChanges),
                 "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
+                "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
                 "generate_source_risk_report" => ApplySourceRiskReport(projectPlan, operation, backupRoot, fileChanges),
                 "rewrite_unity_event_listeners" => ApplyUnityEventListenerRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_delegate_assignments" => ApplyDelegateAssignmentRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
             };
@@ -1078,6 +1082,24 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyDelegateEventBridge(
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        string source = new DelegateEventBridgeGenerator().GenerateSource();
+        if (File.Exists(operation.FilePath) && string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(operation.FilePath, backupRoot, fileChanges);
+        Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
+        File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
+        UpdateTrackedFileHash(operation.FilePath, fileChanges);
+        return true;
+    }
+
     private static bool ApplyUnityEventListenerRewrite(
         string sourcePath,
         string backupRoot,
@@ -1090,6 +1112,29 @@ public sealed class MigrationApplier
 
         string original = File.ReadAllText(sourcePath);
         string rewritten = new UnityEventListenerRewriter().RewriteSource(original);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyDelegateAssignmentRewrite(
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = new DelegateAssignmentRewriter().RewriteSource(original);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;

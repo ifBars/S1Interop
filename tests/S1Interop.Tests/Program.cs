@@ -48,6 +48,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         MigrationApplyAndRollbackRewritesUnityEventListeners();
         count++;
+        MigrationApplyAndRollbackRewritesSimpleDelegateAssignments();
+        count++;
         MigrationApplyAndRollbackGeneratesSourceRiskReport();
         count++;
         VerifyMigrationCanIncludeSourceMigrationsInSandbox();
@@ -611,13 +613,14 @@ internal sealed class S1InteropFixtureTests
                     public static void Bind(Button button)
                     {
                         button.onClick.AddListener(OnClicked);
-                        SomeEvent = (Action)Delegate.Combine(SomeEvent, new Action(OnClicked));
+                        SomeEvent = (Action)Delegate.Combine(OtherEvent, new Action(OnClicked));
                     }
 
                     [HarmonyTranspiler]
                     public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) => instructions;
 
                     private static event Action? SomeEvent;
+                    private static event Action? OtherEvent;
                     private static void OnClicked() { }
                 }
                 """);
@@ -646,6 +649,114 @@ internal sealed class S1InteropFixtureTests
                 rollbackResult.RemovedFiles.Contains(reportPath),
                 "Rollback should report removing the generated source-risk report.");
             Assert(!File.Exists(reportPath), "Rollback should remove the generated source-risk report.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesSimpleDelegateAssignments()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "DelegateSourceMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "DelegateBindings.cs");
+            string bridgePath = Path.Combine(tempRoot, "S1Interop.Generated", DelegateEventBridgeGenerator.SourceFileName);
+            string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using System;
+
+                namespace DelegateSourceMod;
+
+                public static class DelegateBindings
+                {
+                    private static Action? SomeEvent;
+                    private static Action? OtherEvent;
+                    private static Action? ManualEvent;
+                    private static Action? TernaryEvent;
+                    private static Action? ExistingEvent;
+                    private static bool Flag;
+
+                    public static void Bind()
+                    {
+                        SomeEvent = (Action?)Delegate.Combine(SomeEvent, new Action(OnClicked));
+                        SomeEvent = (Action?)Delegate.Remove(SomeEvent, new Action(OnClicked));
+                        OtherEvent = (Action?)System.Delegate.Combine(OtherEvent, new Action(OnClicked)); // keep comment
+                        ManualEvent = (Action?)Delegate.Combine(OtherEvent, new Action(OnClicked));
+                        TernaryEvent = (Action?)Delegate.Combine(Flag ? TernaryEvent : OtherEvent, new Action(OnClicked));
+                        ExistingEvent = (Action?)S1Interop.Generated.S1InteropDelegateEventBridge.Combine(ExistingEvent, new Action(OnClicked));
+                    }
+
+                    private static void OnClicked() { }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_delegate_event_bridge"),
+                "Migration plan should generate the delegate event bridge for safe delegate rewrites.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_delegate_assignments"),
+                "Migration plan should rewrite safe delegate assignments.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
+                "Migration plan should still report delegate cases that are not safe to rewrite.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "generate_delegate_event_bridge"),
+                "Migration apply should create the delegate bridge.");
+            Assert(File.Exists(bridgePath), "Delegate bridge was not written.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("SomeEvent = (Action?)S1Interop.Generated.S1InteropDelegateEventBridge.Combine(SomeEvent, new Action(OnClicked));", StringComparison.Ordinal),
+                "Safe Delegate.Combine self-assignment was not rewritten.");
+            Assert(
+                migratedSource.Contains("SomeEvent = (Action?)S1Interop.Generated.S1InteropDelegateEventBridge.Remove(SomeEvent, new Action(OnClicked));", StringComparison.Ordinal),
+                "Safe Delegate.Remove self-assignment was not rewritten.");
+            Assert(
+                migratedSource.Contains("OtherEvent = (Action?)S1Interop.Generated.S1InteropDelegateEventBridge.Combine(OtherEvent, new Action(OnClicked)); // keep comment", StringComparison.Ordinal),
+                "System.Delegate.Combine self-assignment was not rewritten while preserving the comment.");
+            Assert(
+                migratedSource.Contains("ManualEvent = (Action?)Delegate.Combine(OtherEvent, new Action(OnClicked));", StringComparison.Ordinal),
+                "Non-self delegate assignment should stay manual.");
+            Assert(
+                migratedSource.Contains("TernaryEvent = (Action?)Delegate.Combine(Flag ? TernaryEvent : OtherEvent, new Action(OnClicked));", StringComparison.Ordinal),
+                "Complex delegate expression should stay manual.");
+            Assert(
+                migratedSource.Contains("ExistingEvent = (Action?)S1Interop.Generated.S1InteropDelegateEventBridge.Combine(ExistingEvent, new Action(OnClicked));", StringComparison.Ordinal),
+                "Existing bridge usage should stay intact.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            SourceRisk[] remainingDelegateRisks = after.Projects.Single().SourceInterop!.SourceRisks
+                .Where(risk => risk.Kind.Equals("DirectDelegateCombine", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            Assert(remainingDelegateRisks.Length == 2, "Only the non-rewritable delegate risks should remain after migration.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the rewritten delegate source file.");
+            Assert(rollbackResult.RemovedFiles.Contains(bridgePath), "Rollback did not remove the generated delegate bridge.");
+            Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback did not remove the generated source-risk report.");
+            Assert(!File.Exists(bridgePath), "Generated delegate bridge should be removed by rollback.");
+            Assert(!File.Exists(reportPath), "Generated source-risk report should be removed by rollback.");
         }
         finally
         {

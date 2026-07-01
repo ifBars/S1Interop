@@ -15,10 +15,10 @@ internal static class CliHelp
               s1interop verify-migration [path=.] [--dual-runtime] [--include-source-migrations] [--build] [--il2cpp-game-path path] [--mono-game-path path] [--build-timeout-seconds n] [--format text|json]
               s1interop migrate rollback <manifest.json> [--format text|json]
 
-            Current slice:
-              analyze/lint discover .csproj files, infer Mono/IL2CPP/CrossCompat configurations,
-              report build-surface diagnostics, install build validation hooks, generate public-safe source facades, UnityEvent bridges, and source-risk reports,
-              and verify sandboxed migrations for one project or a discovered workspace without reading or redistributing game assemblies.
+            What it does:
+              analyze/lint inspect .csproj files and infer Mono, IL2CPP, and CrossCompat configurations.
+              migrate can scaffold dual-runtime build settings, generated source helpers, and source-risk reports.
+              verify-migration runs the migration in a temporary sandbox before changing a real project.
             """);
     }
 }

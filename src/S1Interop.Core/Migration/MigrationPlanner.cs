@@ -194,8 +194,12 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticUnityEventRisks = project.SourceInterop.SourceRisks
                 .Where(UnityEventListenerRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticDelegateRisks = project.SourceInterop.SourceRisks
+                .Where(DelegateAssignmentRewriter.CanRewrite)
+                .ToArray();
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
+                .Except(automaticDelegateRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -220,6 +224,31 @@ public sealed class MigrationPlanner
                         "low",
                         true,
                         "Rewrite simple direct UnityEvent AddListener/RemoveListener calls through the generated S1Interop UnityEvent bridge."));
+                }
+            }
+
+            if (automaticDelegateRisks.Length > 0)
+            {
+                operations.Add(new MigrationOperation(
+                    "generate_delegate_event_bridge",
+                    DelegateEventBridgeGenerator.GetSourcePath(project.ProjectPath),
+                    null,
+                    "low",
+                    true,
+                    "Generate a small delegate-event bridge used by safe Delegate.Combine/Remove self-assignment rewrites."));
+
+                foreach (string sourceFile in automaticDelegateRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_delegate_assignments",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple Delegate.Combine/Remove self-assignments through the generated S1Interop delegate bridge."));
                 }
             }
 

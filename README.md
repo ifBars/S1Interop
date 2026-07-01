@@ -1,39 +1,70 @@
 # S1Interop
 
-S1Interop is an early Schedule One modding toolchain for moving C# mods toward Mono and IL2CPP support with less manual project setup.
+S1Interop helps Schedule One mod developers move Mono mods toward IL2CPP and dual-runtime builds without hand-editing every project file, reference path, and obvious source compatibility case.
 
-The current tool is not a finished "convert every mod with one command" product. It is already useful for inspecting mod projects, scaffolding dual-runtime build configurations, generating compatibility helpers, and verifying migrations in a temporary sandbox before touching a real project.
+It is an alpha tool. It can already inspect real mod projects, scaffold dual-runtime build configurations, generate compatibility helpers, and verify migrations in a temporary sandbox. It is not a promise that every Mono mod can become IL2CPP-compatible with one command.
 
-## What it does today
+## What works today
 
-- Finds Schedule One mod `.csproj` files in a project or workspace.
-- Infers Mono, IL2CPP, and CrossCompat configurations from project metadata, references, packages, and source defines.
-- Reports build-surface issues that commonly block IL2CPP migration.
-- Adds opt-in IL2CPP configurations for Mono-only projects when `migrate --dual-runtime` can infer the source Mono configs.
-- Updates a sibling `.sln` so new IL2CPP configurations show up in Visual Studio.
-- Moves local game paths into ignored `local.build.props` scaffolding.
-- Conditionalizes simple `ScheduleOne.*` usings into Mono and IL2CPP branches.
-- Generates source helpers for handled cases such as public-safe namespace facades and UnityEvent listener bridges.
-- Writes a source-risk report for patterns that still need human review, such as Harmony transpilers or unsafe delegate surfaces.
-- Runs migration plans in a sandbox with `verify-migration`, then deletes the sandbox.
+- Discover Schedule One mod `.csproj` files from a project folder or workspace.
+- Infer Mono, IL2CPP, and CrossCompat configurations from project metadata, references, packages, and source defines.
+- Report common IL2CPP migration blockers, including target framework drift, stale publicized assemblies, wrong reference surfaces, missing runtime defines, injected type issues, and source patterns that need review.
+- Add IL2CPP configurations for Mono-only projects when `migrate --dual-runtime` can infer the source Mono configuration.
+- Update a sibling `.sln` so generated configurations appear in Visual Studio.
+- Move machine-specific game paths into ignored `local.build.props` scaffolding.
+- Rewrite simple ScheduleOne using directives, generated type facades, UnityEvent listener calls, and other handled source patterns.
+- Generate a source-risk report for cases that still need deliberate review, such as Harmony transpilers or unsafe delegate surfaces.
+- Run the migration in a throwaway sandbox with `verify-migration` before touching the real project.
 
-## Safety boundaries
+## Safety model
 
-S1Interop may inspect local project files and user-provided game install paths. It should not commit, package, or redistribute Schedule One assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or AssetRipper exports.
+S1Interop works on your mod source and project files. It should not commit, package, or redistribute Schedule One assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or AssetRipper exports.
 
-Generated machine-local files are ignored by default:
+Applied migrations write a manifest and backups under `s1interop-runs/<run-id>/`, so you can roll back a generated change set:
 
-- `local.build.props`
-- `s1interop-runs/`
-- `s1interop-cache/`
+```powershell
+dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate rollback .\s1interop-runs\<run-id>\manifest.json
+```
 
-Internal project notes should stay out of public commits. Use ignored paths such as `.internal/`, `docs/internal/`, or `*.internal.md` for local planning, validation notes, and workspace-specific findings.
+Machine-local and internal files are ignored by default:
+
+```text
+local.build.props
+Directory.Build.user.props
+s1interop-runs/
+s1interop-cache/
+.internal/
+docs/internal/
+*.internal.md
+*.local.md
+```
+
+Keep local validation notes, private workspace findings, demo recordings, and machine-specific paths in those ignored locations. Public docs should describe repeatable user workflows, not one developer's local setup.
 
 ## Build from source
 
 ```powershell
 dotnet restore .\S1Interop.sln
 dotnet build .\S1Interop.sln
+```
+
+## Repository layout
+
+```text
+src/S1Interop.Cli/
+  CommandLine/   argument parsing and supported command metadata
+  Commands/      command execution paths
+  Reporting/     text output and help
+
+src/S1Interop.Core/
+  Analysis/      project discovery, MSBuild inspection, and source-risk analysis
+  Migration/     migration planning, application, rollback, and sandbox verification
+  Generation/    generated source and report writers
+  Rewriting/     source rewrite helpers
+  Utilities/     shared low-level helpers
+
+tests/S1Interop.Tests/
+  Portable and local integration coverage
 ```
 
 ## Run from source
@@ -45,13 +76,7 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `--apply` only after reviewing the dry-run output. Applied migrations write backups and a manifest under `s1interop-runs/<run-id>/`.
-
-Rollback uses that manifest:
-
-```powershell
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate rollback .\s1interop-runs\<run-id>\manifest.json
-```
+Use `--apply` only after reviewing the dry-run output.
 
 ## Install as a local tool
 
@@ -63,7 +88,7 @@ dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\pack
 .\.tools\s1interop --help
 ```
 
-After that, run commands through `.\.tools\s1interop`:
+Then run:
 
 ```powershell
 .\.tools\s1interop analyze .
@@ -73,13 +98,13 @@ After that, run commands through `.\.tools\s1interop`:
 
 ## Local game paths
 
-Public users will have different Schedule One install paths. Pass paths explicitly when build verification needs them:
+Every developer has different Schedule One install paths. Pass paths explicitly when build verification needs them:
 
 ```powershell
 .\.tools\s1interop verify-migration . --dual-runtime --build --il2cpp-game-path "<your IL2CPP Schedule I install>" --mono-game-path "<your Mono Schedule I install>"
 ```
 
-When a migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Keep that file local.
+If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Do not commit that file.
 
 ## Commands
 
@@ -101,10 +126,10 @@ Portable tests run without private local fixtures:
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --portable
 ```
 
-Maintainers can also run the integration suite when the expected local mod workspace is available:
+Maintainers can run integration tests when the expected local mod workspace and game installs are available:
 
 ```powershell
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --integration
 ```
 
-The integration suite is allowed to depend on local open-source mod checkouts and local game paths. Do not encode those paths into committed docs or project files.
+Integration tests may use local open-source mod checkouts and local game paths. Keep those assumptions out of committed project files and public docs.
