@@ -123,7 +123,7 @@ public sealed class MemberAccessFallbackRewriter
             return false;
         }
 
-        string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}({signature.ParameterName}) as {castType};";
+        string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}<{castType}>({signature.ParameterName});";
         lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
         lines.Insert(openBraceLine + 1, replacement);
         return true;

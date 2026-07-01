@@ -609,7 +609,7 @@ internal sealed class S1InteropFixtureTests
 
             string migratedSource = File.ReadAllText(tempSource);
             Assert(
-                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer(notice) as GameObject;", StringComparison.Ordinal) &&
+                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
                 "Simple typed fallback getter should be rewritten through S1InteropMemberRegistry.");
 
@@ -666,7 +666,7 @@ internal sealed class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer(notice) as GameObject;", StringComparison.Ordinal),
+            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal),
             $"Simple typed fallback getter should rewrite through the generated member registry. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
@@ -4729,11 +4729,13 @@ internal sealed class S1InteropFixtureTests
         Assert(
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static T? GetNoticeContainer<T>(object instance) where T : class => GetNoticeContainer(instance) as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value);", StringComparison.Ordinal),
             $"Generated member registry should include field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string PlayerCameraInstanceName = \"Instance\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetPlayerCameraInstance() => GetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static T? GetPlayerCameraInstance<T>() where T : class => GetPlayerCameraInstance() as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool TrySetPlayerCameraInstance(object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, value);", StringComparison.Ordinal),
             $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
