@@ -13,7 +13,7 @@ public sealed class MemberAccessTargetCatalog
         RegexOptions.Compiled);
 
     private static readonly Regex TypeOfFieldOrPropertyRegex = new(
-        @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*,",
+        @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
 
     public IReadOnlyList<MemberAccessTarget> Discover(string projectPath)
@@ -60,10 +60,33 @@ public sealed class MemberAccessTargetCatalog
                 ownerTypeName,
                 memberName,
                 SanitizeAlias(memberName),
-                IsStatic: false));
+                IsStatic: IsStaticMemberLookup(lines, index)));
         }
 
         return CreateUniqueAliases(targets);
+    }
+
+    private static bool IsStaticMemberLookup(IReadOnlyList<string> lines, int startIndex)
+    {
+        string statement = GetStatementWindow(lines, startIndex, maxLineCount: 4);
+        return statement.Contains("BindingFlags.Static", StringComparison.Ordinal) &&
+               !statement.Contains("BindingFlags.Instance", StringComparison.Ordinal);
+    }
+
+    private static string GetStatementWindow(IReadOnlyList<string> lines, int startIndex, int maxLineCount)
+    {
+        int endIndex = Math.Min(lines.Count, startIndex + maxLineCount);
+        var statementLines = new List<string>();
+        for (int index = startIndex; index < endIndex; index++)
+        {
+            statementLines.Add(lines[index]);
+            if (lines[index].Contains(';', StringComparison.Ordinal))
+            {
+                break;
+            }
+        }
+
+        return string.Join('\n', statementLines);
     }
 
     private static IReadOnlyList<MemberAccessTarget> CreateUniqueAliases(IReadOnlyList<MemberAccessTarget> targets)

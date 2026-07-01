@@ -239,7 +239,9 @@ public sealed class MigrationPlanner
                 .Where(MemberAccessFallbackRewriter.CanRewrite)
                 .ToArray();
             bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
-                .Any(risk => risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase)) &&
+                .Any(risk =>
+                    risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase) ||
+                    risk.Kind.Equals("DirectMemberReflectionLookup", StringComparison.OrdinalIgnoreCase)) &&
                 new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count > 0;
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
@@ -353,7 +355,7 @@ public sealed class MigrationPlanner
                     null,
                     "low",
                     true,
-                    "Generate S1InteropMember declarations for typed field/property reflection fallback targets."));
+                    "Generate S1InteropMember declarations for typed field/property reflection targets."));
 
                 foreach (string sourceFile in automaticMemberAccessRisks
                              .Select(risk => risk.FilePath)

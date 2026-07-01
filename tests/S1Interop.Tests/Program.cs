@@ -58,6 +58,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
         count++;
+        SourceInteropAnalyzerReportsDirectMemberReflectionLookupRisk();
+        count++;
         MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
         count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
@@ -626,6 +628,86 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SourceInteropAnalyzerReportsDirectMemberReflectionLookupRisk()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "DirectReflectionMod.csproj");
+            string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "DirectReflection.cs"),
+                """
+                using System.Reflection;
+
+                namespace DirectReflectionMod;
+
+                public static class DirectReflection
+                {
+                    public static FieldInfo? GetHomeScreenField()
+                    {
+                        return typeof(PhoneApp).GetField("_homeScreenInstance", BindingFlags.NonPublic | BindingFlags.Instance);
+                    }
+
+                    public static PropertyInfo? GetUserDataDirectoryProperty()
+                    {
+                        return typeof(MelonEnvironment).GetProperty("UserDataDirectory", BindingFlags.Public | BindingFlags.Static);
+                    }
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
+            Assert(
+                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 2,
+                $"Source analyzer should report direct typeof(...).GetField/GetProperty lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
+            Assert(
+                risks.Where(risk => risk.Kind == "DirectMemberReflectionLookup").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
+                "Direct member reflection lookup risk should point developers toward generated S1InteropMember declarations.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_member_access_targets" && operation.Automatic),
+                "Migration plan should generate member-access target attributes for direct member reflection lookups.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package" && operation.Automatic),
+                "Migration plan should install the S1Interop generator package when direct member-access target attributes are generated.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "source_risk_direct_member_reflection_lookup" && !operation.Automatic),
+                "Migration plan should keep direct member reflection lookup guidance manual until a safe source rewrite exists.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "generate_member_access_targets"),
+                "Migration apply should create generated member-access target declarations for direct reflection lookups.");
+            Assert(File.Exists(targetPath), "Generated direct member-access target declarations were not written.");
+
+            string generatedTargets = File.ReadAllText(targetPath);
+            Assert(
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", IsStatic = true)]", StringComparison.Ordinal),
+                "Generated member-access targets should include direct member reflection declarations and static metadata.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated direct member-access target declarations.");
         }
         finally
         {

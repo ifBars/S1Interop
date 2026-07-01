@@ -36,6 +36,14 @@ public sealed class SourceInteropAnalyzer
         @"\.GetProperty\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex TypeOfFieldOrPropertyLookupRegex = new(
+        @"typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)\s*\.\s*Get(?:Field|Property)\s*\(\s*""[A-Za-z_][A-Za-z0-9_]*""\s*(?:,|\))",
+        RegexOptions.Compiled);
+
+    private static readonly Regex ReflectionLookupReceiverRegex = new(
+        @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
+        RegexOptions.Compiled);
+
     public SourceInteropAnalysis Analyze(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -237,7 +245,8 @@ public sealed class SourceInteropAnalyzer
                 "Prefer a generated S1InteropMember method target with ParameterTypeNames so backend-specific type names and by-ref parameters stay centralized."));
         }
 
-        if (IsFieldPropertyReflectionFallbackLine(lines, index))
+        bool isFieldPropertyReflectionFallback = IsFieldPropertyReflectionFallbackLine(lines, index);
+        if (isFieldPropertyReflectionFallback)
         {
             sourceRisks.Add(new SourceRisk(
                 "FieldPropertyReflectionFallback",
@@ -247,6 +256,18 @@ public sealed class SourceInteropAnalyzer
                 "Manual reflection fallback between fields and properties is a common Mono/IL2CPP member-shape drift point.",
                 $"{relativePath}:{index + 1}: {trimmed}",
                 "Prefer generated S1InteropMember field/property accessors so the member name, owner type, cache, and get/set behavior stay centralized across runtimes."));
+        }
+
+        if (!isFieldPropertyReflectionFallback && IsDirectMemberReflectionLookupLine(lines, index))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "DirectMemberReflectionLookup",
+                "low",
+                sourceFile,
+                index + 1,
+                "Direct reflected field/property lookup can drift between Mono and IL2CPP member surfaces.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer generated S1InteropMember declarations so the owner type, member name, static shape, and cached lookup stay centralized across runtimes."));
         }
     }
 
@@ -304,16 +325,60 @@ public sealed class SourceInteropAnalyzer
     private static bool IsFieldPropertyReflectionFallbackLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
-        if (!ReflectionFieldLookupRegex.IsMatch(line))
+        Match fieldLookup = ReflectionLookupReceiverRegex.Matches(line)
+            .FirstOrDefault(match => match.Groups["kind"].Value == "Field")!;
+        if (fieldLookup is null || !fieldLookup.Success)
         {
             return false;
         }
 
+        string receiver = NormalizeReflectionReceiver(fieldLookup.Groups["receiver"].Value);
         string forwardWindow = GetSourceWindow(lines, index, maxLineCount: 16);
         string backwardWindow = GetSourceWindow(lines, Math.Max(0, index - 15), Math.Min(16, index + 1));
-        return ReflectionPropertyLookupRegex.IsMatch(forwardWindow) ||
-               ReflectionPropertyLookupRegex.IsMatch(backwardWindow);
+        return HasReflectionLookup(forwardWindow, receiver, "Property") ||
+               HasReflectionLookup(backwardWindow, receiver, "Property");
     }
+
+    private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
+    {
+        string line = lines[index];
+        if (!TypeOfFieldOrPropertyLookupRegex.IsMatch(line))
+        {
+            return false;
+        }
+
+        string sourceWindow = GetSourceWindow(lines, index, maxLineCount: 16);
+        string backwardWindow = GetSourceWindow(lines, Math.Max(0, index - 15), Math.Min(16, index + 1));
+        return !HasFieldPropertyFallbackPair(sourceWindow) &&
+               !HasFieldPropertyFallbackPair(backwardWindow);
+    }
+
+    private static bool HasFieldPropertyFallbackPair(string sourceWindow)
+    {
+        foreach (Match match in ReflectionLookupReceiverRegex.Matches(sourceWindow))
+        {
+            if (match.Groups["kind"].Value != "Field")
+            {
+                continue;
+            }
+
+            if (HasReflectionLookup(sourceWindow, NormalizeReflectionReceiver(match.Groups["receiver"].Value), "Property"))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasReflectionLookup(string sourceWindow, string receiver, string kind) =>
+        ReflectionLookupReceiverRegex.Matches(sourceWindow)
+            .Any(match =>
+                match.Groups["kind"].Value == kind &&
+                NormalizeReflectionReceiver(match.Groups["receiver"].Value) == receiver);
+
+    private static string NormalizeReflectionReceiver(string receiver) =>
+        Regex.Replace(receiver, @"\s+", string.Empty);
 
     private static string GetSourceWindow(IReadOnlyList<string> lines, int startIndex, int maxLineCount)
     {
