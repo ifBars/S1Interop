@@ -50,6 +50,8 @@ internal sealed class S1InteropFixtureTests
         int count = 0;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
         count++;
+        SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
+        count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
         count++;
         MigrationApplyAndRollbackRewritesUnityEventListeners();
@@ -174,6 +176,8 @@ internal sealed class S1InteropFixtureTests
         OverTheCounterReportsHarmonyTranspilerRisk();
         count++;
         EmployeeTweaksPackageReferencesAreRuntimeEvidence();
+        count++;
+        EmployeeTweaksReportsHarmonyOverloadBindingRisk();
         count++;
         VerifyMigrationSupportsLegacyConfigurationPlatformConditions();
         count++;
@@ -379,6 +383,76 @@ internal sealed class S1InteropFixtureTests
                     operation.RuleId == "source_risk_harmony_transpiler" &&
                     !operation.Automatic),
                 "Migration plan should surface Harmony transpiler risks as non-automatic guidance.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "HarmonyBindingMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "MoveItemPatch.cs"),
+                """
+                using HarmonyLib;
+                using ScheduleOne.ItemFramework;
+                using ScheduleOne.Management;
+                using ScheduleOne.NPCs.Behaviour;
+
+                namespace HarmonyBindingMod;
+
+                public static class MoveItemPatch
+                {
+                    public static void Patch(Harmony harmony)
+                    {
+                        var method = AccessTools.Method(
+                            typeof(MoveItemBehaviour),
+                            nameof(MoveItemBehaviour.IsDestinationValid),
+                            [
+                                typeof(TransitRoute),
+                                typeof(ItemInstance),
+                                typeof(string).MakeByRefType()
+                            ]
+                        );
+
+                        harmony.Patch(method, prefix: new HarmonyMethod(typeof(MoveItemPatch), nameof(Prefix)));
+                    }
+
+                    private static bool Prefix(ref string invalidReason) => true;
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
+            Assert(
+                risks.Any(risk =>
+                    risk.Kind == "HarmonyOverloadBinding" &&
+                    risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal) &&
+                    risk.Remediation.Contains("ParameterTypeNames", StringComparison.Ordinal)),
+                "Source analyzer should report AccessTools.Method overload binding as generated method-target guidance.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "source_risk_harmony_overload_binding" &&
+                    !operation.Automatic),
+                "Migration plan should surface Harmony overload binding as non-automatic generator guidance.");
         }
         finally
         {
@@ -882,6 +956,18 @@ internal sealed class S1InteropFixtureTests
         Assert(
             il2Cpp.Evidence.Any(evidence => evidence.Contains("IL2CPP package RefGen.Schedule-I.Il2Cpp", StringComparison.Ordinal)),
             "EmployeeTweaks IL2CPP runtime evidence should include its RefGen package.");
+    }
+
+    private void EmployeeTweaksReportsHarmonyOverloadBindingRisk()
+    {
+        ProjectAnalysis project = AnalyzeProject(@"s1-employeetweaks\EmployeeTweaks.csproj");
+
+        Assert(
+            project.SourceInterop?.SourceRisks.Any(risk =>
+                risk.Kind == "HarmonyOverloadBinding" &&
+                risk.FilePath.EndsWith(@"Patches\Unpackaging\MoveItemBehaviourPatches.cs", StringComparison.OrdinalIgnoreCase) &&
+                risk.Remediation.Contains("ParameterTypeNames", StringComparison.Ordinal)) == true,
+            "EmployeeTweaks should report manual AccessTools.Method overload binding as generated method-target guidance.");
     }
 
     private void MsBuildOsPlatformConditionsAreEvaluated()

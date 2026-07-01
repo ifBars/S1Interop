@@ -114,6 +114,7 @@ public sealed class SourceInteropAnalyzer
             AddLineSourceRisks(
                 sourceFile,
                 relativePath,
+                lines,
                 lines[index],
                 index,
                 runtimeGuardStack.Contains(true),
@@ -161,6 +162,7 @@ public sealed class SourceInteropAnalyzer
     private static void AddLineSourceRisks(
         string sourceFile,
         string relativePath,
+        IReadOnlyList<string> lines,
         string line,
         int index,
         bool isRuntimeGuarded,
@@ -214,6 +216,18 @@ public sealed class SourceInteropAnalyzer
                 $"{relativePath}:{index + 1}: {trimmed}",
                 "Prefer S1API EventHelper or DelegateSupport.ConvertDelegate for generated-wrapper event surfaces."));
         }
+
+        if (IsHarmonyOverloadBindingLine(lines, index))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "HarmonyOverloadBinding",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Harmony overload binding uses explicit runtime Type arrays that can drift between Mono and IL2CPP wrappers.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer a generated S1InteropMember method target with ParameterTypeNames so backend-specific type names and by-ref parameters stay centralized."));
+        }
     }
 
     private static bool IsHarmonyTranspilerLine(string line) =>
@@ -249,6 +263,33 @@ public sealed class SourceInteropAnalyzer
         !line.Contains("Il2CppSystem.Delegate.", StringComparison.Ordinal) &&
         !line.Contains("DelegateSupport.ConvertDelegate", StringComparison.Ordinal) &&
         !line.Contains("EventHelper.", StringComparison.Ordinal);
+
+    private static bool IsHarmonyOverloadBindingLine(IReadOnlyList<string> lines, int index)
+    {
+        string line = lines[index];
+        if (!line.Contains("AccessTools.Method", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string sourceWindow = GetSourceWindow(lines, index, maxLineCount: 12);
+        return sourceWindow.Contains("typeof(", StringComparison.Ordinal) &&
+               (sourceWindow.Contains(".MakeByRefType()", StringComparison.Ordinal) ||
+                sourceWindow.Contains("new[]", StringComparison.Ordinal) ||
+                sourceWindow.Contains("new Type[]", StringComparison.Ordinal) ||
+                sourceWindow.Contains("new System.Type[]", StringComparison.Ordinal) ||
+                ContainsCollectionExpressionParameterList(sourceWindow));
+    }
+
+    private static string GetSourceWindow(IReadOnlyList<string> lines, int startIndex, int maxLineCount)
+    {
+        int endIndex = Math.Min(lines.Count, startIndex + maxLineCount);
+        return string.Join('\n', lines.Skip(startIndex).Take(endIndex - startIndex));
+    }
+
+    private static bool ContainsCollectionExpressionParameterList(string sourceWindow) =>
+        Regex.IsMatch(sourceWindow, @"(?m)^\s*\[\s*$") ||
+        Regex.IsMatch(sourceWindow, @"(?m)^\s*\[\s*typeof\s*\(");
 
     private static void UpdateRuntimeGuardStack(string line, Stack<bool> runtimeGuardStack)
     {
