@@ -4098,6 +4098,8 @@ internal sealed class S1InteropFixtureTests
             """
             [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
             [assembly: S1Interop.S1InteropType("ScheduleOne.UI.Phone.Phone", Alias = "Phone", Il2CppTypeName = "Il2CppScheduleOne.UI.Phone.Phone")]
+            [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
+            [assembly: S1Interop.S1InteropMember("Phone", "StartUpdateVolume", Alias = "StartUpdateVolume", Kind = S1Interop.S1InteropMemberKind.Method)]
 
             namespace SyntheticMod
             {
@@ -4131,6 +4133,20 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("private static readonly System.Collections.Generic.Dictionary<string, System.Type?> Cache", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
+        Assert(
+            il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value);", StringComparison.Ordinal),
+            $"Generated member registry should include field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, instance, args);", StringComparison.Ordinal),
+            $"Generated member registry should include method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("ownerType.GetProperty(memberName, AllBindings)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("ownerType.GetField(memberName, AllBindings)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("ownerType.GetMethod(memberName, AllBindings)", StringComparison.Ordinal),
+            "Generated member registry should cache property, field, and method lookup paths.");
     }
 
     private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()
