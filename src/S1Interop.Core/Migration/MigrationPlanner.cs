@@ -166,6 +166,31 @@ public sealed class MigrationPlanner
                 "Install a project-local MSBuild target that runs S1Interop lint before compilation and can be restored through the migration manifest."));
         }
 
+        string[] playerCameraCompatFiles = PlayerCameraCompatRewriter
+            .FindFilesWithCloseInterfaceCalls(project.ProjectPath)
+            .ToArray();
+        if (playerCameraCompatFiles.Length > 0)
+        {
+            operations.Add(new MigrationOperation(
+                "generate_player_camera_compat_bridge",
+                PlayerCameraCompatGenerator.GetSourcePath(project.ProjectPath),
+                null,
+                "low",
+                true,
+                "Generate a PlayerCamera compatibility bridge for Mono-only CloseInterface calls missing from IL2CPP wrappers."));
+
+            foreach (string sourceFile in playerCameraCompatFiles)
+            {
+                operations.Add(new MigrationOperation(
+                    "rewrite_player_camera_close_interface",
+                    sourceFile,
+                    null,
+                    "low",
+                    true,
+                    "Rewrite PlayerCamera.CloseInterface calls through the generated S1Interop compatibility bridge."));
+            }
+        }
+
         SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(project);
         if (facadePlan.HasContent)
         {

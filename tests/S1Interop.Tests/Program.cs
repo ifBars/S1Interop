@@ -124,6 +124,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
+        PlayerCameraCompatBridgeRewritesCloseInterfaceCalls();
+        count++;
         SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
         count++;
         DuplicateLangVersionUsesEffectiveLastValueForSdkFacadeSupport();
@@ -185,7 +187,7 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy();
         count++;
-        VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch();
+        VerifyMigrationBuildGateConvertsRealBarsGraphics();
         count++;
         VerifyMigrationMovesGameRootModDependencyHintPaths();
         count++;
@@ -2062,7 +2064,7 @@ internal sealed class S1InteropFixtureTests
         }
     }
 
-    private void VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch()
+    private void VerifyMigrationBuildGateConvertsRealBarsGraphics()
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "BarsGraphics");
         string sourceProject = Path.Combine(sourceDirectory, "BarsGraphics.csproj");
@@ -2091,16 +2093,17 @@ internal sealed class S1InteropFixtureTests
                 Il2CppGamePath: il2CppRoot,
                 MonoGamePath: monoRoot));
 
-        Assert(!result.Success, "BarsGraphics should currently expose a development-only IL2CPP API surface mismatch.");
+        Assert(result.Success, $"BarsGraphics should migrate and build both runtimes. Build output: {FormatBuildResults(result.BuildResults)}");
         Assert(result.AfterDiagnostics.Count == 0, $"BarsGraphics migration should clear analyzer diagnostics before build classification. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
         IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults ?? [];
         Assert(buildResults.Count == 4, $"BarsGraphics should build-check four configurations, got {buildResults.Count}.");
-        MigrationBuildResult il2CppDevelopment = buildResults.Single(build => build.Configuration == "Il2cppDevelopment");
-        Assert(il2CppDevelopment.FailureKind == "Il2CppApiSurfaceMismatch", $"BarsGraphics development IL2CPP failure should classify as API mismatch. Build output: {FormatBuildResults(buildResults)}");
-        Assert(il2CppDevelopment.Attribution == "MigrationCompileFailure", $"BarsGraphics API mismatch should be attributed to migration compile failure. Build output: {FormatBuildResults(buildResults)}");
         Assert(
-            buildResults.Where(build => build.Configuration != "Il2cppDevelopment").All(build => build.Success),
-            $"Only BarsGraphics Il2cppDevelopment should fail in this fixture. Build output: {FormatBuildResults(buildResults)}");
+            buildResults.All(build => build.Success),
+            $"All BarsGraphics runtime configurations should build after migration. Build output: {FormatBuildResults(buildResults)}");
+        Assert(buildResults.Any(build => build.Configuration == "MonoDevelopment" && build.Runtime == RuntimeKind.Mono), "BarsGraphics build results should include MonoDevelopment.");
+        Assert(buildResults.Any(build => build.Configuration == "MonoStable" && build.Runtime == RuntimeKind.Mono), "BarsGraphics build results should include MonoStable.");
+        Assert(buildResults.Any(build => build.Configuration == "Il2cppDevelopment" && build.Runtime == RuntimeKind.Il2Cpp), "BarsGraphics build results should include Il2cppDevelopment.");
+        Assert(buildResults.Any(build => build.Configuration == "Il2cppStable" && build.Runtime == RuntimeKind.Il2Cpp), "BarsGraphics build results should include Il2cppStable.");
         Assert(result.SandboxDeleted, "BarsGraphics build-gated verification should delete its sandbox.");
         Assert(
             string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
@@ -3971,6 +3974,53 @@ internal sealed class S1InteropFixtureTests
             rewritten.Contains("using static ScheduleOne.UI.HUD;", StringComparison.Ordinal) &&
             rewritten.Contains("using static Il2CppScheduleOne.UI.HUD;", StringComparison.Ordinal),
             "Alias and static ScheduleOne usings should remain source-level guarded because global namespace imports cannot replace them safely.");
+    }
+
+    private void PlayerCameraCompatBridgeRewritesCloseInterfaceCalls()
+    {
+        string source =
+            """
+            using GamePlayerCamera = ScheduleOne.PlayerScripts.PlayerCamera;
+
+            namespace SyntheticMod
+            {
+                public static class CameraFlow
+                {
+                    public static void Restore()
+                    {
+                        GamePlayerCamera.Instance.CloseInterface(0f, true);
+                        ScheduleOne.PlayerScripts.PlayerCamera.Instance.CloseInterface();
+                    }
+                }
+            }
+            """;
+
+        string rewritten = PlayerCameraCompatRewriter.RewriteSource(source);
+
+        Assert(
+            rewritten.Contains(
+                "S1Interop.Generated.S1PlayerCameraCompat.CloseInterface(GamePlayerCamera.Instance, 0f, true);",
+                StringComparison.Ordinal),
+            $"PlayerCamera CloseInterface call with arguments was not rewritten. Rewritten source:{Environment.NewLine}{rewritten}");
+        Assert(
+            rewritten.Contains(
+                "S1Interop.Generated.S1PlayerCameraCompat.CloseInterface(ScheduleOne.PlayerScripts.PlayerCamera.Instance);",
+                StringComparison.Ordinal),
+            $"PlayerCamera CloseInterface call without arguments was not rewritten. Rewritten source:{Environment.NewLine}{rewritten}");
+        Assert(!rewritten.Contains(".CloseInterface(0f, true);", StringComparison.Ordinal), "Direct CloseInterface call should be routed through the generated compatibility bridge.");
+
+        string bridgeSource = PlayerCameraCompatGenerator.GenerateSource();
+        Assert(
+            bridgeSource.Contains("namespace S1Interop.Generated", StringComparison.Ordinal) &&
+            !bridgeSource.Contains("namespace S1Interop.Generated;", StringComparison.Ordinal),
+            "Generated PlayerCamera bridge should avoid C# 10-only file-scoped namespace syntax.");
+        Assert(
+            bridgeSource.Contains("camera.CloseInterface(cameraLerpTime, reenableCameraInput);", StringComparison.Ordinal),
+            "Generated PlayerCamera bridge should preserve the Mono CloseInterface call.");
+        Assert(
+            bridgeSource.Contains("camera.SetCanLook(true);", StringComparison.Ordinal) &&
+            bridgeSource.Contains("camera.SetDoFActive(false, cameraLerpTime);", StringComparison.Ordinal),
+            "Generated PlayerCamera bridge should provide an IL2CPP fallback using wrapper-visible camera APIs.");
     }
 
     private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()

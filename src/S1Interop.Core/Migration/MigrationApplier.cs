@@ -86,6 +86,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_unity_event_listeners", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_player_camera_close_interface", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("install_build_validation_hook", StringComparison.OrdinalIgnoreCase);
@@ -114,9 +115,11 @@ public sealed class MigrationApplier
                 "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
                 "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
+                "generate_player_camera_compat_bridge" => ApplyPlayerCameraCompatBridge(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_source_risk_report" => ApplySourceRiskReport(projectPlan, operation, backupRoot, fileChanges),
                 "rewrite_unity_event_listeners" => ApplyUnityEventListenerRewrite(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_delegate_assignments" => ApplyDelegateAssignmentRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_player_camera_close_interface" => ApplyPlayerCameraCloseInterfaceRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
             };
@@ -171,9 +174,11 @@ public sealed class MigrationApplier
         {
             "generate_sdk_facade" => 10,
             "generate_unity_event_bridge" => 10,
+            "generate_player_camera_compat_bridge" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
             "conditionalize_scheduleone_usings" => 20,
             "rewrite_unity_event_listeners" => 20,
+            "rewrite_player_camera_close_interface" => 20,
             _ => 0
         };
 
@@ -1100,6 +1105,27 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyPlayerCameraCompatBridge(
+        ProjectMigrationPlan projectPlan,
+        XDocument document,
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        string source = PlayerCameraCompatGenerator.GenerateSource();
+        bool changed = false;
+        if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
+        {
+            TrackFile(operation.FilePath, backupRoot, fileChanges);
+            Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
+            File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
+            UpdateTrackedFileHash(operation.FilePath, fileChanges);
+            changed = true;
+        }
+
+        return EnsureGeneratedFacadeCompileInclude(document, projectPlan.ProjectPath, operation.FilePath) || changed;
+    }
+
     private static bool ApplyUnityEventListenerRewrite(
         string sourcePath,
         string backupRoot,
@@ -1135,6 +1161,29 @@ public sealed class MigrationApplier
 
         string original = File.ReadAllText(sourcePath);
         string rewritten = new DelegateAssignmentRewriter().RewriteSource(original);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyPlayerCameraCloseInterfaceRewrite(
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = PlayerCameraCompatRewriter.RewriteSource(original);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;
