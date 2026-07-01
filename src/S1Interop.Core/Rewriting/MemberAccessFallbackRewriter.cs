@@ -2,7 +2,7 @@ namespace S1Interop.Core;
 
 public sealed class MemberAccessFallbackRewriter
 {
-    private static readonly HashSet<string> UnsupportedReturnTypes = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> ValueReturnTypes = new(StringComparer.Ordinal)
     {
         "bool",
         "byte",
@@ -12,11 +12,14 @@ public sealed class MemberAccessFallbackRewriter
         "float",
         "int",
         "long",
-        "object",
         "short",
-        "string",
         "uint",
-        "ulong",
+        "ulong"
+    };
+
+    private static readonly HashSet<string> UnsupportedReturnTypes = new(StringComparer.Ordinal)
+    {
+        "object",
         "void"
     };
 
@@ -115,7 +118,8 @@ public sealed class MemberAccessFallbackRewriter
             return false;
         }
 
-        string castType = signature.ReturnType.EndsWith("?", StringComparison.Ordinal)
+        bool nullableReturn = signature.ReturnType.EndsWith("?", StringComparison.Ordinal);
+        string castType = nullableReturn
             ? signature.ReturnType[..^1]
             : signature.ReturnType;
         if (UnsupportedReturnTypes.Contains(castType))
@@ -123,7 +127,15 @@ public sealed class MemberAccessFallbackRewriter
             return false;
         }
 
-        string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}<{castType}>({signature.ParameterName});";
+        if (ValueReturnTypes.Contains(castType) && !nullableReturn)
+        {
+            return false;
+        }
+
+        string accessor = ValueReturnTypes.Contains(castType)
+            ? $"Get{target.MemberAlias}Value<{castType}>"
+            : $"Get{target.MemberAlias}<{castType}>";
+        string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.{accessor}({signature.ParameterName});";
         lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
         lines.Insert(openBraceLine + 1, replacement);
         return true;

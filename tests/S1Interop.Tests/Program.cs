@@ -54,6 +54,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         MemberAccessFallbackRewriterRewritesSimpleTypedGetter();
         count++;
+        MemberAccessFallbackRewriterRewritesNullableValueGetter();
+        count++;
         SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
         count++;
         MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
@@ -668,6 +670,45 @@ internal sealed class S1InteropFixtureTests
         Assert(
             rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal),
             $"Simple typed fallback getter should rewrite through the generated member registry. Rewritten source:{Environment.NewLine}{rewritten}");
+    }
+
+    private void MemberAccessFallbackRewriterRewritesNullableValueGetter()
+    {
+        string source =
+            """
+            using System.Reflection;
+
+            namespace ReflectionFallbackMod;
+
+            public static class ReflectionFallback
+            {
+                public static float? GetRenderScale(RenderPipelineAsset asset)
+                {
+                    FieldInfo? field = typeof(RenderPipelineAsset).GetField("renderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (field != null && field.GetValue(asset) is float fieldValue)
+                    {
+                        return fieldValue;
+                    }
+
+                    PropertyInfo? property = typeof(RenderPipelineAsset).GetProperty("renderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    return property == null ? null : property.GetValue(asset) as float?;
+                }
+            }
+            """;
+        string sourcePath = Path.Combine(Path.GetTempPath(), "ReflectionFallback.cs");
+        var target = new MemberAccessTarget(
+            sourcePath,
+            9,
+            "RenderPipelineAsset",
+            "UnityEngine.Rendering.RenderPipelineAsset",
+            "renderScale",
+            "renderScale",
+            IsStatic: false);
+
+        string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
+        Assert(
+            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetrenderScaleValue<float>(asset);", StringComparison.Ordinal),
+            $"Nullable value fallback getter should rewrite through the generated member registry value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MigrationApplyAndRollbackRewritesHarmonyOverloadBindings()
@@ -4730,12 +4771,14 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainer<T>(object instance) where T : class => GetNoticeContainer(instance) as T;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static T? GetNoticeContainerValue<T>(object instance) where T : struct => GetNoticeContainer(instance) is T value ? value : (T?)null;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool TrySetNoticeContainer(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, value);", StringComparison.Ordinal),
             $"Generated member registry should include field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string PlayerCameraInstanceName = \"Instance\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetPlayerCameraInstance() => GetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetPlayerCameraInstance<T>() where T : class => GetPlayerCameraInstance() as T;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static T? GetPlayerCameraInstanceValue<T>() where T : struct => GetPlayerCameraInstance() is T value ? value : (T?)null;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool TrySetPlayerCameraInstance(object? value) => TrySetValue(S1InteropTypeRegistry.PlayerCameraName, PlayerCameraInstanceName, null, value);", StringComparison.Ordinal),
             $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
