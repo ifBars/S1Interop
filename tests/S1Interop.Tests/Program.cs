@@ -94,6 +94,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateStagesLocalS1InteropGeneratorPackage();
         count++;
+        VerifyMigrationBuildGatePreservesAncestorNuGetConfig();
+        count++;
         VerifyMigrationBuildGateFailsCompilerBrokenSandbox();
         count++;
         VerifyMigrationBuildGateReportsMissingHintPathReadiness();
@@ -2703,6 +2705,70 @@ internal sealed class S1InteropFixtureTests
                     build.Command.Contains("S1Interop.ExternalReferences", StringComparison.Ordinal)),
                 $"Build commands should include sandbox-local S1Interop package source. Build output: {FormatBuildResults(result.BuildResults)}");
             Assert(result.SandboxDeleted, "Generator package staging verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGatePreservesAncestorNuGetConfig()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string packageFeed = Path.Combine(tempRoot, "local-feed");
+            string projectDirectory = Path.Combine(tempRoot, "ModProject");
+            Directory.CreateDirectory(packageFeed);
+            Directory.CreateDirectory(projectDirectory);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "NuGet.config"),
+                $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <clear />
+                    <add key="LocalFixtureFeed" value="{packageFeed}" />
+                  </packageSources>
+                </configuration>
+                """);
+
+            string tempProject = Path.Combine(projectDirectory, "PackageSourceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Missing.ScheduleOne.Package" Version="1.2.3" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(projectDirectory, "Core.cs"),
+                """
+                namespace PackageSourceMod;
+
+                internal static class Core
+                {
+                    internal static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "Missing package fixture should fail build verification.");
+            Assert(
+                result.BuildResults!.All(build =>
+                    build.FailureKind == "PackageFeedMissing" &&
+                    build.Output.Contains("LocalFixtureFeed", StringComparison.OrdinalIgnoreCase)),
+                $"Sandbox restore should preserve the ancestor NuGet.config package source. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Ancestor NuGet.config verification should delete its sandbox.");
         }
         finally
         {

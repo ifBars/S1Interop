@@ -159,6 +159,7 @@ public sealed class MigrationVerifier
         try
         {
             CopyProjectDirectory(sourceRoot, sandboxRoot);
+            StageAncestorNuGetConfig(sourceProject.ProjectPath, sourceRoot, sandboxRoot);
 
             WorkspaceAnalysis before = analyzer.Analyze(sandboxProjectPath);
             WorkspaceAnalysis after = before;
@@ -2389,6 +2390,47 @@ public sealed class MigrationVerifier
                 File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
             }
         }
+    }
+
+    private static void StageAncestorNuGetConfig(string sourceProjectPath, string sourceRoot, string sandboxRoot)
+    {
+        string fullSourceRoot = Path.GetFullPath(sourceRoot);
+        if (File.Exists(Path.Combine(sandboxRoot, "NuGet.config")) ||
+            File.Exists(Path.Combine(sandboxRoot, "nuget.config")))
+        {
+            return;
+        }
+
+        string sourceProjectDirectory = Path.GetDirectoryName(Path.GetFullPath(sourceProjectPath))!;
+        foreach (string ancestor in EnumerateAncestors(sourceProjectDirectory).Skip(1).Take(8))
+        {
+            string fullAncestor = Path.GetFullPath(ancestor);
+            if (fullAncestor.StartsWith(fullSourceRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string? configPath = FindNuGetConfig(fullAncestor);
+            if (configPath is null)
+            {
+                continue;
+            }
+
+            File.Copy(configPath, Path.Combine(sandboxRoot, Path.GetFileName(configPath)), overwrite: false);
+            return;
+        }
+    }
+
+    private static string? FindNuGetConfig(string directory)
+    {
+        string configPath = Path.Combine(directory, "NuGet.config");
+        if (File.Exists(configPath))
+        {
+            return configPath;
+        }
+
+        configPath = Path.Combine(directory, "nuget.config");
+        return File.Exists(configPath) ? configPath : null;
     }
 
     private static bool ShouldSkipDirectory(string directory)
