@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace S1Interop.Core;
+using S1Interop.Core;
+
+namespace S1Interop.Core.Generators;
 
 public sealed class SdkFacadeGenerator
 {

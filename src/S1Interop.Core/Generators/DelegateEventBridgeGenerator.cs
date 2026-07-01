@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Generators;
 
 public sealed class DelegateEventBridgeGenerator
 {

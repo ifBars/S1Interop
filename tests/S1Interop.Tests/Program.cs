@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using S1Interop.Core;
+using S1Interop.Core.Generators;
 using S1Interop.Generators;
 using CoreDiagnosticSeverity = S1Interop.Core.DiagnosticSeverity;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;

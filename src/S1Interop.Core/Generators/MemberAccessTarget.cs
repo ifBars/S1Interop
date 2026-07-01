@@ -1,4 +1,4 @@
-namespace S1Interop.Core;
+namespace S1Interop.Core.Generators;
 
 public enum MemberAccessKind
 {

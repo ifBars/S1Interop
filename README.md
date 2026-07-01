@@ -59,8 +59,8 @@ src/S1Interop.Cli/
 
 src/S1Interop.Core/
   Analysis/      project discovery, MSBuild inspection, and source-risk analysis
+  Generators/    migration-time generated source and report writers
   Migration/     migration planning, application, rollback, and sandbox verification
-  Generation/    generated source and report writers
   Rewriting/     source rewrite helpers
   Utilities/     shared low-level helpers
 
@@ -73,7 +73,14 @@ tests/S1Interop.Tests/
 
 ## Compile-time generators
 
-S1Interop also ships an experimental analyzer/source-generator package, `S1Interop.Generators`. It is for cases where a mod wants compile-time generated helpers instead of hand-maintained backend strings and reflection caches.
+S1Interop has two generator layers:
+
+- `S1Interop.Core.Generators` is used by the CLI. It writes migration-time files such as SDK facades, bridge helpers, member-target declarations, and source-risk reports.
+- `S1Interop.Generators` is the Roslyn analyzer/source-generator package installed into migrated mod projects. It emits compile-time helpers from attributes.
+
+The SDK facade belongs to the CLI layer because it is produced during migration from the current project source. The Roslyn package stays focused on compile-time additive code that a mod project can reference privately.
+
+`S1Interop.Generators` is for cases where a mod wants compile-time generated helpers instead of hand-maintained backend strings and reflection caches.
 
 Example:
 
@@ -96,6 +103,14 @@ Method declarations can also include `ParameterTypeNames` for overload-specific 
 When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
+
+Roslyn source generators are additive: they can emit new C# and diagnostics, but they cannot rewrite existing source calls or modify IL. A single-DLL compatibility path is still possible, but it needs one of these shapes:
+
+- source migration rewrites known call sites to generated backend-routing helpers before build;
+- mod code calls generated facades directly;
+- a future IL-weaving step rewrites compiled call sites after Roslyn compilation.
+
+The current project deliberately uses the first two paths. IL weaving is a separate future layer because it changes the compiled assembly and needs stronger verification than source generation.
 
 Until `S1Interop.Generators` is published, projects that opt into generator attributes need a local package source:
 
