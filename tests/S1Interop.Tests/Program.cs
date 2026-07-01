@@ -642,6 +642,7 @@ internal sealed class S1InteropFixtureTests
         try
         {
             string tempProject = Path.Combine(tempRoot, "DirectReflectionMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "DirectReflection.cs");
             string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
             File.WriteAllText(
                 tempProject,
@@ -653,7 +654,7 @@ internal sealed class S1InteropFixtureTests
                 </Project>
                 """);
             File.WriteAllText(
-                Path.Combine(tempRoot, "DirectReflection.cs"),
+                tempSource,
                 """
                 using System.Reflection;
 
@@ -668,7 +669,9 @@ internal sealed class S1InteropFixtureTests
 
                     public static PropertyInfo? GetUserDataDirectoryProperty()
                     {
-                        return typeof(MelonEnvironment).GetProperty("UserDataDirectory", BindingFlags.Public | BindingFlags.Static);
+                        var property = typeof(MelonEnvironment).GetProperty("UserDataDirectory",
+                            BindingFlags.Public | BindingFlags.Static);
+                        return property;
                     }
                 }
                 """);
@@ -691,13 +694,19 @@ internal sealed class S1InteropFixtureTests
                 projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package" && operation.Automatic),
                 "Migration plan should install the S1Interop generator package when direct member-access target attributes are generated.");
             Assert(
-                projectPlan.Operations.Any(operation => operation.RuleId == "source_risk_direct_member_reflection_lookup" && !operation.Automatic),
-                "Migration plan should keep direct member reflection lookup guidance manual until a safe source rewrite exists.");
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_direct_member_reflection_lookups" && operation.Automatic),
+                "Migration plan should rewrite safe direct member reflection lookup statements through generated typed accessors.");
+            Assert(
+                !projectPlan.Operations.Any(operation => operation.RuleId == "source_risk_direct_member_reflection_lookup" && !operation.Automatic),
+                "Migration plan should not keep automatically rewritten direct member reflection lookups as manual guidance.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "generate_member_access_targets"),
                 "Migration apply should create generated member-access target declarations for direct reflection lookups.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_direct_member_reflection_lookups"),
+                "Migration apply should rewrite direct member reflection lookup statements.");
             Assert(File.Exists(targetPath), "Generated direct member-access target declarations were not written.");
 
             string generatedTargets = File.ReadAllText(targetPath);
@@ -705,8 +714,14 @@ internal sealed class S1InteropFixtureTests
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\", Kind = S1Interop.S1InteropMemberKind.Field)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal),
                 "Generated member-access targets should include direct member reflection declarations and static metadata.");
+            string rewrittenSource = File.ReadAllText(tempSource);
+            Assert(
+                rewrittenSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("var property = S1Interop.Generated.S1InteropMemberRegistry.UserDataDirectoryPropertyInfo;", StringComparison.Ordinal),
+                $"Direct member reflection lookups should be rewritten to generated typed metadata accessors. Source:{Environment.NewLine}{rewrittenSource}");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten direct reflection source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated direct member-access target declarations.");
         }
         finally
@@ -4869,6 +4884,10 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public static object? GetHomeScreenField(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, HomeScreenFieldName, instance, S1InteropMemberKind.Field);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetDeviceIdProperty() => GetValue(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, null, S1InteropMemberKind.Property);", StringComparison.Ordinal),
             $"Generated member registry should honor exact field/property member kinds. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public static System.Reflection.FieldInfo? HomeScreenFieldFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, HomeScreenFieldName, parameterTypeNames: null, S1InteropMemberKind.Field) as System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static System.Reflection.PropertyInfo? DeviceIdPropertyPropertyInfo => ResolveMember(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, parameterTypeNames: null, S1InteropMemberKind.Property) as System.Reflection.PropertyInfo;", StringComparison.Ordinal),
+            $"Generated member registry should expose exact typed member metadata accessors. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static System.Reflection.MethodInfo? StartUpdateVolumeMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null);", StringComparison.Ordinal) &&

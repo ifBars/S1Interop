@@ -408,6 +408,15 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             else
             {
                 string memberKind = $"S1InteropMemberKind.{member.Kind}";
+                if (member.Kind == S1InteropMemberKind.Field)
+                {
+                    builder.AppendLine($"        public static System.Reflection.FieldInfo? {member.Alias}FieldInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, {memberKind}) as System.Reflection.FieldInfo;");
+                }
+                else if (member.Kind == S1InteropMemberKind.Property)
+                {
+                    builder.AppendLine($"        public static System.Reflection.PropertyInfo? {member.Alias}PropertyInfo => ResolveMember(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, parameterTypeNames: null, {memberKind}) as System.Reflection.PropertyInfo;");
+                }
+
                 if (member.IsStatic)
                 {
                     builder.AppendLine($"        public static object? Get{member.Alias}() => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, null, {memberKind});");

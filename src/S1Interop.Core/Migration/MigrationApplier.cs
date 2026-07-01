@@ -90,6 +90,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_harmony_overload_bindings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_member_access_fallbacks", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_direct_member_reflection_lookups", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_player_camera_close_interface", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
@@ -128,6 +129,7 @@ public sealed class MigrationApplier
                 "rewrite_delegate_assignments" => ApplyDelegateAssignmentRewrite(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_harmony_overload_bindings" => ApplyHarmonyOverloadBindingRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_member_access_fallbacks" => ApplyMemberAccessFallbackRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
+                "rewrite_direct_member_reflection_lookups" => ApplyDirectMemberReflectionLookupRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_player_camera_close_interface" => ApplyPlayerCameraCloseInterfaceRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
@@ -192,6 +194,7 @@ public sealed class MigrationApplier
             "rewrite_unity_event_listeners" => 20,
             "rewrite_harmony_overload_bindings" => 20,
             "rewrite_member_access_fallbacks" => 20,
+            "rewrite_direct_member_reflection_lookups" => 20,
             "rewrite_player_camera_close_interface" => 20,
             _ => 0
         };
@@ -1341,6 +1344,36 @@ public sealed class MigrationApplier
 
         string original = File.ReadAllText(sourcePath);
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(original, sourcePath, targets);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyDirectMemberReflectionLookupRewrite(
+        string projectPath,
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        IReadOnlyList<MemberAccessTarget> targets = new MemberAccessTargetCatalog().Discover(projectPath);
+        if (targets.Count == 0)
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = new DirectMemberReflectionLookupRewriter().RewriteSource(original, sourcePath, targets);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;

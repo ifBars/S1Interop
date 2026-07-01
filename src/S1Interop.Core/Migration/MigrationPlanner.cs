@@ -238,6 +238,9 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticMemberAccessRisks = project.SourceInterop.SourceRisks
                 .Where(MemberAccessFallbackRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticDirectMemberLookupRisks = project.SourceInterop.SourceRisks
+                .Where(DirectMemberReflectionLookupRewriter.CanRewrite)
+                .ToArray();
             bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
                 .Any(risk =>
                     risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase) ||
@@ -248,6 +251,7 @@ public sealed class MigrationPlanner
                 .Except(automaticDelegateRisks)
                 .Except(automaticHarmonyOverloadRisks)
                 .Except(automaticMemberAccessRisks)
+                .Except(automaticDirectMemberLookupRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -369,6 +373,20 @@ public sealed class MigrationPlanner
                         "low",
                         true,
                         "Rewrite simple typed field/property reflection fallback getters through generated S1InteropMemberRegistry accessors."));
+                }
+
+                foreach (string sourceFile in automaticDirectMemberLookupRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_direct_member_reflection_lookups",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple direct typeof(...).GetField/GetProperty lookups through generated S1InteropMemberRegistry FieldInfo/PropertyInfo accessors."));
                 }
             }
 
