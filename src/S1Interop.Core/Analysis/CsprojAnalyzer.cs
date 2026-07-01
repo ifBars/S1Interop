@@ -491,9 +491,7 @@ public sealed class CsprojAnalyzer
         foreach (XElement element in document.Descendants().Where(element => !element.HasElements))
         {
             string text = element.Value.Trim();
-            if ((text.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase) ||
-                 text.StartsWith(@"D:\", StringComparison.OrdinalIgnoreCase)) &&
-                seenEvidence.Add(text))
+            if (IsAbsoluteWindowsPath(text) && seenEvidence.Add(text))
             {
                 diagnostics.Add(new InteropDiagnostic(
                     "local_path_in_project",
@@ -552,7 +550,7 @@ public sealed class CsprojAnalyzer
             .Select(entry => entry.Element)
             .Where(IsNamed("LangVersion"))
             .Select(element => element.Value.Trim())
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+            .LastOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static bool IsCSharp10OrNewer(string langVersion)
@@ -682,6 +680,12 @@ public sealed class CsprojAnalyzer
         return (text.StartsWith(@"\", StringComparison.Ordinal) && !text.StartsWith(@"\\", StringComparison.Ordinal)) ||
                (text.StartsWith("/", StringComparison.Ordinal) && !text.StartsWith("//", StringComparison.Ordinal));
     }
+
+    private static bool IsAbsoluteWindowsPath(string value) =>
+        value.Length >= 3 &&
+        char.IsLetter(value[0]) &&
+        value[1] == ':' &&
+        (value[2] == '\\' || value[2] == '/');
 
     private static bool HasLocalReferencePropertyScaffold(string projectPath)
     {

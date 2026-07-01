@@ -56,6 +56,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         MsBuildOsPlatformConditionsAreEvaluated();
         count++;
+        LocalPathDiagnosticsDetectAnyWindowsDriveLetter();
+        count++;
         MigrationPreservesLocalPropsUnderOsConditionedGameDir();
         count++;
         MigrationApplyAndRollbackScaffoldsLocalReferenceProperties();
@@ -124,6 +126,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SdkFacadeAliasesFullyQualifiedScheduleOneTypes();
         count++;
+        DuplicateLangVersionUsesEffectiveLastValueForSdkFacadeSupport();
+        count++;
         MigrationApplyAndRollbackRewritesFullyQualifiedScheduleOneTypes();
         count++;
         HideFromIl2CppMigrationHandlesMultipleTargetsAndOverloads();
@@ -175,6 +179,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationPreservesBguiMixedConfigurationPaths();
         count++;
+        VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
+        count++;
         VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch();
         count++;
         VerifyMigrationMovesGameRootModDependencyHintPaths();
@@ -192,6 +198,8 @@ internal sealed class S1InteropFixtureTests
         SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
         count++;
         SdkFacadeMigrationRequiresCSharp10ForDefaultLangVersionProjects();
+        count++;
+        DuplicateLangVersionRealModsDoNotRequireCSharp10Migration();
         count++;
         MigrationPlannerCreatesOperationsForBrokenFixture();
         count++;
@@ -908,6 +916,44 @@ internal sealed class S1InteropFixtureTests
                 hintPath is null ||
                 !hintPath.Contains(@"C:\home\user", StringComparison.OrdinalIgnoreCase),
                 $"OS conditions should not combine Windows path semantics with the Linux GameDir, got {hintPath}.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void LocalPathDiagnosticsDetectAnyWindowsDriveLetter()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ArbitraryDrivePathMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <GameDir>Z:\Steam\steamapps\common\Schedule I</GameDir>
+                    <ReleaseDir>Q:\code\UnityModding\Schedule_1_Modding\Hoverboard\BundleInfo\</ReleaseDir>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            ProjectAnalysis project = analyzer.Analyze(tempProject).Projects.Single();
+            string[] evidence = project.Diagnostics
+                .Where(diagnostic => diagnostic.RuleId == "local_path_in_project")
+                .Select(diagnostic => diagnostic.Evidence ?? string.Empty)
+                .ToArray();
+
+            Assert(
+                evidence.Contains(@"Z:\Steam\steamapps\common\Schedule I", StringComparer.OrdinalIgnoreCase),
+                "Local path diagnostics should detect non-C/D Windows game roots.");
+            Assert(
+                evidence.Contains(@"Q:\code\UnityModding\Schedule_1_Modding\Hoverboard\BundleInfo\", StringComparer.OrdinalIgnoreCase),
+                "Local path diagnostics should detect non-game absolute Windows paths too.");
         }
         finally
         {
@@ -1837,6 +1883,44 @@ internal sealed class S1InteropFixtureTests
         Assert(
             File.Exists(localProps) == hadLocalProps,
             "bGUI verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationConvergesOnHoverboardWithoutMutatingSource()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "Hoverboard");
+        string sourceProject = Path.Combine(sourceDirectory, "Hoverboard.csproj");
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(DualRuntime: true));
+
+        Assert(
+            result.Success,
+            $"Hoverboard verify-migration should converge on runtime defines, local paths, and reference copy-local cleanup. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        Assert(
+            result.BeforeDiagnostics.Any(diagnostic => diagnostic.RuleId == "missing_runtime_define"),
+            "Hoverboard fixture should exercise missing runtime define migration.");
+        Assert(
+            result.BeforeDiagnostics.Any(diagnostic => diagnostic.RuleId == "local_path_in_project"),
+            "Hoverboard fixture should exercise local path migration.");
+        Assert(
+            result.BeforeDiagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+            "Hoverboard's effective LangVersion=latest should avoid unnecessary C# 10 migration.");
+        Assert(result.SandboxDeleted, "Hoverboard verify-migration should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "Hoverboard verify-migration should not mutate the real project file.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "Hoverboard verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "Hoverboard verify-migration should not create or remove real local.build.props.");
     }
 
     private void VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch()
@@ -4040,6 +4124,65 @@ internal sealed class S1InteropFixtureTests
                 operation.RuleId == "global_usings_require_langversion" &&
                 operation.Automatic),
             "Default LangVersion projects with generated S1Interop facades should plan a C# 10 migration.");
+    }
+
+    private void DuplicateLangVersionUsesEffectiveLastValueForSdkFacadeSupport()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "DuplicateLangVersionMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <LangVersion>default</LangVersion>
+                    <LangVersion>latest</LangVersion>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                using ScheduleOne.DevUtilities;
+
+                namespace DuplicateLangVersionMod;
+
+                public static class Core
+                {
+                    public static void Touch() => PlayerSingleton<PlayerCamera>.InstanceExists.ToString();
+                }
+                """);
+
+            ProjectAnalysis project = analyzer.Analyze(tempProject).Projects.Single();
+
+            Assert(
+                new SdkFacadeGenerator().Plan(project).HasContent,
+                "Fixture should require an SDK facade so LangVersion support is evaluated.");
+            Assert(
+                project.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+                "Duplicate LangVersion properties should use the effective last value.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DuplicateLangVersionRealModsDoNotRequireCSharp10Migration()
+    {
+        ProjectAnalysis hoverboard = AnalyzeProject(@"Hoverboard\Hoverboard.csproj");
+        Assert(
+            hoverboard.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+            "Hoverboard's later LangVersion=latest should satisfy generated facade support.");
+
+        ProjectAnalysis modernCheatMenu = AnalyzeProject(@"Modern-Cheat-Menu\Cheat Menu\Modern Cheat Menu.csproj");
+        Assert(
+            modernCheatMenu.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+            "Modern-Cheat-Menu's later LangVersion=latest should satisfy generated facade support.");
     }
 
     private void MigrationApplyAndRollbackWorkOnCopiedFixture()
