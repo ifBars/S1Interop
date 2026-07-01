@@ -4098,10 +4098,14 @@ internal sealed class S1InteropFixtureTests
             """
             [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
             [assembly: S1Interop.S1InteropType("ScheduleOne.UI.Phone.Phone", Alias = "Phone", Il2CppTypeName = "Il2CppScheduleOne.UI.Phone.Phone")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("Phone", "StartUpdateVolume", Alias = "StartUpdateVolume", Kind = S1Interop.S1InteropMemberKind.Method)]
             [assembly: S1Interop.S1InteropMember("Phone", "Open", Alias = "OpenPhone", Kind = S1Interop.S1InteropMemberKind.Method, IsStatic = true)]
+            [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
 
             namespace SyntheticMod
             {
@@ -4147,17 +4151,22 @@ internal sealed class S1InteropFixtureTests
             $"Generated member registry should include static field/property bridge helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, instance, args);", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string OpenPhoneName = \"Open\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static object? InvokeOpenPhone(params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, OpenPhoneName, null, args);", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static object? InvokeOpenPhone(params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, OpenPhoneName, null, null, args);", StringComparison.Ordinal),
             $"Generated member registry should include static method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public const string MoveItemBehaviourName = \"Il2CppScheduleOne.NPCs.Behaviour.MoveItemBehaviour\";", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? InvokeIsDestinationValid(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" }, instance, args);", StringComparison.Ordinal),
+            $"Generated member registry should include overload-specific method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("ownerType.GetProperty(memberName, AllBindings)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ownerType.GetField(memberName, AllBindings)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("ownerType.GetMethod(memberName, AllBindings)", StringComparison.Ordinal),
-            "Generated member registry should cache property, field, and method lookup paths.");
+            il2CppGenerated.Contains("ownerType.GetMethod(memberName, AllBindings, binder: null, types: parameterTypes, modifiers: null)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("parameterType.MakeByRefType()", StringComparison.Ordinal),
+            "Generated member registry should cache property, field, method overload, and by-ref lookup paths.");
     }
 
     private void SdkFacadeAliasesFullyQualifiedScheduleOneTypes()
