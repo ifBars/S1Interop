@@ -82,6 +82,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("generate_unity_event_bridge", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_delegate_event_bridge", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_harmony_method_targets", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("generate_member_access_targets", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_source_risk_report", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("conditionalize_scheduleone_usings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
@@ -119,6 +120,7 @@ public sealed class MigrationApplier
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
                 "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
                 "generate_harmony_method_targets" => ApplyHarmonyMethodTargets(projectPlan, document, operation, backupRoot, fileChanges),
+                "generate_member_access_targets" => ApplyMemberAccessTargets(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_player_camera_compat_bridge" => ApplyPlayerCameraCompatBridge(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_source_risk_report" => ApplySourceRiskReport(projectPlan, operation, backupRoot, fileChanges),
                 "rewrite_unity_event_listeners" => ApplyUnityEventListenerRewrite(operation.FilePath, backupRoot, fileChanges),
@@ -180,6 +182,7 @@ public sealed class MigrationApplier
             "generate_sdk_facade" => 10,
             "generate_unity_event_bridge" => 10,
             "generate_harmony_method_targets" => 10,
+            "generate_member_access_targets" => 10,
             "generate_player_camera_compat_bridge" => 10,
             "install_s1interop_generator_package" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
@@ -1179,6 +1182,33 @@ public sealed class MigrationApplier
         }
 
         string source = new HarmonyMethodTargetGenerator().GenerateSource(targets);
+        bool changed = false;
+        if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
+        {
+            TrackFile(operation.FilePath, backupRoot, fileChanges);
+            Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
+            File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
+            UpdateTrackedFileHash(operation.FilePath, fileChanges);
+            changed = true;
+        }
+
+        return EnsureGeneratedFacadeCompileInclude(document, projectPlan.ProjectPath, operation.FilePath) || changed;
+    }
+
+    private static bool ApplyMemberAccessTargets(
+        ProjectMigrationPlan projectPlan,
+        XDocument document,
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        IReadOnlyList<MemberAccessTarget> targets = new MemberAccessTargetCatalog().Discover(projectPlan.ProjectPath);
+        if (targets.Count == 0)
+        {
+            return false;
+        }
+
+        string source = new MemberAccessTargetGenerator().GenerateSource(targets);
         bool changed = false;
         if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
         {

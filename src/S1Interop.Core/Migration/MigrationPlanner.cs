@@ -235,6 +235,9 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticHarmonyOverloadRisks = project.SourceInterop.SourceRisks
                 .Where(HarmonyOverloadBindingRewriter.CanRewrite)
                 .ToArray();
+            bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
+                .Any(risk => risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase)) &&
+                new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count > 0;
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
                 .Except(automaticDelegateRisks)
@@ -325,6 +328,28 @@ public sealed class MigrationPlanner
                         true,
                         "Rewrite simple AccessTools.Method overload bindings to generated S1InteropMemberRegistry MethodInfo properties."));
                 }
+            }
+
+            if (hasGeneratedMemberAccessTargets)
+            {
+                if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+                {
+                    operations.Add(new MigrationOperation(
+                        "install_s1interop_generator_package",
+                        project.ProjectPath,
+                        null,
+                        "low",
+                        true,
+                        "Install the S1Interop Roslyn generator package required by generated member access target attributes."));
+                }
+
+                operations.Add(new MigrationOperation(
+                    "generate_member_access_targets",
+                    MemberAccessTargetGenerator.GetSourcePath(project.ProjectPath),
+                    null,
+                    "low",
+                    true,
+                    "Generate S1InteropMember declarations for typed field/property reflection fallback targets."));
             }
 
             if (manualRisks.Length > 0)

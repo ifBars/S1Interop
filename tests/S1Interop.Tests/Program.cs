@@ -485,6 +485,7 @@ internal sealed class S1InteropFixtureTests
         {
             string tempProject = Path.Combine(tempRoot, "ReflectionFallbackMod.csproj");
             string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
+            string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
             File.WriteAllText(
                 tempProject,
                 """
@@ -503,6 +504,18 @@ internal sealed class S1InteropFixtureTests
 
                 public static class ReflectionFallback
                 {
+                    public static object? ReadTypedNotice()
+                    {
+                        FieldInfo? field = typeof(GameOffenceNotice).GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            return field.GetValue(null);
+                        }
+
+                        PropertyInfo? property = typeof(GameOffenceNotice).GetProperty("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return property?.GetValue(null);
+                    }
+
                     public static object? ReadContainer(object notice)
                     {
                         FieldInfo? field = notice.GetType().GetField("container", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -543,7 +556,7 @@ internal sealed class S1InteropFixtureTests
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 2,
+                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 3,
                 "Source analyzer should report field-first and property-first reflection fallbacks while ignoring the runtime-guarded fallback.");
             Assert(
                 risks.Where(risk => risk.Kind == "FieldPropertyReflectionFallback").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
@@ -556,12 +569,32 @@ internal sealed class S1InteropFixtureTests
                     operation.RuleId == "source_risk_field_property_reflection_fallback" &&
                     !operation.Automatic),
                 "Migration plan should surface field/property reflection fallback as manual generated-accessor guidance.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "generate_member_access_targets" &&
+                    operation.Automatic),
+                "Migration plan should generate member-access target attributes for typed field/property reflection fallbacks.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "install_s1interop_generator_package" &&
+                    operation.Automatic),
+                "Migration plan should install the S1Interop generator package when member-access target attributes are generated.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "generate_member_access_targets"),
+                "Migration apply should create generated member-access target declarations.");
+            Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
                 "Migration apply should create a source-risk report for reflection fallback guidance.");
+            Assert(File.Exists(targetPath), "Generated member-access target declarations were not written.");
             Assert(File.Exists(reportPath), "Source-risk report was not written for reflection fallback guidance.");
+
+            string generatedTargets = File.ReadAllText(targetPath);
+            Assert(
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"GameOffenceNotice\", Alias = \"GameOffenceNotice\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"GameOffenceNotice\", \"container\", Alias = \"container\")]", StringComparison.Ordinal),
+                "Generated member-access targets should include typed owner/member declarations.");
 
             string report = File.ReadAllText(reportPath);
             Assert(
@@ -570,6 +603,8 @@ internal sealed class S1InteropFixtureTests
                 "Source-risk report should include field/property reflection fallback guidance.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the generator package reference change.");
+            Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
         }
         finally
