@@ -381,7 +381,11 @@ public sealed class MigrationVerifier
         int exitCode = exited ? process.ExitCode : -1;
         string capturedOutput = output.ToString().Trim();
         bool compileSucceeded = exited && exitCode == 0;
-        (string classifiedKind, string classifiedSummary) = ClassifyBuildResult(compileSucceeded, !exited, capturedOutput);
+        (string classifiedKind, string classifiedSummary) = ClassifyBuildResult(
+            compileSucceeded,
+            !exited,
+            capturedOutput,
+            configuration.Runtime);
         MigrationBuildIssue[] outputIssues = EnrichPackageIssues(
             configuration,
             FilterOutputIssues(
@@ -1337,6 +1341,11 @@ public sealed class MigrationVerifier
             kind = "ReferenceSurfaceMissing";
             remediation = "Check that the selected runtime game root and local dependency properties point at the assemblies that expose this namespace/type for the active configuration.";
         }
+        else if (classifiedKind.Equals("Il2CppApiSurfaceMismatch", StringComparison.OrdinalIgnoreCase))
+        {
+            kind = "Il2CppApiSurfaceMismatch";
+            remediation = "Add an IL2CPP-safe shim, facade alias, or runtime-specific source branch for this generated-wrapper API difference.";
+        }
 
         return
         [
@@ -1423,10 +1432,12 @@ public sealed class MigrationVerifier
             issue.Kind.Equals("PackageFeedMissing", StringComparison.OrdinalIgnoreCase));
         bool hasReferenceSurfaceIssues = outputIssues.Any(issue =>
             issue.Kind.Equals("ReferenceSurfaceMissing", StringComparison.OrdinalIgnoreCase));
+        bool hasIl2CppApiSurfaceIssues = outputIssues.Any(issue =>
+            issue.Kind.Equals("Il2CppApiSurfaceMismatch", StringComparison.OrdinalIgnoreCase));
         bool hasCompileErrors = outputIssues.Any(issue =>
             issue.Kind.Equals("CompileError", StringComparison.OrdinalIgnoreCase));
 
-        if ((hasLocalReferenceIssues || hasPackageIssues || hasReferenceSurfaceIssues) && hasCompileErrors)
+        if ((hasLocalReferenceIssues || hasPackageIssues || hasReferenceSurfaceIssues || hasIl2CppApiSurfaceIssues) && hasCompileErrors)
         {
             return ("Mixed", "Mixed");
         }
@@ -1439,6 +1450,11 @@ public sealed class MigrationVerifier
         if (hasReferenceSurfaceIssues)
         {
             return ("BlockedByReferenceSurface", "DependencyNotReady");
+        }
+
+        if (hasIl2CppApiSurfaceIssues)
+        {
+            return ("CompileFailed", "MigrationCompileFailure");
         }
 
         if (hasPackageIssues)
@@ -2009,7 +2025,11 @@ public sealed class MigrationVerifier
         return KnownExternalMemberTypeHints.Any(hint => line.Contains(hint, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static (string FailureKind, string Summary) ClassifyBuildResult(bool success, bool timedOut, string output)
+    private static (string FailureKind, string Summary) ClassifyBuildResult(
+        bool success,
+        bool timedOut,
+        string output,
+        RuntimeKind runtime)
     {
         if (success)
         {
@@ -2057,6 +2077,11 @@ public sealed class MigrationVerifier
         string? missingMemberSurface = lines.FirstOrDefault(IsExternalMemberSurfaceError);
         if (missingMemberSurface is not null)
         {
+            if (runtime == RuntimeKind.Il2Cpp)
+            {
+                return ("Il2CppApiSurfaceMismatch", missingMemberSurface);
+            }
+
             return ("ReferenceSurfaceMissing", missingMemberSurface);
         }
 

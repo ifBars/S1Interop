@@ -84,6 +84,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateClassifiesExternalMemberSurfaceFailures();
         count++;
+        VerifyMigrationBuildGateClassifiesIl2CppMemberSurfaceFailuresAsMigrationIssues();
+        count++;
         VerifyMigrationBuildGateReportsUnsetLocalReferenceProperties();
         count++;
         VerifyMigrationBuildGateClassifiesSiblingBinReferencesAsModDependencies();
@@ -170,6 +172,8 @@ internal sealed class S1InteropFixtureTests
         VerifyMigrationMovesBetterJukeboxAbsoluteHintPaths();
         count++;
         VerifyMigrationPreservesBguiMixedConfigurationPaths();
+        count++;
+        VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch();
         count++;
         VerifyMigrationMovesGameRootModDependencyHintPaths();
         count++;
@@ -1724,6 +1728,57 @@ internal sealed class S1InteropFixtureTests
             "bGUI verify-migration should not create or remove real local.build.props.");
     }
 
+    private void VerifyMigrationBuildGateClassifiesRealBarsGraphicsIl2CppApiMismatch()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "BarsGraphics");
+        string sourceProject = Path.Combine(sourceDirectory, "BarsGraphics.csproj");
+        string il2CppRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppAssembly = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll");
+        string monoAssembly = Path.Combine(monoRoot, "Schedule I_Data", "Managed", "Assembly-CSharp.dll");
+        if (!File.Exists(sourceProject) || !File.Exists(il2CppAssembly) || !File.Exists(monoAssembly))
+        {
+            Console.WriteLine("Skipping BarsGraphics build-gated integration because local game roots are not available.");
+            return;
+        }
+
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
+        string localProps = Path.Combine(sourceDirectory, "local.build.props");
+        bool hadRunsDirectory = Directory.Exists(runsDirectory);
+        bool hadLocalProps = File.Exists(localProps);
+
+        MigrationVerificationResult result = new MigrationVerifier().Verify(
+            sourceProject,
+            new MigrationVerifierOptions(
+                DualRuntime: true,
+                Build: true,
+                BuildTimeoutSeconds: 120,
+                Il2CppGamePath: il2CppRoot,
+                MonoGamePath: monoRoot));
+
+        Assert(!result.Success, "BarsGraphics should currently expose a development-only IL2CPP API surface mismatch.");
+        Assert(result.AfterDiagnostics.Count == 0, $"BarsGraphics migration should clear analyzer diagnostics before build classification. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+        IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults ?? [];
+        Assert(buildResults.Count == 4, $"BarsGraphics should build-check four configurations, got {buildResults.Count}.");
+        MigrationBuildResult il2CppDevelopment = buildResults.Single(build => build.Configuration == "Il2cppDevelopment");
+        Assert(il2CppDevelopment.FailureKind == "Il2CppApiSurfaceMismatch", $"BarsGraphics development IL2CPP failure should classify as API mismatch. Build output: {FormatBuildResults(buildResults)}");
+        Assert(il2CppDevelopment.Attribution == "MigrationCompileFailure", $"BarsGraphics API mismatch should be attributed to migration compile failure. Build output: {FormatBuildResults(buildResults)}");
+        Assert(
+            buildResults.Where(build => build.Configuration != "Il2cppDevelopment").All(build => build.Success),
+            $"Only BarsGraphics Il2cppDevelopment should fail in this fixture. Build output: {FormatBuildResults(buildResults)}");
+        Assert(result.SandboxDeleted, "BarsGraphics build-gated verification should delete its sandbox.");
+        Assert(
+            string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+            "BarsGraphics verify-migration should not mutate the real project file.");
+        Assert(
+            Directory.Exists(runsDirectory) == hadRunsDirectory,
+            "BarsGraphics verify-migration should not create or remove real s1interop-runs.");
+        Assert(
+            File.Exists(localProps) == hadLocalProps,
+            "BarsGraphics verify-migration should not create or remove real local.build.props.");
+    }
+
     private void VerifyMigrationMovesGameRootModDependencyHintPaths()
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "CasinoDirectDeposit");
@@ -2227,6 +2282,68 @@ internal sealed class S1InteropFixtureTests
                     build.Attribution == "DependencyNotReady"),
                 $"Missing external member APIs should be attributed to dependency readiness. Build output: {FormatBuildResults(result.BuildResults)}");
             Assert(result.SandboxDeleted, "Missing external member surface build verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void VerifyMigrationBuildGateClassifiesIl2CppMemberSurfaceFailuresAsMigrationIssues()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "Il2CppMemberSurfaceMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net6.0</TargetFramework>
+                    <Configurations>Il2cpp</Configurations>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Il2cpp'">
+                    <DefineConstants>IL2CPP</DefineConstants>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace Il2CppMemberSurfaceMod;
+
+                public sealed class PlayerCamera
+                {
+                }
+
+                public static class Core
+                {
+                    public static void Restore(PlayerCamera camera)
+                    {
+                        camera.CloseInterface(0f, true);
+                    }
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(!result.Success, "IL2CPP member surface mismatch should fail verify-migration when build verification is enabled.");
+            Assert(result.BuildResults?.Count == 1, $"Build verification should run the Il2cpp configuration, got {result.BuildResults?.Count ?? 0}.");
+            MigrationBuildResult build = result.BuildResults![0];
+            Assert(build.Runtime == RuntimeKind.Il2Cpp, $"Expected IL2CPP runtime inference, got {build.Runtime}.");
+            Assert(build.FailureKind == "Il2CppApiSurfaceMismatch", $"Expected IL2CPP API surface mismatch, got {FormatBuildResults(result.BuildResults)}.");
+            Assert(build.ReadinessStatus == "CompileFailed", $"Expected compile-failed readiness, got {FormatBuildResults(result.BuildResults)}.");
+            Assert(build.Attribution == "MigrationCompileFailure", $"Expected migration compile attribution, got {FormatBuildResults(result.BuildResults)}.");
+            Assert(
+                build.Issues.Any(issue =>
+                    issue.Kind == "Il2CppApiSurfaceMismatch" &&
+                    issue.Remediation?.Contains("IL2CPP-safe shim", StringComparison.OrdinalIgnoreCase) == true),
+                $"IL2CPP API mismatch should include shim/facade remediation. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "IL2CPP member surface mismatch build verification should delete its sandbox.");
         }
         finally
         {
