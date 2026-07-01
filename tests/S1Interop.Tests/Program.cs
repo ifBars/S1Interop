@@ -52,6 +52,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
         count++;
+        MigrationApplyAndRollbackRewritesHarmonyOverloadBindings();
+        count++;
         SourceInteropAnalyzerDoesNotReportRuntimeGuardedSourceRisks();
         count++;
         MigrationApplyAndRollbackRewritesUnityEventListeners();
@@ -450,9 +452,107 @@ internal sealed class S1InteropFixtureTests
             ProjectMigrationPlan projectPlan = plan.Projects.Single();
             Assert(
                 projectPlan.Operations.Any(operation =>
-                    operation.RuleId == "source_risk_harmony_overload_binding" &&
-                    !operation.Automatic),
-                "Migration plan should surface Harmony overload binding as non-automatic generator guidance.");
+                    operation.RuleId == "generate_harmony_method_targets" &&
+                    operation.Automatic),
+                "Migration plan should generate Harmony method target attributes for safely parsed overload bindings.");
+            Assert(
+                projectPlan.Operations.Any(operation =>
+                    operation.RuleId == "rewrite_harmony_overload_bindings" &&
+                    operation.Automatic),
+                "Migration plan should rewrite safely parsed Harmony overload bindings.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesHarmonyOverloadBindings()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "HarmonyBindingMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "MoveItemPatch.cs");
+            string targetSource = Path.Combine(tempRoot, "S1Interop.Generated", HarmonyMethodTargetGenerator.SourceFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using HarmonyLib;
+                using ScheduleOne.ItemFramework;
+                using ScheduleOne.Management;
+                using ScheduleOne.NPCs.Behaviour;
+
+                namespace HarmonyBindingMod;
+
+                public static class MoveItemPatch
+                {
+                    public static void Patch(Harmony harmony)
+                    {
+                        var method = AccessTools.Method(
+                            typeof(MoveItemBehaviour),
+                            nameof(MoveItemBehaviour.IsDestinationValid),
+                            [
+                                typeof(TransitRoute),
+                                typeof(ItemInstance),
+                                typeof(string).MakeByRefType()
+                            ]
+                        );
+
+                        harmony.Patch(method, prefix: new HarmonyMethod(typeof(MoveItemPatch), nameof(Prefix)));
+                    }
+
+                    private static bool Prefix(ref string invalidReason) => true;
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before);
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Harmony method target migration should install the S1Interop generator package.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "generate_harmony_method_targets"),
+                "Harmony method target migration should generate assembly attributes.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_harmony_overload_bindings"),
+                "Harmony method target migration should rewrite AccessTools.Method blocks.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(File.Exists(targetSource), "Harmony method target source was not generated.");
+            string generated = File.ReadAllText(targetSource);
+            Assert(
+                generated.Contains("[assembly: S1Interop.S1InteropType(\"MoveItemBehaviour\", Alias = \"MoveItemBehaviour\")]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\" })]", StringComparison.Ordinal),
+                $"Generated Harmony target attributes are incomplete. Generated source:{Environment.NewLine}{generated}");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("var method = S1Interop.Generated.S1InteropMemberRegistry.IsDestinationValidMethod;", StringComparison.Ordinal),
+                $"Harmony AccessTools.Method block should be rewritten to generated MethodInfo target. Migrated source:{Environment.NewLine}{migratedSource}");
+            Assert(
+                !migratedSource.Contains("AccessTools.Method", StringComparison.Ordinal),
+                "Rewritten Harmony source should not keep the old AccessTools.Method block.");
+            Assert(
+                File.ReadAllText(tempProject).Contains("S1Interop.Generators", StringComparison.Ordinal),
+                "Project should reference the S1Interop generator package after migration.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the project file.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the rewritten source file.");
+            Assert(rollbackResult.RemovedFiles.Contains(targetSource), "Rollback did not remove generated Harmony method targets.");
+            Assert(!File.Exists(targetSource), "Generated Harmony method target source should be removed by rollback.");
         }
         finally
         {
@@ -968,6 +1068,17 @@ internal sealed class S1InteropFixtureTests
                 risk.FilePath.EndsWith(@"Patches\Unpackaging\MoveItemBehaviourPatches.cs", StringComparison.OrdinalIgnoreCase) &&
                 risk.Remediation.Contains("ParameterTypeNames", StringComparison.Ordinal)) == true,
             "EmployeeTweaks should report manual AccessTools.Method overload binding as generated method-target guidance.");
+
+        MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(project.ProjectPath, [project]));
+        ProjectMigrationPlan projectPlan = plan.Projects.Single();
+        Assert(
+            projectPlan.Operations.Any(operation => operation.RuleId == "generate_harmony_method_targets"),
+            "EmployeeTweaks should plan generated Harmony method targets for MoveItemBehaviour overload bindings.");
+        Assert(
+            projectPlan.Operations.Any(operation =>
+                operation.RuleId == "rewrite_harmony_overload_bindings" &&
+                operation.FilePath.EndsWith(@"Patches\Unpackaging\MoveItemBehaviourPatches.cs", StringComparison.OrdinalIgnoreCase)),
+            "EmployeeTweaks should plan a source rewrite for MoveItemBehaviour AccessTools.Method overload bindings.");
     }
 
     private void MsBuildOsPlatformConditionsAreEvaluated()
@@ -4225,6 +4336,11 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("private static readonly System.Collections.Generic.Dictionary<string, System.Type?> Cache", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
+        Assert(
+            il2CppGenerated.Contains("ResolveFromLoadedAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("assembly.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("string.Equals(type.Name, runtimeTypeName, System.StringComparison.Ordinal)", StringComparison.Ordinal),
+            "Generated type registry should fall back to cached loaded-assembly lookup for simple generated migration type names.");
         Assert(
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance);", StringComparison.Ordinal) &&

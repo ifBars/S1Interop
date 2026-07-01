@@ -232,9 +232,13 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticDelegateRisks = project.SourceInterop.SourceRisks
                 .Where(DelegateAssignmentRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticHarmonyOverloadRisks = project.SourceInterop.SourceRisks
+                .Where(HarmonyOverloadBindingRewriter.CanRewrite)
+                .ToArray();
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
                 .Except(automaticDelegateRisks)
+                .Except(automaticHarmonyOverloadRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -284,6 +288,42 @@ public sealed class MigrationPlanner
                         "low",
                         true,
                         "Rewrite simple Delegate.Combine/Remove self-assignments through the generated S1Interop delegate bridge."));
+                }
+            }
+
+            if (automaticHarmonyOverloadRisks.Length > 0)
+            {
+                if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+                {
+                    operations.Add(new MigrationOperation(
+                        "install_s1interop_generator_package",
+                        project.ProjectPath,
+                        null,
+                        "low",
+                        true,
+                        "Install the S1Interop Roslyn generator package required by generated Harmony method target attributes."));
+                }
+
+                operations.Add(new MigrationOperation(
+                    "generate_harmony_method_targets",
+                    HarmonyMethodTargetGenerator.GetSourcePath(project.ProjectPath),
+                    null,
+                    "low",
+                    true,
+                    "Generate overload-specific S1InteropMember declarations for Harmony AccessTools.Method targets."));
+
+                foreach (string sourceFile in automaticHarmonyOverloadRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_harmony_overload_bindings",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple AccessTools.Method overload bindings to generated S1InteropMemberRegistry MethodInfo properties."));
                 }
             }
 

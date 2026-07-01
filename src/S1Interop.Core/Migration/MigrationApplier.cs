@@ -81,11 +81,13 @@ public sealed class MigrationApplier
             bool mutatesProjectDocument =
                 !operation.RuleId.Equals("generate_unity_event_bridge", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_delegate_event_bridge", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("generate_harmony_method_targets", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_source_risk_report", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("conditionalize_scheduleone_usings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_unity_event_listeners", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_harmony_overload_bindings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_player_camera_close_interface", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
@@ -116,10 +118,12 @@ public sealed class MigrationApplier
                 "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
                 "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
+                "generate_harmony_method_targets" => ApplyHarmonyMethodTargets(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_player_camera_compat_bridge" => ApplyPlayerCameraCompatBridge(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_source_risk_report" => ApplySourceRiskReport(projectPlan, operation, backupRoot, fileChanges),
                 "rewrite_unity_event_listeners" => ApplyUnityEventListenerRewrite(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_delegate_assignments" => ApplyDelegateAssignmentRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_harmony_overload_bindings" => ApplyHarmonyOverloadBindingRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_player_camera_close_interface" => ApplyPlayerCameraCloseInterfaceRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
@@ -175,11 +179,13 @@ public sealed class MigrationApplier
         {
             "generate_sdk_facade" => 10,
             "generate_unity_event_bridge" => 10,
+            "generate_harmony_method_targets" => 10,
             "generate_player_camera_compat_bridge" => 10,
             "install_s1interop_generator_package" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
             "conditionalize_scheduleone_usings" => 20,
             "rewrite_unity_event_listeners" => 20,
+            "rewrite_harmony_overload_bindings" => 20,
             "rewrite_player_camera_close_interface" => 20,
             _ => 0
         };
@@ -1159,6 +1165,33 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyHarmonyMethodTargets(
+        ProjectMigrationPlan projectPlan,
+        XDocument document,
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        IReadOnlyList<HarmonyMethodTarget> targets = new HarmonyMethodTargetCatalog().Discover(projectPlan.ProjectPath);
+        if (targets.Count == 0)
+        {
+            return false;
+        }
+
+        string source = new HarmonyMethodTargetGenerator().GenerateSource(targets);
+        bool changed = false;
+        if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
+        {
+            TrackFile(operation.FilePath, backupRoot, fileChanges);
+            Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
+            File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
+            UpdateTrackedFileHash(operation.FilePath, fileChanges);
+            changed = true;
+        }
+
+        return EnsureGeneratedFacadeCompileInclude(document, projectPlan.ProjectPath, operation.FilePath) || changed;
+    }
+
     private static bool ApplyPlayerCameraCompatBridge(
         ProjectMigrationPlan projectPlan,
         XDocument document,
@@ -1215,6 +1248,36 @@ public sealed class MigrationApplier
 
         string original = File.ReadAllText(sourcePath);
         string rewritten = new DelegateAssignmentRewriter().RewriteSource(original);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyHarmonyOverloadBindingRewrite(
+        string projectPath,
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        IReadOnlyList<HarmonyMethodTarget> targets = new HarmonyMethodTargetCatalog().Discover(projectPath);
+        if (targets.Count == 0)
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = new HarmonyOverloadBindingRewriter().RewriteSource(original, sourcePath, targets);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;

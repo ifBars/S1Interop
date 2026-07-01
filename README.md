@@ -12,7 +12,7 @@ It is an alpha tool. It can already inspect real mod projects, scaffold dual-run
 - Add IL2CPP configurations for Mono-only projects when `migrate --dual-runtime` can infer the source Mono configuration.
 - Update a sibling `.sln` so generated configurations appear in Visual Studio.
 - Move machine-specific game paths into ignored `local.build.props` scaffolding.
-- Rewrite simple ScheduleOne using directives, generated type facades, UnityEvent listener calls, and other handled source patterns.
+- Rewrite simple ScheduleOne using directives, generated type facades, UnityEvent listener calls, Harmony overload bindings, and other handled source patterns.
 - Generate opt-in Roslyn compile-time helpers for backend-specific type-name/reflection caches.
 - Generate a source-risk report for cases that still need deliberate review, such as Harmony transpilers or unsafe delegate surfaces.
 - Run the migration in a throwaway sandbox with `verify-migration` before touching the real project.
@@ -92,6 +92,8 @@ The generator emits `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName`
 Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberRegistry.GetNoticeContainer(...)`, `TrySetNoticeContainer(...)`, and static helpers such as `GetPlayerCameraInstance()`. These helpers intentionally check both properties and fields, which covers a common Schedule One migration case where a value is a field on Mono but a property on IL2CPP.
 
 Method declarations can also include `ParameterTypeNames` for overload-specific binding. Use registered type aliases for game types and `&` for by-ref parameters. The generator emits both an invoker and a `MethodInfo` property, so Harmony patch targets can use the same generated overload binding instead of repeating `AccessTools.Method(...)` parameter arrays.
+
+When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
 
