@@ -20,6 +20,14 @@ public sealed class MemberAccessTargetCatalog
         @"(?<helper>[A-Za-z_][A-Za-z0-9_.]*)\s*\.\s*Try(?<operation>Get|Set)(?<static>Static)?FieldOrProperty\s*\(\s*(?<target>[_A-Za-z][A-Za-z0-9_]*)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
         RegexOptions.Compiled);
 
+    private static readonly Regex GeneratedTypeAttributeRegex = new(
+        @"S1InteropType\s*\(\s*""(?<type>[^""]+)""\s*,\s*Alias\s*=\s*""(?<alias>[^""]+)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex GeneratedMemberAttributeRegex = new(
+        @"S1InteropMember\s*\(\s*""(?<owner>[^""]+)""\s*,\s*""(?<member>[^""]+)""\s*,\s*Alias\s*=\s*""(?<alias>[^""]+)""(?<options>[^)]*)\)",
+        RegexOptions.Compiled);
+
     private static readonly Regex IdentifierTypeRegex = new(
         @"(?<![A-Za-z0-9_])(?:(?:public|private|protected|internal|static|readonly|volatile|new|sealed|unsafe)\s+)*(?<type>[A-Za-z_][A-Za-z0-9_.]*)(?:\?)?(?:\s*<[^>\r\n;()]+>)?\s+(?<name>[_A-Za-z][A-Za-z0-9_]*)\b",
         RegexOptions.Compiled);
@@ -59,7 +67,11 @@ public sealed class MemberAccessTargetCatalog
         string[] sourceFiles = WorkspaceTraversal.EnumerateFiles(projectDirectory, "*.cs", ExcludedDirectoryNames)
             .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        return CreateUniqueAliases(sourceFiles.SelectMany(DiscoverFileTargets).ToArray());
+        MemberAccessTarget[] sourceTargets = sourceFiles
+            .SelectMany(DiscoverFileTargets)
+            .Concat(DiscoverGeneratedTargets(projectDirectory))
+            .ToArray();
+        return CreateUniqueAliases(sourceTargets);
     }
 
     public IReadOnlyList<MemberAccessTarget> DiscoverFileTargets(string sourceFile)
@@ -163,12 +175,20 @@ public sealed class MemberAccessTargetCatalog
 
     private static MemberAccessTarget MergeMemberAccessKinds(IReadOnlyList<MemberAccessTarget> targets)
     {
-        MemberAccessTarget first = targets.OrderBy(target => target.Line).First();
+        MemberAccessTarget first = targets
+            .OrderBy(target => IsGeneratedMemberAccessTargetsFile(target.SourceFilePath))
+            .ThenBy(target => target.SourceFilePath, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(target => target.Line)
+            .First();
         MemberAccessKind kind = targets.Select(target => target.Kind).Distinct().Count() == 1
             ? first.Kind
             : MemberAccessKind.FieldOrProperty;
         return first with { Kind = kind };
     }
+
+    private static bool IsGeneratedMemberAccessTargetsFile(string path) =>
+        Path.GetFileName(path).Equals(Generators.MemberAccessTargetGenerator.SourceFileName, StringComparison.OrdinalIgnoreCase) &&
+        Path.GetFileName(Path.GetDirectoryName(path) ?? string.Empty).Equals("S1Interop.Generated", StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<string, string> DiscoverScheduleOneUsings(IEnumerable<string> lines)
     {
@@ -249,6 +269,70 @@ public sealed class MemberAccessTargetCatalog
                 IsStatic: match.Groups["static"].Success,
                 Kind: MemberAccessKind.FieldOrProperty);
         }
+    }
+
+    private static IEnumerable<MemberAccessTarget> DiscoverGeneratedTargets(string projectDirectory)
+    {
+        string generatedPath = Path.Combine(
+            projectDirectory,
+            "S1Interop.Generated",
+            Generators.MemberAccessTargetGenerator.SourceFileName);
+        if (!File.Exists(generatedPath))
+        {
+            yield break;
+        }
+
+        string[] lines = File.ReadAllLines(generatedPath);
+        Dictionary<string, string> typeAliases = DiscoverGeneratedTypeAliases(lines);
+        for (int index = 0; index < lines.Length; index++)
+        {
+            Match match = GeneratedMemberAttributeRegex.Match(lines[index]);
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string ownerAlias = Unescape(match.Groups["owner"].Value);
+            string memberName = Unescape(match.Groups["member"].Value);
+            string memberAlias = Unescape(match.Groups["alias"].Value);
+            string options = match.Groups["options"].Value;
+            yield return new MemberAccessTarget(
+                Path.GetFullPath(generatedPath),
+                index + 1,
+                ownerAlias,
+                typeAliases.TryGetValue(ownerAlias, out string? ownerTypeName) ? ownerTypeName : ownerAlias,
+                memberName,
+                memberAlias,
+                IsStatic: options.Contains("IsStatic = true", StringComparison.Ordinal),
+                Kind: GetGeneratedMemberKind(options));
+        }
+    }
+
+    private static Dictionary<string, string> DiscoverGeneratedTypeAliases(IEnumerable<string> lines)
+    {
+        var typeAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string line in lines)
+        {
+            Match match = GeneratedTypeAttributeRegex.Match(line);
+            if (match.Success)
+            {
+                typeAliases[Unescape(match.Groups["alias"].Value)] = Unescape(match.Groups["type"].Value);
+            }
+        }
+
+        return typeAliases;
+    }
+
+    private static MemberAccessKind GetGeneratedMemberKind(string options)
+    {
+        if (options.Contains("S1InteropMemberKind.Field", StringComparison.Ordinal))
+        {
+            return MemberAccessKind.Field;
+        }
+
+        return options.Contains("S1InteropMemberKind.Property", StringComparison.Ordinal)
+            ? MemberAccessKind.Property
+            : MemberAccessKind.FieldOrProperty;
     }
 
     private static bool CanResolveHelperTargetType(
@@ -384,4 +468,7 @@ public sealed class MemberAccessTargetCatalog
         string sanitized = new(chars);
         return char.IsDigit(sanitized[0]) ? "_" + sanitized : sanitized;
     }
+
+    private static string Unescape(string value) =>
+        value.Replace("\\\"", "\"", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
 }

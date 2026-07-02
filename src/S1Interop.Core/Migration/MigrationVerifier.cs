@@ -9,7 +9,7 @@ public sealed class MigrationVerifier
 {
     private const string SandboxPrefix = "S1Interop.Verify.";
     private const int MaxVerificationPasses = 8;
-    private const int MaxBuildOutputChars = 12000;
+    private const int MaxBuildOutputChars = 40000;
     private const int MaxBuildIssues = 40;
     private const string ExternalReferenceStagingDirectoryName = "S1Interop.ExternalReferences";
 
@@ -20,6 +20,10 @@ public sealed class MigrationVerifier
     private static readonly Regex MissingPackageSourcesRegex = new(
         @"No packages exist with this id in source\(s\):\s*(?<sources>.+)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    private static readonly Regex MissingReferenceOutputRegex = new(
+        @"assembly\s+""(?<include>[^""]+)""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly string[] KnownExternalNamespaceHints =
     [
@@ -118,6 +122,8 @@ public sealed class MigrationVerifier
     private readonly WorkspaceAnalyzer analyzer = new();
     private readonly MigrationPlanner planner = new();
     private readonly MigrationApplier applier = new();
+
+    private sealed record StagedS1InteropGeneratorPackage(string SourcePath, string Version);
 
     public MigrationVerificationResult Verify(string path) =>
         Verify(path, MigrationVerifierOptions.Default);
@@ -283,7 +289,7 @@ public sealed class MigrationVerifier
             ];
         }
 
-        string? s1InteropPackageSource = StageS1InteropGeneratorPackageSource(sandboxProjectPath, project);
+        StagedS1InteropGeneratorPackage? s1InteropPackageSource = StageS1InteropGeneratorPackageSource(sandboxProjectPath, project);
         return configurations
             .Select(configuration => BuildConfiguration(sandboxProjectPath, configuration, options, s1InteropPackageSource))
             .ToArray();
@@ -293,7 +299,7 @@ public sealed class MigrationVerifier
         string projectPath,
         ConfigurationAnalysis configuration,
         MigrationVerifierOptions options,
-        string? additionalRestoreSource)
+        StagedS1InteropGeneratorPackage? additionalRestoreSource)
     {
         MigrationBuildIssue[] readinessIssues = AnalyzeBuildReadiness(projectPath, configuration, options);
         List<string> arguments =
@@ -311,9 +317,11 @@ public sealed class MigrationVerifier
             "-p:DeployOnBuild=false",
             "-p:BuildProjectReferences=false"
         ];
-        if (!string.IsNullOrWhiteSpace(additionalRestoreSource))
+        if (additionalRestoreSource is not null)
         {
-            arguments.Add($"-p:RestoreAdditionalProjectSources={additionalRestoreSource}");
+            arguments.Add($"-p:RestoreAdditionalProjectSources={additionalRestoreSource.SourcePath}");
+            arguments.Add($"-p:RestorePackagesPath={Path.Combine(Path.GetDirectoryName(additionalRestoreSource.SourcePath)!, "Packages")}");
+            arguments.Add("-p:RestoreNoCache=true");
         }
 
         if (!string.IsNullOrWhiteSpace(configuration.TargetFramework))
@@ -346,6 +354,8 @@ public sealed class MigrationVerifier
                 command,
                 "Build skipped because readiness checks found missing local references.");
         }
+
+        DeleteSandboxBuildOutputs(projectPath);
 
         using var process = new Process();
         process.StartInfo.FileName = "dotnet";
@@ -437,7 +447,7 @@ public sealed class MigrationVerifier
             capturedOutput);
     }
 
-    private static string? StageS1InteropGeneratorPackageSource(string sandboxProjectPath, ProjectAnalysis project)
+    private static StagedS1InteropGeneratorPackage? StageS1InteropGeneratorPackageSource(string sandboxProjectPath, ProjectAnalysis project)
     {
         if (!project.Configurations.Any(configuration =>
                 configuration.PackageReferences.Any(package =>
@@ -457,10 +467,8 @@ public sealed class MigrationVerifier
             ExternalReferenceStagingDirectoryName,
             "NuGet");
         Directory.CreateDirectory(packageSource);
-        if (Directory.EnumerateFiles(packageSource, "S1Interop.Generators.*.nupkg").Any())
-        {
-            return packageSource;
-        }
+        string packageVersion = $"0.1.0-alpha.1.local.{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        RewriteSandboxGeneratorPackageVersion(sandboxProjectPath, packageVersion);
 
         using var process = new Process();
         process.StartInfo.FileName = "dotnet";
@@ -470,6 +478,8 @@ public sealed class MigrationVerifier
         process.StartInfo.ArgumentList.Add("Debug");
         process.StartInfo.ArgumentList.Add("--output");
         process.StartInfo.ArgumentList.Add(packageSource);
+        process.StartInfo.ArgumentList.Add($"-p:PackageVersion={packageVersion}");
+        process.StartInfo.ArgumentList.Add($"-p:Version={packageVersion}");
         process.StartInfo.ArgumentList.Add("-v:minimal");
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
@@ -492,9 +502,30 @@ public sealed class MigrationVerifier
         }
 
         return process.ExitCode == 0 &&
-               Directory.EnumerateFiles(packageSource, "S1Interop.Generators.*.nupkg").Any()
-            ? packageSource
+               Directory.EnumerateFiles(packageSource, $"S1Interop.Generators.{packageVersion}.nupkg").Any()
+            ? new StagedS1InteropGeneratorPackage(packageSource, packageVersion)
             : null;
+    }
+
+    private static void RewriteSandboxGeneratorPackageVersion(string sandboxProjectPath, string packageVersion)
+    {
+        XDocument document = XDocument.Load(sandboxProjectPath, LoadOptions.PreserveWhitespace);
+        bool changed = false;
+        foreach (XElement package in document.Descendants().Where(IsNamed("PackageReference")))
+        {
+            if (!string.Equals(package.Attribute("Include")?.Value, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            package.SetAttributeValue("Version", packageVersion);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            document.Save(sandboxProjectPath);
+        }
     }
 
     private static string? FindS1InteropGeneratorProject(string sandboxProjectDirectory)
@@ -1504,6 +1535,16 @@ public sealed class MigrationVerifier
             kind = "ReferenceSurfaceMissing";
             remediation = "Check that the selected runtime game root and local dependency properties point at the assemblies that expose this namespace/type for the active configuration.";
         }
+        else if (classifiedKind.Equals("MissingReference", StringComparison.OrdinalIgnoreCase))
+        {
+            Match match = MissingReferenceOutputRegex.Match(classifiedSummary);
+            if (match.Success)
+            {
+                include = match.Groups["include"].Value.Trim();
+            }
+
+            remediation = "Fix the HintPath or imported local props so this reference resolves on this machine.";
+        }
         else if (classifiedKind.Equals("Il2CppApiSurfaceMismatch", StringComparison.OrdinalIgnoreCase))
         {
             kind = "Il2CppApiSurfaceMismatch";
@@ -1609,7 +1650,8 @@ public sealed class MigrationVerifier
             return ("Timeout", "ToolingFailure");
         }
 
-        bool hasLocalReferenceIssues = readinessIssues.Any(IsLocalReferenceReadinessIssue);
+        bool hasLocalReferenceIssues = readinessIssues.Any(IsLocalReferenceReadinessIssue) ||
+                                       outputIssues.Any(IsLocalReferenceReadinessIssue);
         bool hasPackageIssues = outputIssues.Any(issue =>
             issue.Kind.Equals("PackageFeedMissing", StringComparison.OrdinalIgnoreCase));
         bool hasReferenceSurfaceIssues = outputIssues.Any(issue =>
@@ -2145,7 +2187,11 @@ public sealed class MigrationVerifier
     }
 
     private static bool IsLocalReferenceReadinessIssue(MigrationBuildIssue issue) =>
-        issue.Kind.Contains("Missing", StringComparison.OrdinalIgnoreCase) ||
+        issue.Kind.Equals("MissingReference", StringComparison.OrdinalIgnoreCase) ||
+        issue.Kind.Equals("GeneratedIl2CppAssembliesMissing", StringComparison.OrdinalIgnoreCase) ||
+        issue.Kind.Equals("MonoManagedAssembliesMissing", StringComparison.OrdinalIgnoreCase) ||
+        issue.Kind.Equals("MelonLoaderRuntimeMissing", StringComparison.OrdinalIgnoreCase) ||
+        issue.Kind.Equals("ModDependencyMissing", StringComparison.OrdinalIgnoreCase) ||
         issue.Kind.Equals("LocalBuildPropertiesUnset", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsExternalModdingReference(string include)
@@ -2356,6 +2402,41 @@ public sealed class MigrationVerifier
         return sandboxRoot;
     }
 
+    private static void DeleteSandboxBuildOutputs(string projectPath)
+    {
+        string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
+        if (!Path.GetFileName(projectDirectory).StartsWith(SandboxPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        DeleteSandboxChildDirectory(projectDirectory, "bin");
+        DeleteSandboxChildDirectory(projectDirectory, "obj");
+    }
+
+    private static void DeleteSandboxChildDirectory(string sandboxRoot, string childDirectoryName)
+    {
+        string target = Path.GetFullPath(Path.Combine(sandboxRoot, childDirectoryName));
+        if (!target.StartsWith(sandboxRoot, StringComparison.OrdinalIgnoreCase) ||
+            !Directory.Exists(target))
+        {
+            return;
+        }
+
+        foreach (string file in Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        foreach (string directory in Directory.EnumerateDirectories(target, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(directory, FileAttributes.Normal);
+        }
+
+        File.SetAttributes(target, FileAttributes.Normal);
+        Directory.Delete(target, recursive: true);
+    }
+
     private static string FindSandboxSourceRoot(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
@@ -2460,7 +2541,13 @@ public sealed class MigrationVerifier
 
     private static bool ShouldSkipDirectory(string directory)
     {
-        if (ExcludedDirectoryNames.Contains(Path.GetFileName(directory)))
+        string directoryName = Path.GetFileName(directory);
+        if (directoryName.Equals("S1Interop.Generated", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (ExcludedDirectoryNames.Contains(directoryName))
         {
             return true;
         }
