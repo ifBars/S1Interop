@@ -5975,15 +5975,20 @@ internal sealed class S1InteropFixtureTests
             $"Generated member registry should include cached dynamic instance method invocation helpers for backend-neutral reflection wrappers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             runtimeGenerated.Contains("public static object? CreatePlayerCamera(params object?[] args) => Create(PlayerCameraName, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? CreatePlayerCamera<T>(params object?[] args) where T : class => CreatePlayerCamera(args) as T;", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? GetPlayerCameraStatic(string memberName) => S1InteropMemberRegistry.GetValue(PlayerCameraName, memberName, null);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool TrySetPlayerCameraStatic(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue(PlayerCameraName, memberName, null, value);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCameraStatic(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke(PlayerCameraName, methodName, parameterTypeNames: null, null, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? InvokePlayerCameraStatic<T>(string methodName, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(InvokePlayerCameraStatic(methodName, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCameraStatic(string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.Invoke(PlayerCameraName, methodName, parameterTypeNames, null, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? InvokePlayerCameraStatic<T>(string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(InvokePlayerCameraStatic(methodName, parameterTypeNames, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsPlayerCamera(object? instance) => IsInstance(instance, PlayerCameraName);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? GetPlayerCamera(object? instance, string memberName) => S1InteropMemberRegistry.GetInstanceValue(instance, memberName);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool TrySetPlayerCamera(object? instance, string memberName, object? value) => S1InteropMemberRegistry.TrySetInstanceValue(instance, memberName, value);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCamera(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? InvokePlayerCamera<T>(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(InvokePlayerCamera(instance, methodName, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCamera(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, parameterTypeNames, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? InvokePlayerCamera<T>(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(InvokePlayerCamera(instance, methodName, parameterTypeNames, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? Create(string runtimeTypeName, params object?[] args)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsInstance(object? instance, string runtimeTypeName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("constructor.Invoke(converted)", StringComparison.Ordinal),
@@ -6010,6 +6015,10 @@ internal sealed class S1InteropFixtureTests
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route alias parameter types through runtime-resolved names. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
+            runtimeGenerated.Contains("public static T? InvokeIsDestinationValid<T>(object? instance, params object?[] args) => CastResult<T>(InvokeIsDestinationValid(instance, args));", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static T? CastResult<T>(object? value)", StringComparison.Ordinal),
+            $"Backend-neutral member registry should expose typed method invocation helpers for new backend-neutral projects. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetPacketMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetPacketName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"byte[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed array parameter names to IL2CPP array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
@@ -6031,6 +6040,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "Instance", Alias = "HudInstance", IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("Hud", "Scale", Alias = "HudScale", Kind = S1Interop.S1InteropMemberKind.Field)]
             [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int", "string&" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "GetScaleText", Alias = "HudGetScaleText", Kind = S1Interop.S1InteropMemberKind.Method)]
             [assembly: S1Interop.S1InteropMember("Hud", "RewriteGuid", Alias = "HudRewriteGuid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "RewriteNames", Alias = "HudRewriteNames", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.List<string>&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetData", Alias = "HudSetData", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid", "System.Collections.Generic.List<string>" })]
@@ -6071,6 +6081,11 @@ internal sealed class S1InteropFixtureTests
                         name = "il2cpp:" + name;
                         LastName = name;
                         return "done";
+                    }
+
+                    public string GetScaleText()
+                    {
+                        return Scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     }
 
                     public string SetData(Il2CppSystem.Guid guid, Il2CppSystem.Collections.Generic.List<string> names)
@@ -6306,8 +6321,10 @@ internal sealed class S1InteropFixtureTests
         MethodInfo? isHud = typeRegistryType.GetMethod("IsHud", [typeof(object)]);
         MethodInfo? getHud = typeRegistryType.GetMethod("GetHud", [typeof(object), typeof(string)]);
         MethodInfo? trySetHud = typeRegistryType.GetMethod("TrySetHud", [typeof(object), typeof(string), typeof(object)]);
-        MethodInfo? invokeHud = typeRegistryType.GetMethod("InvokeHud", [typeof(object), typeof(string), typeof(object[])]);
-        MethodInfo? invokeHudOverload = typeRegistryType.GetMethod("InvokeHud", [typeof(object), typeof(string), typeof(string[]), typeof(object[])]);
+        MethodInfo? invokeHud = typeRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "InvokeHud" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object), typeof(string), typeof(object[]) }));
+        MethodInfo? invokeHudOverload = typeRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "InvokeHud" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object), typeof(string), typeof(string[]), typeof(object[]) }));
         Assert(isHud is not null, "Generated type registry should expose an alias-level IsHud helper.");
         Assert(getHud is not null, "Generated type registry should expose an alias-level GetHud helper.");
         Assert(trySetHud is not null, "Generated type registry should expose an alias-level TrySetHud helper.");
@@ -6345,7 +6362,19 @@ internal sealed class S1InteropFixtureTests
         Assert(dynamicSetResult is true, "Generated dynamic instance setter should convert values and write through cached instance member lookup.");
         Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 99, "Generated dynamic instance setter should update the fake Il2Cpp field.");
 
-        MethodInfo? invokeSetLevel = memberRegistryType.GetMethod("InvokeHudSetLevel", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeHudGeneric = typeRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "InvokeHud" && method.IsGenericMethodDefinition && method.GetGenericArguments().Length == 1 && method.GetParameters().Length == 3);
+        Assert(invokeHudGeneric is not null, "Generated alias-level invoker should expose a typed generic overload.");
+        object? typedFacadeResult = invokeHudGeneric!.MakeGenericMethod(typeof(int)).Invoke(null, [hud, "GetScaleText", Array.Empty<object?>()]);
+        Assert(typedFacadeResult is 99, $"Generated alias-level typed invoker should convert simple reflected return values. Result={typedFacadeResult}");
+
+        MethodInfo? invokeGetScaleTextGeneric = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "InvokeHudGetScaleText" && method.IsGenericMethodDefinition && method.GetGenericArguments().Length == 1);
+        Assert(invokeGetScaleTextGeneric is not null, "Generated member invoker should expose a typed generic overload.");
+        object? typedMemberResult = invokeGetScaleTextGeneric!.MakeGenericMethod(typeof(int)).Invoke(null, [hud, Array.Empty<object?>()]);
+        Assert(typedMemberResult is 99, $"Generated member typed invoker should convert simple reflected return values. Result={typedMemberResult}");
+
+        MethodInfo? invokeSetLevel = GetNonGenericMethod(memberRegistryType, "InvokeHudSetLevel", typeof(object), typeof(object[]));
         Assert(invokeSetLevel is not null, "Generated member registry should expose InvokeHudSetLevel.");
         object?[] args = ["7", "fps"];
         object? invokeResult = invokeSetLevel!.Invoke(null, [hud, args]);
@@ -6362,42 +6391,42 @@ internal sealed class S1InteropFixtureTests
         Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 11, "Generated dynamic instance invoker should convert arguments before invocation.");
         Assert(string.Equals(dynamicArgs[1] as string, "il2cpp:hud", StringComparison.Ordinal), $"Generated dynamic instance invoker should copy by-ref argument values back to caller args. Arg={dynamicArgs[1]}");
 
-        MethodInfo? invokeRewriteGuid = memberRegistryType.GetMethod("InvokeHudRewriteGuid", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeRewriteGuid = GetNonGenericMethod(memberRegistryType, "InvokeHudRewriteGuid", typeof(object), typeof(object[]));
         Assert(invokeRewriteGuid is not null, "Generated member registry should expose InvokeHudRewriteGuid.");
         object?[] guidArgs = [Guid.Parse("11111111-2222-3333-4444-555555555555")];
         object? rewriteGuidResult = invokeRewriteGuid!.Invoke(null, [hud, guidArgs]);
         Assert(string.Equals(rewriteGuidResult as string, "22222222-3333-4444-5555-666666666666", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref Guid result. Result={rewriteGuidResult}");
         Assert(guidArgs[0] is Guid copiedGuid && copiedGuid == Guid.Parse("22222222-3333-4444-5555-666666666666"), $"Generated method invoker should copy IL2CPP Guid ref values back as System.Guid. Arg={guidArgs[0]}");
 
-        MethodInfo? invokeRewriteNames = memberRegistryType.GetMethod("InvokeHudRewriteNames", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeRewriteNames = GetNonGenericMethod(memberRegistryType, "InvokeHudRewriteNames", typeof(object), typeof(object[]));
         Assert(invokeRewriteNames is not null, "Generated member registry should expose InvokeHudRewriteNames.");
         object?[] nameRefArgs = [new List<string> { "alpha", "beta" }];
         object? rewriteNamesResult = invokeRewriteNames!.Invoke(null, [hud, nameRefArgs]);
         Assert(string.Equals(rewriteNamesResult as string, "2:delta:echo", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref list result. Result={rewriteNamesResult}");
         Assert(nameRefArgs[0] is List<string> copiedNames && copiedNames.SequenceEqual(new[] { "delta", "echo" }), $"Generated method invoker should copy IL2CPP list ref values back as managed lists. Arg={nameRefArgs[0]}");
 
-        MethodInfo? invokeRewriteScores = memberRegistryType.GetMethod("InvokeHudRewriteScores", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeRewriteScores = GetNonGenericMethod(memberRegistryType, "InvokeHudRewriteScores", typeof(object), typeof(object[]));
         Assert(invokeRewriteScores is not null, "Generated member registry should expose InvokeHudRewriteScores.");
         object?[] scoreRefArgs = [new Dictionary<string, int> { ["north"] = 4 }];
         object? rewriteScoresResult = invokeRewriteScores!.Invoke(null, [hud, scoreRefArgs]);
         Assert(string.Equals(rewriteScoresResult as string, "2:12:15", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref dictionary result. Result={rewriteScoresResult}");
         Assert(scoreRefArgs[0] is Dictionary<string, int> copiedScores && copiedScores.Count == 2 && copiedScores["east"] == 12 && copiedScores["west"] == 15, $"Generated method invoker should copy IL2CPP dictionary ref values back as managed dictionaries. Arg={scoreRefArgs[0]}");
 
-        MethodInfo? invokeRewriteTags = memberRegistryType.GetMethod("InvokeHudRewriteTags", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeRewriteTags = GetNonGenericMethod(memberRegistryType, "InvokeHudRewriteTags", typeof(object), typeof(object[]));
         Assert(invokeRewriteTags is not null, "Generated member registry should expose InvokeHudRewriteTags.");
         object?[] tagRefArgs = [new HashSet<string> { "north" }];
         object? rewriteTagsResult = invokeRewriteTags!.Invoke(null, [hud, tagRefArgs]);
         Assert(string.Equals(rewriteTagsResult as string, "2:True:True", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref hash set result. Result={rewriteTagsResult}");
         Assert(tagRefArgs[0] is HashSet<string> copiedTags && copiedTags.SetEquals(new[] { "east", "west" }), $"Generated method invoker should copy IL2CPP hash set ref values back as managed hash sets. Arg={tagRefArgs[0]}");
 
-        MethodInfo? invokeRewriteBytes = memberRegistryType.GetMethod("InvokeHudRewriteBytes", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeRewriteBytes = GetNonGenericMethod(memberRegistryType, "InvokeHudRewriteBytes", typeof(object), typeof(object[]));
         Assert(invokeRewriteBytes is not null, "Generated member registry should expose InvokeHudRewriteBytes.");
         object?[] byteRefArgs = [new byte[] { 1, 2 }];
         object? rewriteBytesResult = invokeRewriteBytes!.Invoke(null, [hud, byteRefArgs]);
         Assert(string.Equals(rewriteBytesResult as string, "3:4:5:6", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref byte-array result. Result={rewriteBytesResult}");
         Assert(byteRefArgs[0] is byte[] copiedBytes && copiedBytes.SequenceEqual(new byte[] { 4, 5, 6 }), $"Generated method invoker should copy IL2CPP byte-array ref values back as managed byte arrays. Arg={byteRefArgs[0]}");
 
-        MethodInfo? invokeSetData = memberRegistryType.GetMethod("InvokeHudSetData", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeSetData = GetNonGenericMethod(memberRegistryType, "InvokeHudSetData", typeof(object), typeof(object[]));
         Assert(invokeSetData is not null, "Generated member registry should expose InvokeHudSetData.");
         Guid guid = Guid.Parse("11111111-2222-3333-4444-555555555555");
         object? setDataResult = invokeSetData!.Invoke(null, [hud, new object?[] { guid, new[] { "alpha", "beta" } }]);
@@ -6405,21 +6434,21 @@ internal sealed class S1InteropFixtureTests
             string.Equals(setDataResult as string, "11111111-2222-3333-4444-555555555555:2:alpha", StringComparison.Ordinal),
             $"Generated method invoker should convert System.Guid and managed arrays to fake IL2CPP Guid/List parameter types. Result={setDataResult}");
 
-        MethodInfo? invokeSetBytes = memberRegistryType.GetMethod("InvokeHudSetBytes", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeSetBytes = GetNonGenericMethod(memberRegistryType, "InvokeHudSetBytes", typeof(object), typeof(object[]));
         Assert(invokeSetBytes is not null, "Generated member registry should expose InvokeHudSetBytes.");
         object? setBytesResult = invokeSetBytes!.Invoke(null, [hud, new object?[] { new byte[] { 7, 9 } }]);
         Assert(
             string.Equals(setBytesResult as string, "2:7:9", StringComparison.Ordinal),
             $"Generated method invoker should convert managed byte arrays to fake IL2CPP struct arrays. Result={setBytesResult}");
 
-        MethodInfo? invokeSetLabels = memberRegistryType.GetMethod("InvokeHudSetLabels", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeSetLabels = GetNonGenericMethod(memberRegistryType, "InvokeHudSetLabels", typeof(object), typeof(object[]));
         Assert(invokeSetLabels is not null, "Generated member registry should expose InvokeHudSetLabels.");
         object? setLabelsResult = invokeSetLabels!.Invoke(null, [hud, new object?[] { new[] { "north", "south" } }]);
         Assert(
             string.Equals(setLabelsResult as string, "2:north:south", StringComparison.Ordinal),
             $"Generated method invoker should convert managed string arrays to fake IL2CPP reference arrays. Result={setLabelsResult}");
 
-        MethodInfo? invokeSetScores = memberRegistryType.GetMethod("InvokeHudSetScores", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeSetScores = GetNonGenericMethod(memberRegistryType, "InvokeHudSetScores", typeof(object), typeof(object[]));
         Assert(invokeSetScores is not null, "Generated member registry should expose InvokeHudSetScores.");
         var scores = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(new Dictionary<string, int>
         {
@@ -6431,7 +6460,7 @@ internal sealed class S1InteropFixtureTests
             string.Equals(setScoresResult as string, "2:4:8", StringComparison.Ordinal),
             $"Generated method invoker should convert managed read-only dictionaries to fake IL2CPP dictionaries. Result={setScoresResult}");
 
-        MethodInfo? invokeSetTags = memberRegistryType.GetMethod("InvokeHudSetTags", [typeof(object), typeof(object[])]);
+        MethodInfo? invokeSetTags = GetNonGenericMethod(memberRegistryType, "InvokeHudSetTags", typeof(object), typeof(object[]));
         Assert(invokeSetTags is not null, "Generated member registry should expose InvokeHudSetTags.");
         var tags = new HashSet<string> { "north", "south", "north" };
         object? setTagsResult = invokeSetTags!.Invoke(null, [hud, new object?[] { tags }]);
@@ -7256,6 +7285,15 @@ internal sealed class S1InteropFixtureTests
         }
 
         return count;
+    }
+
+    private static MethodInfo? GetNonGenericMethod(Type type, string name, params Type[] parameterTypes)
+    {
+        return type.GetMethods()
+            .FirstOrDefault(method =>
+                string.Equals(method.Name, name, StringComparison.Ordinal) &&
+                !method.IsGenericMethod &&
+                method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(parameterTypes));
     }
 
     private static string RunTypeRegistryGenerator(string source, params string[] symbols)

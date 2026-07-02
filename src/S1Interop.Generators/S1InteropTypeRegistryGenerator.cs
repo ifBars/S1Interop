@@ -347,15 +347,20 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
             builder.AppendLine($"        public static System.Type? {entry.Alias} => Resolve({entry.Alias}Name);");
             builder.AppendLine($"        public static object? Create{entry.Alias}(params object?[] args) => Create({entry.Alias}Name, args);");
+            builder.AppendLine($"        public static T? Create{entry.Alias}<T>(params object?[] args) where T : class => Create{entry.Alias}(args) as T;");
             builder.AppendLine($"        public static object? Get{entry.Alias}Static(string memberName) => S1InteropMemberRegistry.GetValue({entry.Alias}Name, memberName, null);");
             builder.AppendLine($"        public static bool TrySet{entry.Alias}Static(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue({entry.Alias}Name, memberName, null, value);");
             builder.AppendLine($"        public static object? Invoke{entry.Alias}Static(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke({entry.Alias}Name, methodName, parameterTypeNames: null, null, args);");
+            builder.AppendLine($"        public static T? Invoke{entry.Alias}Static<T>(string methodName, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(Invoke{entry.Alias}Static(methodName, args));");
             builder.AppendLine($"        public static object? Invoke{entry.Alias}Static(string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.Invoke({entry.Alias}Name, methodName, parameterTypeNames, null, args);");
+            builder.AppendLine($"        public static T? Invoke{entry.Alias}Static<T>(string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(Invoke{entry.Alias}Static(methodName, parameterTypeNames, args));");
             builder.AppendLine($"        public static bool Is{entry.Alias}(object? instance) => IsInstance(instance, {entry.Alias}Name);");
             builder.AppendLine($"        public static object? Get{entry.Alias}(object? instance, string memberName) => S1InteropMemberRegistry.GetInstanceValue(instance, memberName);");
             builder.AppendLine($"        public static bool TrySet{entry.Alias}(object? instance, string memberName, object? value) => S1InteropMemberRegistry.TrySetInstanceValue(instance, memberName, value);");
             builder.AppendLine($"        public static object? Invoke{entry.Alias}(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, args);");
+            builder.AppendLine($"        public static T? Invoke{entry.Alias}<T>(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(Invoke{entry.Alias}(instance, methodName, args));");
             builder.AppendLine($"        public static object? Invoke{entry.Alias}(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, parameterTypeNames, args);");
+            builder.AppendLine($"        public static T? Invoke{entry.Alias}<T>(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(Invoke{entry.Alias}(instance, methodName, parameterTypeNames, args));");
             builder.AppendLine();
         }
 
@@ -693,10 +698,12 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                 if (member.IsStatic)
                 {
                     builder.AppendLine($"        public static object? Invoke{member.Alias}(params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)}, null, args);");
+                    builder.AppendLine($"        public static T? Invoke{member.Alias}<T>(params object?[] args) => CastResult<T>(Invoke{member.Alias}(args));");
                 }
                 else
                 {
                     builder.AppendLine($"        public static object? Invoke{member.Alias}(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)}, instance, args);");
+                    builder.AppendLine($"        public static T? Invoke{member.Alias}<T>(object? instance, params object?[] args) => CastResult<T>(Invoke{member.Alias}(instance, args));");
                 }
             }
             else
@@ -734,6 +741,41 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object? instance)");
         builder.AppendLine("        {");
         builder.AppendLine("            return GetValue(ownerTypeName, memberName, instance, S1InteropMemberKind.FieldOrProperty);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static T? CastResult<T>(object? value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (value is T typed)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return typed;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (value is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return default;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type targetType = System.Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);");
+        builder.AppendLine("            if (targetType.IsEnum)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                try");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return value is string text ? (T)System.Enum.Parse(targetType, text, ignoreCase: true) : (T)System.Enum.ToObject(targetType, value);");
+        builder.AppendLine("                }");
+        builder.AppendLine("                catch");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return default;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return (T)System.Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return default;");
+        builder.AppendLine("            }");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        public static object? GetInstanceValue(object? instance, string memberName)");

@@ -100,6 +100,8 @@ Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberReg
 
 Method declarations can also include `ParameterTypeNames` for overload-specific binding. Use registered type aliases for game types and `&` for by-ref parameters. The generator emits both an invoker and a `MethodInfo` property, so Harmony patch targets can use the same generated overload binding instead of repeating `AccessTools.Method(...)` parameter arrays.
 
+Generated method and type facades also include typed convenience helpers such as `InvokeIsDestinationValid<bool>(...)` and `InvokePlayerCamera<int>(...)`. These still use the same cached backend-neutral reflection path, but they keep simple mod code from scattering object casts and primitive conversions around call sites.
+
 When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
