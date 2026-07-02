@@ -350,6 +350,10 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             builder.AppendLine($"        public static object? Get{entry.Alias}Static(string memberName) => S1InteropMemberRegistry.GetValue({entry.Alias}Name, memberName, null);");
             builder.AppendLine($"        public static bool TrySet{entry.Alias}Static(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue({entry.Alias}Name, memberName, null, value);");
             builder.AppendLine($"        public static object? Invoke{entry.Alias}Static(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke({entry.Alias}Name, methodName, parameterTypeNames: null, null, args);");
+            builder.AppendLine($"        public static bool Is{entry.Alias}(object? instance) => IsInstance(instance, {entry.Alias}Name);");
+            builder.AppendLine($"        public static object? Get{entry.Alias}(object? instance, string memberName) => S1InteropMemberRegistry.GetInstanceValue(instance, memberName);");
+            builder.AppendLine($"        public static bool TrySet{entry.Alias}(object? instance, string memberName, object? value) => S1InteropMemberRegistry.TrySetInstanceValue(instance, memberName, value);");
+            builder.AppendLine($"        public static object? Invoke{entry.Alias}(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, args);");
             builder.AppendLine();
         }
 
@@ -411,6 +415,17 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static bool IsInstance(object? instance, string runtimeTypeName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (instance is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type? runtimeType = Resolve(runtimeTypeName);");
+        builder.AppendLine("            return runtimeType is not null && runtimeType.IsInstanceOfType(instance);");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static System.Type? ResolveFromLoadedAssemblies(string runtimeTypeName)");
