@@ -858,6 +858,11 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                    return true;");
         builder.AppendLine("                }");
         builder.AppendLine();
+        builder.AppendLine("                if (TryConvertIl2CppArray(value, conversionType, out converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
         builder.AppendLine("                if (conversionType.IsEnum)");
         builder.AppendLine("                {");
         builder.AppendLine("                    converted = value is string text ? System.Enum.Parse(conversionType, text, ignoreCase: true) : System.Enum.ToObject(conversionType, value);");
@@ -958,6 +963,87 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                converted = null;");
         builder.AppendLine("                return false;");
         builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryConvertIl2CppArray(object value, System.Type targetType, out object? converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            converted = null;");
+        builder.AppendLine("            if (targetType.FullName is null ||");
+        builder.AppendLine("                (!targetType.FullName.StartsWith(\"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1\", System.StringComparison.Ordinal) &&");
+        builder.AppendLine("                 !targetType.FullName.StartsWith(\"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1\", System.StringComparison.Ordinal)))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (value is string || value is not System.Collections.IEnumerable enumerable)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type[] genericArguments = targetType.GetGenericArguments();");
+        builder.AppendLine("            if (genericArguments.Length != 1)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Collections.Generic.List<object?> items = new System.Collections.Generic.List<object?>();");
+        builder.AppendLine("                foreach (object? item in enumerable)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (!TryConvertValue(item, genericArguments[0], out object? convertedItem))");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        return false;");
+        builder.AppendLine("                    }");
+        builder.AppendLine();
+        builder.AppendLine("                    items.Add(convertedItem);");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                object? array = CreateIl2CppArray(targetType, items.Count);");
+        builder.AppendLine("                if (array is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                System.Reflection.PropertyInfo? indexer = targetType.GetProperty(\"Item\", new[] { typeof(int) });");
+        builder.AppendLine("                System.Reflection.MethodInfo? setItem = targetType.GetMethod(\"set_Item\", new[] { typeof(int), genericArguments[0] });");
+        builder.AppendLine("                if (indexer is null && setItem is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                for (int index = 0; index < items.Count; index++)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (indexer is not null)");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        indexer.SetValue(array, items[index], new object[] { index });");
+        builder.AppendLine("                    }");
+        builder.AppendLine("                    else");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        setItem!.Invoke(array, new object?[] { index, items[index] });");
+        builder.AppendLine("                    }");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                converted = array;");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = null;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static object? CreateIl2CppArray(System.Type targetType, int count)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Reflection.ConstructorInfo? intConstructor = targetType.GetConstructor(new[] { typeof(int) });");
+        builder.AppendLine("            if (intConstructor is not null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return intConstructor.Invoke(new object[] { count });");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.ConstructorInfo? longConstructor = targetType.GetConstructor(new[] { typeof(long) });");
+        builder.AppendLine("            return longConstructor?.Invoke(new object[] { (long)count });");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        public static object? Invoke(string ownerTypeName, string memberName, string[]? parameterTypeNames, object? instance, params object?[] args)");
@@ -1120,6 +1206,11 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("        private static System.Type? ResolveKnownType(string typeName)");
         builder.AppendLine("        {");
+        builder.AppendLine("            if (TryResolveArrayType(typeName, out System.Type? arrayType))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return arrayType;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
         builder.AppendLine("            if (TryResolveGenericListType(typeName, out System.Type? genericListType))");
         builder.AppendLine("            {");
         builder.AppendLine("                return genericListType;");
@@ -1143,6 +1234,51 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                case \"void\": return typeof(void);");
         builder.AppendLine("                default: return S1InteropTypeRegistry.Resolve(typeName);");
         builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryResolveArrayType(string typeName, out System.Type? resolvedType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            resolvedType = null;");
+        builder.AppendLine("            const string structArrayPrefix = \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<\";");
+        builder.AppendLine("            const string referenceArrayPrefix = \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<\";");
+        builder.AppendLine("            if (typeName.EndsWith(\"[]\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Type? elementType = ResolveKnownType(typeName.Substring(0, typeName.Length - 2));");
+        builder.AppendLine("                if (elementType is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                resolvedType = elementType.MakeArrayType();");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            string genericDefinitionName;");
+        builder.AppendLine("            string elementTypeName;");
+        builder.AppendLine("            if (typeName.StartsWith(structArrayPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1\";");
+        builder.AppendLine("                elementTypeName = typeName.Substring(structArrayPrefix.Length, typeName.Length - structArrayPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else if (typeName.StartsWith(referenceArrayPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1\";");
+        builder.AppendLine("                elementTypeName = typeName.Substring(referenceArrayPrefix.Length, typeName.Length - referenceArrayPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type? genericDefinition = S1InteropTypeRegistry.Resolve(genericDefinitionName);");
+        builder.AppendLine("            System.Type? genericElementType = ResolveKnownType(elementTypeName);");
+        builder.AppendLine("            if (genericDefinition is null || genericElementType is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            resolvedType = genericDefinition.MakeGenericType(genericElementType);");
+        builder.AppendLine("            return true;");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static bool TryResolveGenericListType(string typeName, out System.Type? resolvedType)");
@@ -1473,6 +1609,15 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             return $"Il2CppSystem.Collections.Generic.List<{ToIl2CppTypeName(elementTypeName)}>";
         }
 
+        if (monoTypeName.EndsWith("[]", StringComparison.Ordinal))
+        {
+            string elementTypeName = monoTypeName.Substring(0, monoTypeName.Length - 2);
+            string arrayTypeName = IsKnownValueTypeName(elementTypeName)
+                ? "Il2CppStructArray"
+                : "Il2CppReferenceArray";
+            return $"Il2CppInterop.Runtime.InteropTypes.Arrays.{arrayTypeName}<{ToIl2CppTypeName(elementTypeName)}>";
+        }
+
         if (monoTypeName.StartsWith("ScheduleOne.", StringComparison.Ordinal))
         {
             return "Il2Cpp" + monoTypeName;
@@ -1480,6 +1625,9 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
         return monoTypeName;
     }
+
+    private static bool IsKnownValueTypeName(string typeName) =>
+        typeName is "bool" or "byte" or "char" or "double" or "float" or "int" or "long" or "short" or "uint" or "ulong" or "System.Guid" or "Guid";
 
     private static string GetSimpleName(string typeName)
     {

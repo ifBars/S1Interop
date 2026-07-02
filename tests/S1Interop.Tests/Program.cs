@@ -5829,6 +5829,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Phone", "Open", Alias = "OpenPhone", Kind = S1Interop.S1InteropMemberKind.Method, IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("Phone", "deviceUniqueIdentifier", Alias = "DeviceIdProperty", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
+            [assembly: S1Interop.S1InteropMember("Phone", "SetPacket", Alias = "SetPacket", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
 
             namespace SyntheticMod
             {
@@ -5936,7 +5937,10 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public static bool TryConvertValue(object? value, System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppGuid(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppList(value, conversionType, out converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("TryConvertIl2CppArray(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.List`1", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("property.SetValue(instance, converted, null);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("field.SetValue(instance, converted);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("converted = System.Convert.ChangeType(value, conversionType, System.Globalization.CultureInfo.InvariantCulture)", StringComparison.Ordinal) &&
@@ -5992,6 +5996,9 @@ internal sealed class S1InteropFixtureTests
         Assert(
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route alias parameter types through runtime-resolved names. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetPacketMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetPacketName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"byte[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>\") });", StringComparison.Ordinal),
+            $"Backend-neutral member registry should route managed array parameter names to IL2CPP array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
     private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()
@@ -6003,6 +6010,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "Scale", Alias = "HudScale", Kind = S1Interop.S1InteropMemberKind.Field)]
             [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int", "string&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetData", Alias = "HudSetData", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid", "System.Collections.Generic.List<string>" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetBytes", Alias = "HudSetBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
 
             namespace SyntheticMod
             {
@@ -6019,6 +6027,7 @@ internal sealed class S1InteropFixtureTests
                     public int Scale;
                     public string? LastName { get; private set; }
                     public string? LastData { get; private set; }
+                    public string? LastBytes { get; private set; }
 
                     public string SetLevel(int level, ref string name)
                     {
@@ -6032,6 +6041,12 @@ internal sealed class S1InteropFixtureTests
                     {
                         LastData = guid.Value + ":" + names.Count + ":" + names[0];
                         return LastData;
+                    }
+
+                    public string SetBytes(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte> bytes)
+                    {
+                        LastBytes = bytes.Length + ":" + bytes[0] + ":" + bytes[1];
+                        return LastBytes;
                     }
                 }
             }
@@ -6080,6 +6095,45 @@ internal sealed class S1InteropFixtureTests
                     public T? TryCast<T>() where T : class
                     {
                         return target as T;
+                    }
+                }
+
+                namespace Arrays
+                {
+                    public sealed class Il2CppStructArray<T> where T : struct
+                    {
+                        private readonly T[] inner;
+
+                        public Il2CppStructArray(int length)
+                        {
+                            inner = new T[length];
+                        }
+
+                        public int Length => inner.Length;
+
+                        public T this[int index]
+                        {
+                            get => inner[index];
+                            set => inner[index] = value;
+                        }
+                    }
+
+                    public sealed class Il2CppReferenceArray<T> where T : class
+                    {
+                        private readonly T?[] inner;
+
+                        public Il2CppReferenceArray(int length)
+                        {
+                            inner = new T?[length];
+                        }
+
+                        public int Length => inner.Length;
+
+                        public T? this[int index]
+                        {
+                            get => inner[index];
+                            set => inner[index] = value;
+                        }
                     }
                 }
             }
@@ -6188,6 +6242,13 @@ internal sealed class S1InteropFixtureTests
         Assert(
             string.Equals(setDataResult as string, "11111111-2222-3333-4444-555555555555:2:alpha", StringComparison.Ordinal),
             $"Generated method invoker should convert System.Guid and managed arrays to fake IL2CPP Guid/List parameter types. Result={setDataResult}");
+
+        MethodInfo? invokeSetBytes = memberRegistryType.GetMethod("InvokeHudSetBytes", [typeof(object), typeof(object[])]);
+        Assert(invokeSetBytes is not null, "Generated member registry should expose InvokeHudSetBytes.");
+        object? setBytesResult = invokeSetBytes!.Invoke(null, [hud, new object?[] { new byte[] { 7, 9 } }]);
+        Assert(
+            string.Equals(setBytesResult as string, "2:7:9", StringComparison.Ordinal),
+            $"Generated method invoker should convert managed byte arrays to fake IL2CPP struct arrays. Result={setBytesResult}");
 
         Type objectBaseType = assembly.GetType("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", throwOnError: true)!;
         object proxy = Activator.CreateInstance(objectBaseType, [hud])!;
