@@ -6,7 +6,7 @@ namespace S1Interop.Core;
 public static class DualRuntimeProjectScaffolder
 {
     private static readonly Regex ConfigurationConditionRegex = new(
-        @"\$\(\s*Configuration\s*\)\s*'?\s*={1,2}\s*'?(?<name>[^'""\)\s]+)",
+        @"\$\(\s*Configuration\s*\)\s*'?\s*={1,2}\s*(?:'(?<name>[^'|]+)(?:\|[^']*)?'|(?<name>[^'""\)\s|]+))",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static bool NeedsIl2CppConfigurations(ProjectAnalysis project) =>

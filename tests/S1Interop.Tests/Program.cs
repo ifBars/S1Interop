@@ -105,6 +105,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         DualRuntimeMigrationScaffoldsAnalyzerInferredDebugReleaseMonoProject();
         count++;
+        DualRuntimeMigrationPreservesSpaceContainingMonoConfigurationNames();
+        count++;
         DualRuntimeMigrationConditionsImportedMonoRuntimeFlag();
         count++;
         DualRuntimeMigrationInstallsGeneratorPackageWhenAttributesAreDeclared();
@@ -235,6 +237,8 @@ internal sealed class S1InteropFixtureTests
         MigrationApplyConditionalizesS1FuelModGameConstructor();
         count++;
         VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
+        count++;
+        VerifyMigrationConvergesOnMonoOnlyS1FuelModCopy();
         count++;
         VerifyMigrationCleansBigWillyPropertyBasedReferences();
         count++;
@@ -2707,6 +2711,74 @@ internal sealed class S1InteropFixtureTests
         }
     }
 
+    private void DualRuntimeMigrationPreservesSpaceContainingMonoConfigurationNames()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "SpacedConfigMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <Configurations>Debug Mono;Release Mono</Configurations>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'Debug Mono'">
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <DefineConstants>MONO</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'Release Mono'">
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <DefineConstants>MONO;RELEASE</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup Condition="'$(Configuration)' == 'Debug Mono' Or '$(Configuration)' == 'Release Mono'">
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectAnalysis beforeProject = before.Projects.Single();
+            Assert(
+                beforeProject.Configurations.Select(configuration => configuration.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).SequenceEqual(["Debug Mono", "Release Mono"]),
+                "Fixture should start with only space-containing Mono configuration names.");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "add_il2cpp_configuration"),
+                "Migration should scaffold IL2CPP configs for space-containing Mono config names.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            ProjectAnalysis afterProject = after.Projects.Single();
+            string[] names = afterProject.Configurations.Select(configuration => configuration.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+            Assert(
+                names.SequenceEqual(["Debug Il2cpp", "Debug Mono", "Release Il2cpp", "Release Mono"]),
+                $"Dual-runtime migration should preserve full configuration names without adding phantom Debug/Release configs. Names={string.Join(", ", names)}");
+            AssertHasRuntime(afterProject, "Debug Mono", RuntimeKind.Mono);
+            AssertHasRuntime(afterProject, "Release Mono", RuntimeKind.Mono);
+            AssertHasRuntime(afterProject, "Debug Il2cpp", RuntimeKind.Il2Cpp);
+            AssertHasRuntime(afterProject, "Release Il2cpp", RuntimeKind.Il2Cpp);
+
+            string projectText = File.ReadAllText(tempProject);
+            Assert(!projectText.Contains("<Configurations>Debug;Release", StringComparison.Ordinal), "Migration should not add whitespace-truncated Debug/Release configurations.");
+            Assert(!projectText.Contains("Condition=\"'$(Configuration)'=='Debug'\"", StringComparison.Ordinal), "Migration should not add a phantom Debug property group.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the spaced-config project file.");
+            Assert(!File.ReadAllText(tempProject).Contains("Debug Il2cpp", StringComparison.Ordinal), "Rollback should remove generated IL2CPP configs.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void DualRuntimeMigrationConditionsImportedMonoRuntimeFlag()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
@@ -3363,6 +3435,64 @@ internal sealed class S1InteropFixtureTests
         Assert(
             File.Exists(localProps) == hadLocalProps,
             "S1FuelMod verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void VerifyMigrationConvergesOnMonoOnlyS1FuelModCopy()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
+        string sourceProject = Path.Combine(sourceDirectory, "S1FuelMod.csproj");
+        string sourceFuelVehicleData = Path.Combine(sourceDirectory, "Systems", "FuelVehicleData.cs");
+        if (!File.Exists(sourceProject) || !File.Exists(sourceFuelVehicleData))
+        {
+            Console.WriteLine("Skipping S1FuelMod Mono-only migration integration because S1FuelMod is not available.");
+            return;
+        }
+
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string originalFuelVehicleDataHash = ComputeSha256(sourceFuelVehicleData);
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "S1FuelMod.csproj");
+            ReduceS1FuelModCopyToMonoOnly(tempProject);
+            string monoOnlyProjectHash = ComputeSha256(tempProject);
+
+            ProjectAnalysis monoOnlyProject = analyzer.Analyze(tempProject).Projects.Single();
+            AssertHasRuntime(monoOnlyProject, "Debug Mono", RuntimeKind.Mono);
+            AssertHasRuntime(monoOnlyProject, "Release Mono", RuntimeKind.Mono);
+            Assert(
+                monoOnlyProject.Configurations.All(configuration => configuration.Runtime != RuntimeKind.Il2Cpp),
+                "The S1FuelMod test fixture must start as Mono-only before migration.");
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(
+                    DualRuntime: true,
+                    IncludeSourceMigrations: true));
+
+            Assert(
+                result.Success,
+                $"Mono-only S1FuelMod copy should converge to a dual-runtime migration in a sandbox. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.PlannedOperations > 0, "Mono-only S1FuelMod migration should plan sandbox operations.");
+            Assert(result.AppliedOperations > 0, "Mono-only S1FuelMod migration should apply sandbox operations.");
+            Assert(result.SandboxDeleted, "S1FuelMod migration verification should delete its sandbox.");
+            Assert(result.AfterDiagnostics.Count == 0, $"S1FuelMod migration should leave no analyzer diagnostics. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(
+                string.Equals(ComputeSha256(tempProject), monoOnlyProjectHash, StringComparison.Ordinal),
+                "verify-migration should not mutate the Mono-only S1FuelMod fixture project.");
+            Assert(
+                string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+                "S1FuelMod verify-migration should not mutate the real project file.");
+            Assert(
+                string.Equals(ComputeSha256(sourceFuelVehicleData), originalFuelVehicleDataHash, StringComparison.Ordinal),
+                "S1FuelMod verify-migration should not mutate real source files.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
     }
 
     private void VerifyMigrationCleansBigWillyPropertyBasedReferences()
@@ -7548,6 +7678,55 @@ internal sealed class S1InteropFixtureTests
         }
 
         document.Save(projectPath);
+    }
+
+    private static void ReduceS1FuelModCopyToMonoOnly(string projectPath)
+    {
+        XDocument document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement element in document.Root!.Elements().ToArray())
+        {
+            string condition = element.Attribute("Condition")?.Value ?? string.Empty;
+            if ((element.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase) ||
+                 element.Name.LocalName.Equals("ItemGroup", StringComparison.OrdinalIgnoreCase)) &&
+                condition.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Remove();
+            }
+        }
+
+        foreach (XElement import in document.Root.Elements()
+                     .Where(element =>
+                         element.Name.LocalName.Equals("Import", StringComparison.OrdinalIgnoreCase) &&
+                         (element.Attribute("Project")?.Value ?? string.Empty).Contains("MelonIL2CPP.targets", StringComparison.OrdinalIgnoreCase))
+                     .ToArray())
+        {
+            import.Remove();
+        }
+
+        XElement configurations = document.Descendants()
+            .First(element => element.Name.LocalName.Equals("Configurations", StringComparison.OrdinalIgnoreCase));
+        configurations.Value = "Debug Mono;Release Mono";
+
+        document.Save(projectPath);
+
+        string conditionsPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "build", "conditions.props");
+        if (!File.Exists(conditionsPath))
+        {
+            return;
+        }
+
+        XDocument conditionsDocument = XDocument.Load(conditionsPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement element in conditionsDocument.Descendants().ToArray())
+        {
+            string condition = element.Attribute("Condition")?.Value ?? string.Empty;
+            if (condition.Contains("IsMono", StringComparison.OrdinalIgnoreCase) &&
+                condition.Contains("!= 'true'", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Remove();
+            }
+        }
+
+        conditionsDocument.Save(conditionsPath);
     }
 
     private static XElement GetConfigurationPropertyGroup(string projectPath, string configuration)
