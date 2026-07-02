@@ -238,7 +238,7 @@ internal sealed class S1InteropFixtureTests
         count++;
         VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
         count++;
-        VerifyMigrationConvergesOnMonoOnlyS1FuelModCopy();
+        VerifyMigrationBuildGateConvertsMonoOnlyS1FuelModCopy();
         count++;
         VerifyMigrationCleansBigWillyPropertyBasedReferences();
         count++;
@@ -2685,6 +2685,11 @@ internal sealed class S1InteropFixtureTests
             Assert(projectText.Contains("<S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>", StringComparison.Ordinal), "Mono configs should stamp the S1Interop generator runtime property.");
             Assert(projectText.Contains("<S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>", StringComparison.Ordinal), "Generated IL2CPP configs should stamp the S1Interop generator runtime property.");
             Assert(projectText.Contains("Il2CppInterop.Runtime", StringComparison.Ordinal), "Generated IL2CPP configs should reference Il2CppInterop.Runtime.");
+            Assert(projectText.Contains("<Reference Include=\"Il2CppScheduleOne.Core\">", StringComparison.Ordinal), "Generated IL2CPP configs should include split ScheduleOne core wrappers.");
+            Assert(projectText.Contains("<Reference Include=\"Il2Cppcom.rlabrecque.steamworks.net\">", StringComparison.Ordinal), "Generated IL2CPP configs should reference the Steamworks.NET generated wrapper.");
+            Assert(projectText.Contains("<Reference Include=\"UnityEngine.AudioModule\">", StringComparison.Ordinal), "Generated IL2CPP configs should include Unity audio module references for AudioClip/AudioSource APIs.");
+            Assert(projectText.Contains("<Reference Include=\"UnityEngine.PhysicsModule\">", StringComparison.Ordinal), "Generated IL2CPP configs should include Unity physics module references for Collider APIs.");
+            Assert(projectText.Contains("<Reference Include=\"UnityEngine.VehiclesModule\">", StringComparison.Ordinal), "Generated IL2CPP configs should include Unity vehicle module references for WheelCollider APIs.");
             Assert(projectText.Contains("<Reference Include=\"Il2CppFishNet.Runtime\">", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime references to Il2CppFishNet.Runtime.");
             Assert(projectText.Contains("<HintPath>$(GamePath)\\MelonLoader\\Il2CppAssemblies\\Il2CppFishNet.Runtime.dll</HintPath>", StringComparison.Ordinal), "Generated IL2CPP configs should rewrite FishNet.Runtime hint paths without double-prefixing Il2Cpp.");
             Assert(!projectText.Contains("Il2CppIl2CppFishNet.Runtime.dll", StringComparison.Ordinal), "Generated IL2CPP configs should not double-prefix FishNet.Runtime hint paths.");
@@ -3437,14 +3442,18 @@ internal sealed class S1InteropFixtureTests
             "S1FuelMod verify-migration should not create or remove real local.build.props.");
     }
 
-    private void VerifyMigrationConvergesOnMonoOnlyS1FuelModCopy()
+    private void VerifyMigrationBuildGateConvertsMonoOnlyS1FuelModCopy()
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
         string sourceProject = Path.Combine(sourceDirectory, "S1FuelMod.csproj");
         string sourceFuelVehicleData = Path.Combine(sourceDirectory, "Systems", "FuelVehicleData.cs");
-        if (!File.Exists(sourceProject) || !File.Exists(sourceFuelVehicleData))
+        string il2CppRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoRoot = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppAssembly = Path.Combine(il2CppRoot, "MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll");
+        string monoAssembly = Path.Combine(monoRoot, "Schedule I_Data", "Managed", "Assembly-CSharp.dll");
+        if (!File.Exists(sourceProject) || !File.Exists(sourceFuelVehicleData) || !File.Exists(il2CppAssembly) || !File.Exists(monoAssembly))
         {
-            Console.WriteLine("Skipping S1FuelMod Mono-only migration integration because S1FuelMod is not available.");
+            Console.WriteLine("Skipping S1FuelMod Mono-only build-gated integration because local game roots are not available.");
             return;
         }
 
@@ -3470,15 +3479,26 @@ internal sealed class S1InteropFixtureTests
                 tempProject,
                 new MigrationVerifierOptions(
                     DualRuntime: true,
-                    IncludeSourceMigrations: true));
+                    Build: true,
+                    BuildTimeoutSeconds: 240,
+                    IncludeSourceMigrations: true,
+                    Il2CppGamePath: il2CppRoot,
+                    MonoGamePath: monoRoot));
 
             Assert(
                 result.Success,
-                $"Mono-only S1FuelMod copy should converge to a dual-runtime migration in a sandbox. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+                $"Mono-only S1FuelMod copy should migrate to dual runtime and build for both runtimes. Build output: {FormatBuildResults(result.BuildResults)} Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
             Assert(result.PlannedOperations > 0, "Mono-only S1FuelMod migration should plan sandbox operations.");
             Assert(result.AppliedOperations > 0, "Mono-only S1FuelMod migration should apply sandbox operations.");
-            Assert(result.SandboxDeleted, "S1FuelMod migration verification should delete its sandbox.");
+            Assert(result.SandboxDeleted, "S1FuelMod build-gated verification should delete its sandbox.");
             Assert(result.AfterDiagnostics.Count == 0, $"S1FuelMod migration should leave no analyzer diagnostics. Residual: {FormatDiagnostics(result.AfterDiagnostics)}");
+            Assert(result.BuildResults is not null && result.BuildResults.Count == 4, $"S1FuelMod should build-check four configurations. Build output: {FormatBuildResults(result.BuildResults)}");
+            IReadOnlyList<MigrationBuildResult> buildResults = result.BuildResults!;
+            Assert(buildResults.All(build => build.Success), $"Every S1FuelMod migrated build should pass. Build output: {FormatBuildResults(buildResults)}");
+            Assert(buildResults.Any(build => build.Configuration == "Debug Mono" && build.Runtime == RuntimeKind.Mono), "S1FuelMod build results should include Debug Mono.");
+            Assert(buildResults.Any(build => build.Configuration == "Release Mono" && build.Runtime == RuntimeKind.Mono), "S1FuelMod build results should include Release Mono.");
+            Assert(buildResults.Any(build => build.Configuration == "Debug Il2cpp" && build.Runtime == RuntimeKind.Il2Cpp), "S1FuelMod build results should include generated Debug Il2cpp.");
+            Assert(buildResults.Any(build => build.Configuration == "Release Il2cpp" && build.Runtime == RuntimeKind.Il2Cpp), "S1FuelMod build results should include generated Release Il2cpp.");
             Assert(
                 string.Equals(ComputeSha256(tempProject), monoOnlyProjectHash, StringComparison.Ordinal),
                 "verify-migration should not mutate the Mono-only S1FuelMod fixture project.");

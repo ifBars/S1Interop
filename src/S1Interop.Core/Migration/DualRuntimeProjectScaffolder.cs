@@ -386,18 +386,24 @@ public static class DualRuntimeProjectScaffolder
         AddReferenceIfMissing(itemGroup, "MelonLoader", @"$(MelonLoaderPath)\MelonLoader.dll");
         AddReferenceIfMissing(itemGroup, "0Harmony", @"$(MelonLoaderPath)\0Harmony.dll");
         AddReferenceIfMissing(itemGroup, "Il2CppInterop.Runtime", @"$(MelonLoaderPath)\Il2CppInterop.Runtime.dll");
+        AddReferenceIfMissing(itemGroup, "Il2Cppcom.rlabrecque.steamworks.net", @"$(ManagedPath)\Il2Cppcom.rlabrecque.steamworks.net.dll");
         AddReferenceIfMissing(itemGroup, "Newtonsoft.Json", @"$(MelonLoaderPath)\Newtonsoft.Json.dll");
         AddReferenceIfMissing(itemGroup, "Il2Cppmscorlib", @"$(ManagedPath)\Il2Cppmscorlib.dll");
         AddReferenceIfMissing(itemGroup, "Assembly-CSharp", @"$(ManagedPath)\Assembly-CSharp.dll");
         AddReferenceIfMissing(itemGroup, "Il2CppFishNet.Runtime", @"$(ManagedPath)\Il2CppFishNet.Runtime.dll");
+        AddReferenceIfMissing(itemGroup, "Il2CppScheduleOne.Core", @"$(ManagedPath)\Il2CppScheduleOne.Core.dll");
         AddReferenceIfMissing(itemGroup, "Il2CppNewtonsoft.Json", @"$(ManagedPath)\Il2CppNewtonsoft.Json.dll");
         AddReferenceIfMissing(itemGroup, "Unity.TextMeshPro", @"$(ManagedPath)\Unity.TextMeshPro.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.AudioModule", @"$(ManagedPath)\UnityEngine.AudioModule.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.CoreModule", @"$(ManagedPath)\UnityEngine.CoreModule.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.ImageConversionModule", @"$(ManagedPath)\UnityEngine.ImageConversionModule.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.InputLegacyModule", @"$(ManagedPath)\UnityEngine.InputLegacyModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.Physics2DModule", @"$(ManagedPath)\UnityEngine.Physics2DModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.PhysicsModule", @"$(ManagedPath)\UnityEngine.PhysicsModule.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.TextRenderingModule", @"$(ManagedPath)\UnityEngine.TextRenderingModule.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.UI", @"$(ManagedPath)\UnityEngine.UI.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.UIModule", @"$(ManagedPath)\UnityEngine.UIModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.VehiclesModule", @"$(ManagedPath)\UnityEngine.VehiclesModule.dll");
     }
 
     private static void AddReferenceIfMissing(XElement itemGroup, string include, string hintPath)
