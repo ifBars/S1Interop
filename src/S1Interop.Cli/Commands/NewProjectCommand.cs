@@ -23,8 +23,10 @@ internal static class NewProjectCommand
         string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
         string corePath = Path.Combine(targetDirectory, "ModCore.cs");
         string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+        string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
+        string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
         string readmePath = Path.Combine(targetDirectory, "README.md");
-        string[] plannedFiles = [projectPath, corePath, starterPath, readmePath];
+        string[] plannedFiles = [projectPath, corePath, starterPath, localPropsExamplePath, gitignorePath, readmePath];
 
         if (!command.Apply)
         {
@@ -37,6 +39,8 @@ internal static class NewProjectCommand
         File.WriteAllText(projectPath, GenerateProject(projectName), Encoding.UTF8);
         File.WriteAllText(corePath, GenerateCore(projectName), Encoding.UTF8);
         File.WriteAllText(starterPath, new BackendNeutralStarterGenerator().GenerateSource(), Encoding.UTF8);
+        File.WriteAllText(localPropsExamplePath, GenerateLocalPropsExample(), Encoding.UTF8);
+        File.WriteAllText(gitignorePath, GenerateGitignore(), Encoding.UTF8);
         File.WriteAllText(readmePath, GenerateReadme(projectName), Encoding.UTF8);
 
         if (command.Format == OutputFormat.Json)
@@ -88,6 +92,7 @@ internal static class NewProjectCommand
     private static string GenerateProject(string projectName) =>
         $"""
         <Project Sdk="Microsoft.NET.Sdk">
+          <Import Project="local.build.props" Condition="Exists('local.build.props')" />
 
           <PropertyGroup>
             <TargetFramework>netstandard2.1</TargetFramework>
@@ -96,23 +101,75 @@ internal static class NewProjectCommand
             <ImplicitUsings>enable</ImplicitUsings>
             <RootNamespace>{projectName}</RootNamespace>
             <AssemblyName>{projectName}</AssemblyName>
+            <Version>0.1.0</Version>
+            <GamePath Condition="'$(GamePath)'==''">$(MonoGamePath)</GamePath>
+            <ManagedPath Condition="'$(ManagedPath)'=='' and '$(GamePath)'!=''">$(GamePath)\Schedule I_Data\Managed</ManagedPath>
+            <MelonLoaderPath Condition="'$(MelonLoaderPath)'=='' and '$(GamePath)'!=''">$(GamePath)\MelonLoader\net35</MelonLoaderPath>
           </PropertyGroup>
 
           <ItemGroup>
             <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.1" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
           </ItemGroup>
 
+          <ItemGroup>
+            <Reference Include="MelonLoader">
+              <HintPath>$(MelonLoaderPath)\MelonLoader.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="0Harmony">
+              <HintPath>$(MelonLoaderPath)\0Harmony.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="UnityEngine.CoreModule">
+              <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+          </ItemGroup>
+
+          <Target Name="ValidateS1InteropLocalPaths" BeforeTargets="ResolveReferences">
+            <Error Text="Missing MelonLoader at $(MelonLoaderPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(MelonLoaderPath)'=='' or !Exists('$(MelonLoaderPath)\MelonLoader.dll')" />
+            <Error Text="Missing Unity assemblies at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\UnityEngine.CoreModule.dll')" />
+          </Target>
+
         </Project>
         """;
 
     private static string GenerateCore(string projectName) =>
         $$"""
+        using MelonLoader;
+
+        [assembly: MelonInfo(typeof({{projectName}}.ModCore), "{{projectName}}", "0.1.0", "YourName")]
+        [assembly: MelonGame("TVGS", "Schedule I")]
+
         namespace {{projectName}};
 
-        internal static class ModCore
+        public sealed class ModCore : MelonMod
         {
             public const string ModName = "{{projectName}}";
+
+            public override void OnInitializeMelon()
+            {
+                LoggerInstance.Msg($"{ModName} loaded.");
+            }
         }
+        """;
+
+    private static string GenerateLocalPropsExample() =>
+        """
+        <Project>
+          <PropertyGroup>
+            <!-- Local-only paths. Copy this file to local.build.props and keep that file out of source control. -->
+            <MonoGamePath>C:\Path\To\Schedule I_alternate</MonoGamePath>
+            <Il2CppGamePath>C:\Path\To\Schedule I_public</Il2CppGamePath>
+          </PropertyGroup>
+        </Project>
+        """;
+
+    private static string GenerateGitignore() =>
+        """
+        bin/
+        obj/
+        local.build.props
         """;
 
     private static string GenerateReadme(string projectName) =>
@@ -121,12 +178,17 @@ internal static class NewProjectCommand
 
         Backend-neutral Schedule One mod scaffold created by S1Interop.
 
+        Before building locally, copy `local.build.props.example` to `local.build.props` and set your own game paths.
+        `local.build.props` is ignored so machine-specific paths do not get committed.
+
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
 
         ```csharp
         [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
         [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
         ```
+
+        Use generated helpers from `S1Interop.Generated.S1InteropTypeRegistry` and `S1Interop.Generated.S1InteropMemberRegistry` when you want one assembly to resolve Mono or IL2CPP game types at runtime.
         """;
 
     private static string SanitizeIdentifier(string value)

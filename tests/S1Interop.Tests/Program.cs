@@ -1918,6 +1918,8 @@ internal sealed class S1InteropFixtureTests
             string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
             string corePath = Path.Combine(targetDirectory, "ModCore.cs");
             string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
+            string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
             string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
 
             ProcessResult dryRun = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory);
@@ -1934,25 +1936,61 @@ internal sealed class S1InteropFixtureTests
             Assert(File.Exists(projectPath), "s1interop new should create the project file.");
             Assert(File.Exists(corePath), "s1interop new should create the core source file.");
             Assert(File.Exists(starterPath), "s1interop new should create the backend-neutral starter file.");
+            Assert(File.Exists(localPropsExamplePath), "s1interop new should create a local build props example.");
+            Assert(File.Exists(gitignorePath), "s1interop new should create a gitignore for local machine paths and build output.");
 
             string projectSource = File.ReadAllText(projectPath);
             string coreSource = File.ReadAllText(corePath);
             string starterSource = File.ReadAllText(starterPath);
+            string localPropsExampleSource = File.ReadAllText(localPropsExamplePath);
+            string gitignoreSource = File.ReadAllText(gitignorePath);
             Assert(
                 projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
                 projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
                 projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
-                projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, enable C# 10, and install S1Interop.Generators privately.");
+                projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal) &&
+                projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"0Harmony\">", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal),
+                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and reference MelonLoader through local paths.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
+                coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
+                coreSource.Contains("public sealed class ModCore : MelonMod", StringComparison.Ordinal) &&
+                coreSource.Contains("public override void OnInitializeMelon()", StringComparison.Ordinal) &&
                 coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal),
-                "Generated core source should use a sanitized project namespace/name.");
+                "Generated core source should be a real MelonLoader mod entry point with a sanitized project namespace/name.");
             Assert(
                 starterSource.Contains("S1InteropGenerateUnityEventBridge", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
                 "Generated starter should seed backend-neutral generator attributes and examples.");
+            Assert(
+                localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
+                localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
+                gitignoreSource.Contains("local.build.props", StringComparison.Ordinal),
+                "Generated local path scaffolding should show both runtime game paths while keeping local.build.props ignored.");
+
+            string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+            string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+            if (File.Exists(monoMelonLoader))
+            {
+                string packageSource = Path.Combine(tempRoot, "NuGet");
+                Directory.CreateDirectory(packageSource);
+                string generatorProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Generators", "S1Interop.Generators.csproj");
+                ProcessResult pack = RunDotNet("pack", generatorProject, "-c", "Debug", "-o", packageSource, "--nologo", "-v:minimal");
+                Assert(pack.ExitCode == 0, $"Packing local S1Interop.Generators feed for new-project build should succeed. Output: {pack.Output}");
+
+                ProcessResult scaffoldBuild = RunDotNet(
+                    "build",
+                    projectPath,
+                    "--nologo",
+                    "-v:minimal",
+                    $"-p:MonoGamePath={monoGamePath}",
+                    $"-p:RestoreAdditionalProjectSources={packageSource}");
+                Assert(scaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local Mono game path. Output: {scaffoldBuild.Output}");
+            }
 
             ProcessResult secondApply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");
             Assert(secondApply.ExitCode == 2, $"s1interop new should refuse to overwrite a non-empty target. Output: {secondApply.Output}");
