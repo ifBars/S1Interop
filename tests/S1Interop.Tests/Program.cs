@@ -5940,6 +5940,7 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("TryConvertIl2CppGuid(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppList(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppDictionary(value, conversionType, out converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("TryGetDictionaryEntry(entry, out object? key, out object? entryValue)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppArray(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.List`1", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.Dictionary`2", StringComparison.Ordinal) &&
@@ -6299,15 +6300,15 @@ internal sealed class S1InteropFixtureTests
 
         MethodInfo? invokeSetScores = memberRegistryType.GetMethod("InvokeHudSetScores", [typeof(object), typeof(object[])]);
         Assert(invokeSetScores is not null, "Generated member registry should expose InvokeHudSetScores.");
-        var scores = new Dictionary<string, int>
+        var scores = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(new Dictionary<string, int>
         {
             ["north"] = 4,
             ["south"] = 8
-        };
+        });
         object? setScoresResult = invokeSetScores!.Invoke(null, [hud, new object?[] { scores }]);
         Assert(
             string.Equals(setScoresResult as string, "2:4:8", StringComparison.Ordinal),
-            $"Generated method invoker should convert managed dictionaries to fake IL2CPP dictionaries. Result={setScoresResult}");
+            $"Generated method invoker should convert managed read-only dictionaries to fake IL2CPP dictionaries. Result={setScoresResult}");
 
         Type objectBaseType = assembly.GetType("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", throwOnError: true)!;
         object proxy = Activator.CreateInstance(objectBaseType, [hud])!;
