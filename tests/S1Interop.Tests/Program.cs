@@ -5832,6 +5832,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Phone", "SetPacket", Alias = "SetPacket", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
             [assembly: S1Interop.S1InteropMember("Phone", "SetLabels", Alias = "SetLabels", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string[]" })]
             [assembly: S1Interop.S1InteropMember("Phone", "SetScores", Alias = "SetScores", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.Dictionary<string, int>" })]
+            [assembly: S1Interop.S1InteropMember("Phone", "SetTags", Alias = "SetTags", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.HashSet<string>" })]
 
             namespace SyntheticMod
             {
@@ -5939,10 +5940,12 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("public static bool TryConvertValue(object? value, System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppGuid(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppList(value, conversionType, out converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("TryConvertIl2CppHashSet(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppDictionary(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryGetDictionaryEntry(entry, out object? key, out object? entryValue)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppArray(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.List`1", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.HashSet`1", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.Dictionary`2", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1", StringComparison.Ordinal) &&
@@ -6010,6 +6013,9 @@ internal sealed class S1InteropFixtureTests
         Assert(
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetScoresMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetScoresName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.Dictionary<string, int>\", \"Il2CppSystem.Collections.Generic.Dictionary<string, int>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed dictionary parameter names to IL2CPP dictionary wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetTagsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetTagsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.HashSet<string>\", \"Il2CppSystem.Collections.Generic.HashSet<string>\") });", StringComparison.Ordinal),
+            $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
     private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()
@@ -6024,6 +6030,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "SetBytes", Alias = "HudSetBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetLabels", Alias = "HudSetLabels", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string[]" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetScores", Alias = "HudSetScores", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.Dictionary<string, int>" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetTags", Alias = "HudSetTags", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.HashSet<string>" })]
 
             namespace SyntheticMod
             {
@@ -6043,6 +6050,7 @@ internal sealed class S1InteropFixtureTests
                     public string? LastBytes { get; private set; }
                     public string? LastLabels { get; private set; }
                     public string? LastScores { get; private set; }
+                    public string? LastTags { get; private set; }
 
                     public string SetLevel(int level, ref string name)
                     {
@@ -6075,6 +6083,12 @@ internal sealed class S1InteropFixtureTests
                         LastScores = scores.Count + ":" + scores["north"] + ":" + scores["south"];
                         return LastScores;
                     }
+
+                    public string SetTags(Il2CppSystem.Collections.Generic.HashSet<string> tags)
+                    {
+                        LastTags = tags.Count + ":" + tags.Contains("north") + ":" + tags.Contains("south");
+                        return LastTags;
+                    }
                 }
             }
 
@@ -6104,6 +6118,17 @@ internal sealed class S1InteropFixtureTests
                         {
                             inner.Add(value);
                         }
+                    }
+
+                    public sealed class HashSet<T>
+                    {
+                        private readonly System.Collections.Generic.HashSet<T> inner = new System.Collections.Generic.HashSet<T>();
+
+                        public int Count => inner.Count;
+
+                        public bool Add(T value) => inner.Add(value);
+
+                        public bool Contains(T value) => inner.Contains(value);
                     }
 
                     public sealed class Dictionary<TKey, TValue> where TKey : notnull
@@ -6309,6 +6334,14 @@ internal sealed class S1InteropFixtureTests
         Assert(
             string.Equals(setScoresResult as string, "2:4:8", StringComparison.Ordinal),
             $"Generated method invoker should convert managed read-only dictionaries to fake IL2CPP dictionaries. Result={setScoresResult}");
+
+        MethodInfo? invokeSetTags = memberRegistryType.GetMethod("InvokeHudSetTags", [typeof(object), typeof(object[])]);
+        Assert(invokeSetTags is not null, "Generated member registry should expose InvokeHudSetTags.");
+        var tags = new HashSet<string> { "north", "south", "north" };
+        object? setTagsResult = invokeSetTags!.Invoke(null, [hud, new object?[] { tags }]);
+        Assert(
+            string.Equals(setTagsResult as string, "2:True:True", StringComparison.Ordinal),
+            $"Generated method invoker should convert managed hash sets to fake IL2CPP hash sets. Result={setTagsResult}");
 
         Type objectBaseType = assembly.GetType("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", throwOnError: true)!;
         object proxy = Activator.CreateInstance(objectBaseType, [hud])!;
