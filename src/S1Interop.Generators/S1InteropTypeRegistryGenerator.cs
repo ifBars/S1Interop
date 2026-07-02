@@ -858,6 +858,11 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                    return true;");
         builder.AppendLine("                }");
         builder.AppendLine();
+        builder.AppendLine("                if (TryConvertIl2CppDictionary(value, conversionType, out converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
         builder.AppendLine("                if (TryConvertIl2CppArray(value, conversionType, out converted))");
         builder.AppendLine("                {");
         builder.AppendLine("                    return true;");
@@ -956,6 +961,60 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                }");
         builder.AppendLine();
         builder.AppendLine("                converted = list;");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = null;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryConvertIl2CppDictionary(object value, System.Type targetType, out object? converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            converted = null;");
+        builder.AppendLine("            if (targetType.FullName is null || !targetType.FullName.StartsWith(\"Il2CppSystem.Collections.Generic.Dictionary`2\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (value is not System.Collections.IDictionary dictionary)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type[] genericArguments = targetType.GetGenericArguments();");
+        builder.AppendLine("            if (genericArguments.Length != 2)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.MethodInfo? addMethod = targetType.GetMethod(\"Add\", new[] { genericArguments[0], genericArguments[1] });");
+        builder.AppendLine("            if (addMethod is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                object? il2CppDictionary = System.Activator.CreateInstance(targetType);");
+        builder.AppendLine("                if (il2CppDictionary is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                foreach (System.Collections.DictionaryEntry entry in dictionary)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (!TryConvertValue(entry.Key, genericArguments[0], out object? convertedKey) ||");
+        builder.AppendLine("                        !TryConvertValue(entry.Value, genericArguments[1], out object? convertedValue))");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        return false;");
+        builder.AppendLine("                    }");
+        builder.AppendLine();
+        builder.AppendLine("                    addMethod.Invoke(il2CppDictionary, new object?[] { convertedKey, convertedValue });");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                converted = il2CppDictionary;");
         builder.AppendLine("                return true;");
         builder.AppendLine("            }");
         builder.AppendLine("            catch");
@@ -1216,6 +1275,11 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                return genericListType;");
         builder.AppendLine("            }");
         builder.AppendLine();
+        builder.AppendLine("            if (TryResolveGenericDictionaryType(typeName, out System.Type? genericDictionaryType))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return genericDictionaryType;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
         builder.AppendLine("            switch (typeName)");
         builder.AppendLine("            {");
         builder.AppendLine("                case \"System.Guid\": return typeof(System.Guid);");
@@ -1279,6 +1343,73 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("            resolvedType = genericDefinition.MakeGenericType(genericElementType);");
         builder.AppendLine("            return true;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryResolveGenericDictionaryType(string typeName, out System.Type? resolvedType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            resolvedType = null;");
+        builder.AppendLine("            const string monoPrefix = \"System.Collections.Generic.Dictionary<\";");
+        builder.AppendLine("            const string il2CppPrefix = \"Il2CppSystem.Collections.Generic.Dictionary<\";");
+        builder.AppendLine("            string genericDefinitionName;");
+        builder.AppendLine("            string argumentsText;");
+        builder.AppendLine("            if (typeName.StartsWith(monoPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"System.Collections.Generic.Dictionary`2\";");
+        builder.AppendLine("                argumentsText = typeName.Substring(monoPrefix.Length, typeName.Length - monoPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else if (typeName.StartsWith(il2CppPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"Il2CppSystem.Collections.Generic.Dictionary`2\";");
+        builder.AppendLine("                argumentsText = typeName.Substring(il2CppPrefix.Length, typeName.Length - il2CppPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            string[] genericArguments = SplitGenericArguments(argumentsText);");
+        builder.AppendLine("            if (genericArguments.Length != 2)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type? genericDefinition = S1InteropTypeRegistry.Resolve(genericDefinitionName);");
+        builder.AppendLine("            System.Type? keyType = ResolveKnownType(genericArguments[0]);");
+        builder.AppendLine("            System.Type? valueType = ResolveKnownType(genericArguments[1]);");
+        builder.AppendLine("            if (genericDefinition is null || keyType is null || valueType is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            resolvedType = genericDefinition.MakeGenericType(keyType, valueType);");
+        builder.AppendLine("            return true;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static string[] SplitGenericArguments(string argumentsText)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Collections.Generic.List<string> arguments = new System.Collections.Generic.List<string>();");
+        builder.AppendLine("            int depth = 0;");
+        builder.AppendLine("            int start = 0;");
+        builder.AppendLine("            for (int index = 0; index < argumentsText.Length; index++)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                char character = argumentsText[index];");
+        builder.AppendLine("                if (character == '<')");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    depth++;");
+        builder.AppendLine("                }");
+        builder.AppendLine("                else if (character == '>')");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    depth--;");
+        builder.AppendLine("                }");
+        builder.AppendLine("                else if (character == ',' && depth == 0)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    arguments.Add(argumentsText.Substring(start, index - start).Trim());");
+        builder.AppendLine("                    start = index + 1;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            arguments.Add(argumentsText.Substring(start).Trim());");
+        builder.AppendLine("            return arguments.ToArray();");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static bool TryResolveGenericListType(string typeName, out System.Type? resolvedType)");
@@ -1609,6 +1740,18 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             return $"Il2CppSystem.Collections.Generic.List<{ToIl2CppTypeName(elementTypeName)}>";
         }
 
+        const string dictionaryPrefix = "System.Collections.Generic.Dictionary<";
+        if (monoTypeName.StartsWith(dictionaryPrefix, StringComparison.Ordinal) &&
+            monoTypeName.EndsWith(">", StringComparison.Ordinal))
+        {
+            string argumentsText = monoTypeName.Substring(dictionaryPrefix.Length, monoTypeName.Length - dictionaryPrefix.Length - 1);
+            string[] arguments = SplitTopLevelGenericArguments(argumentsText);
+            if (arguments.Length == 2)
+            {
+                return $"Il2CppSystem.Collections.Generic.Dictionary<{ToIl2CppTypeName(arguments[0])}, {ToIl2CppTypeName(arguments[1])}>";
+            }
+        }
+
         if (monoTypeName.EndsWith("[]", StringComparison.Ordinal))
         {
             string elementTypeName = monoTypeName.Substring(0, monoTypeName.Length - 2);
@@ -1628,6 +1771,33 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
     private static bool IsKnownValueTypeName(string typeName) =>
         typeName is "bool" or "byte" or "char" or "double" or "float" or "int" or "long" or "short" or "uint" or "ulong" or "System.Guid" or "Guid";
+
+    private static string[] SplitTopLevelGenericArguments(string argumentsText)
+    {
+        var arguments = new List<string>();
+        int depth = 0;
+        int start = 0;
+        for (int index = 0; index < argumentsText.Length; index++)
+        {
+            char character = argumentsText[index];
+            if (character == '<')
+            {
+                depth++;
+            }
+            else if (character == '>')
+            {
+                depth--;
+            }
+            else if (character == ',' && depth == 0)
+            {
+                arguments.Add(argumentsText.Substring(start, index - start).Trim());
+                start = index + 1;
+            }
+        }
+
+        arguments.Add(argumentsText.Substring(start).Trim());
+        return arguments.ToArray();
+    }
 
     private static string GetSimpleName(string typeName)
     {
