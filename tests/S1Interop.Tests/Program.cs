@@ -3448,8 +3448,22 @@ internal sealed class S1InteropFixtureTests
             string copiedProject = Path.Combine(sourceCopy, "S1FuelMod.csproj");
             WorkspaceAnalysis workspace = analyzer.Analyze(copiedProject);
             SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(workspace.Projects.Single());
-            SdkTypeAlias[] aliases = facadePlan.TypeAliases.Take(16).ToArray();
+            SdkTypeAlias[] aliases = facadePlan.TypeAliases
+                .Take(16)
+                .Append(new SdkTypeAlias("LandVehicle", "ScheduleOne.Vehicles.LandVehicle", "Il2CppScheduleOne.Vehicles.LandVehicle", GenerateGlobalUsing: false))
+                .GroupBy(alias => alias.Alias, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToArray();
             Assert(aliases.Length > 0, "Copied S1FuelMod should expose facade aliases for fresh backend-neutral scaffold validation.");
+            var memberDeclarations = new[]
+            {
+                new S1InteropMemberDeclaration(
+                    "LandVehicle",
+                    "vehicleName",
+                    "S1FuelVehicleName",
+                    "S1Interop.S1InteropMemberKind.FieldOrProperty",
+                    IsStatic: false),
+            };
 
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshS1FuelFacadeMod");
             string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
@@ -3458,8 +3472,9 @@ internal sealed class S1InteropFixtureTests
 
             string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshS1FuelFacadeMod.csproj");
             string starterPath = Path.Combine(scaffoldDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
-            File.WriteAllText(starterPath, BuildBackendNeutralRegistrySource(aliases));
+            File.WriteAllText(starterPath, BuildBackendNeutralRegistrySource(aliases, memberDeclarations));
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+            string packageCache = Path.Combine(tempRoot, "NuGetPackages");
 
             ProcessResult monoBuild = RunDotNet(
                 "build",
@@ -3467,6 +3482,7 @@ internal sealed class S1InteropFixtureTests
                 "--nologo",
                 "-v:minimal",
                 $"-p:MonoGamePath={monoGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
             Assert(monoBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real S1FuelMod aliases should build against Mono references. Output: {monoBuild.Output}");
 
@@ -3477,6 +3493,7 @@ internal sealed class S1InteropFixtureTests
                 "-v:minimal",
                 "-p:S1InteropReferenceRuntime=Il2Cpp",
                 $"-p:Il2CppGamePath={il2CppGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
             Assert(il2CppBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real S1FuelMod aliases should build against IL2CPP references without source changes. Output: {il2CppBuild.Output}");
 
@@ -3485,6 +3502,11 @@ internal sealed class S1InteropFixtureTests
                 aliases.All(alias =>
                     starterSource.Contains($"[assembly: S1Interop.S1InteropType(\"{EscapeCSharpString(alias.MonoType)}\", Alias = \"{EscapeCSharpString(alias.Alias)}\", Il2CppTypeName = \"{EscapeCSharpString(alias.Il2CppType)}\")]", StringComparison.Ordinal)),
                 "Fresh backend-neutral scaffold should use real copied S1FuelMod aliases as assembly-level runtime-resolved declarations.");
+            Assert(
+                starterSource.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"S1FuelVehicleName\")]", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetS1FuelVehicleName(vehicle)", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(vehicle, \"vehicleName\")", StringComparison.Ordinal),
+                "Fresh backend-neutral scaffold should compile declared and dynamic generated member-cache helpers from real copied S1FuelMod reflection usage.");
         }
         finally
         {
@@ -7697,12 +7719,32 @@ internal sealed class S1InteropFixtureTests
             .ToArray();
     }
 
-    private static string BuildBackendNeutralRegistrySource(IEnumerable<SdkTypeAlias> aliases)
+    private static string BuildBackendNeutralRegistrySource(
+        IEnumerable<SdkTypeAlias> aliases,
+        IEnumerable<S1InteropMemberDeclaration>? members = null)
     {
         var builder = new StringBuilder();
-        foreach (SdkTypeAlias alias in aliases)
+        SdkTypeAlias[] aliasDeclarations = aliases.ToArray();
+        foreach (SdkTypeAlias alias in aliasDeclarations)
         {
             builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{EscapeCSharpString(alias.MonoType)}\", Alias = \"{EscapeCSharpString(alias.Alias)}\", Il2CppTypeName = \"{EscapeCSharpString(alias.Il2CppType)}\")]");
+        }
+
+        S1InteropMemberDeclaration[] memberDeclarations = members?.ToArray() ?? Array.Empty<S1InteropMemberDeclaration>();
+        foreach (S1InteropMemberDeclaration member in memberDeclarations)
+        {
+            builder.Append($"[assembly: S1Interop.S1InteropMember(\"{EscapeCSharpString(member.OwnerAlias)}\", \"{EscapeCSharpString(member.MemberName)}\", Alias = \"{EscapeCSharpString(member.Alias)}\"");
+            if (!string.Equals(member.Kind, "S1Interop.S1InteropMemberKind.FieldOrProperty", StringComparison.Ordinal))
+            {
+                builder.Append($", Kind = {member.Kind}");
+            }
+
+            if (member.IsStatic)
+            {
+                builder.Append(", IsStatic = true");
+            }
+
+            builder.AppendLine(")]");
         }
 
         builder.AppendLine();
@@ -7710,10 +7752,37 @@ internal sealed class S1InteropFixtureTests
         builder.AppendLine("{");
         builder.AppendLine("    internal static class BackendNeutralRegistryProbe");
         builder.AppendLine("    {");
+        if (aliasDeclarations.Length > 0)
+        {
+            SdkTypeAlias alias = aliasDeclarations[0];
+            builder.AppendLine($"        public static object? Read{alias.Alias}Dynamically(object instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{alias.Alias}(instance, memberName);");
+        }
+
+        foreach (S1InteropMemberDeclaration member in memberDeclarations)
+        {
+            if (member.IsStatic)
+            {
+                builder.AppendLine($"        public static object? Read{member.Alias}() => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}();");
+            }
+            else
+            {
+                string parameterName = member.OwnerAlias.Equals("LandVehicle", StringComparison.Ordinal) ? "vehicle" : "instance";
+                builder.AppendLine($"        public static object? Read{member.Alias}(object {parameterName}) => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}({parameterName});");
+                builder.AppendLine($"        public static object? Read{member.Alias}Dynamically(object {parameterName}) => S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue({parameterName}, \"{EscapeCSharpString(member.MemberName)}\");");
+            }
+        }
+
         builder.AppendLine("    }");
         builder.AppendLine("}");
         return builder.ToString();
     }
+
+    private sealed record S1InteropMemberDeclaration(
+        string OwnerAlias,
+        string MemberName,
+        string Alias,
+        string Kind,
+        bool IsStatic);
 
     private static string EscapeCSharpString(string value) =>
         value.Replace("\\", "\\\\").Replace("\"", "\\\"");
