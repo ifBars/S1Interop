@@ -5961,10 +5961,12 @@ internal sealed class S1InteropFixtureTests
             runtimeGenerated.Contains("public static object? GetPlayerCameraStatic(string memberName) => S1InteropMemberRegistry.GetValue(PlayerCameraName, memberName, null);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool TrySetPlayerCameraStatic(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue(PlayerCameraName, memberName, null, value);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCameraStatic(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke(PlayerCameraName, methodName, parameterTypeNames: null, null, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? InvokePlayerCameraStatic(string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.Invoke(PlayerCameraName, methodName, parameterTypeNames, null, args);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsPlayerCamera(object? instance) => IsInstance(instance, PlayerCameraName);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? GetPlayerCamera(object? instance, string memberName) => S1InteropMemberRegistry.GetInstanceValue(instance, memberName);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool TrySetPlayerCamera(object? instance, string memberName, object? value) => S1InteropMemberRegistry.TrySetInstanceValue(instance, memberName, value);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? InvokePlayerCamera(object? instance, string methodName, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? InvokePlayerCamera(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, parameterTypeNames, args);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? Create(string runtimeTypeName, params object?[] args)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsInstance(object? instance, string runtimeTypeName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("constructor.Invoke(converted)", StringComparison.Ordinal),
@@ -6124,10 +6126,12 @@ internal sealed class S1InteropFixtureTests
         MethodInfo? getHud = typeRegistryType.GetMethod("GetHud", [typeof(object), typeof(string)]);
         MethodInfo? trySetHud = typeRegistryType.GetMethod("TrySetHud", [typeof(object), typeof(string), typeof(object)]);
         MethodInfo? invokeHud = typeRegistryType.GetMethod("InvokeHud", [typeof(object), typeof(string), typeof(object[])]);
+        MethodInfo? invokeHudOverload = typeRegistryType.GetMethod("InvokeHud", [typeof(object), typeof(string), typeof(string[]), typeof(object[])]);
         Assert(isHud is not null, "Generated type registry should expose an alias-level IsHud helper.");
         Assert(getHud is not null, "Generated type registry should expose an alias-level GetHud helper.");
         Assert(trySetHud is not null, "Generated type registry should expose an alias-level TrySetHud helper.");
         Assert(invokeHud is not null, "Generated type registry should expose an alias-level InvokeHud helper.");
+        Assert(invokeHudOverload is not null, "Generated type registry should expose an overload-specific alias-level InvokeHud helper.");
         Assert(isHud!.Invoke(null, [hud]) is true, "Generated alias-level type checker should recognize the fake Il2Cpp HUD instance.");
         Assert(getHud!.Invoke(null, [hud, "Scale"]) is 0, "Generated alias-level instance getter should route through the member registry.");
         Assert(trySetHud!.Invoke(null, [hud, "Scale", "18"]) is true, "Generated alias-level instance setter should convert and write values.");
@@ -6135,6 +6139,9 @@ internal sealed class S1InteropFixtureTests
         object?[] facadeArgs = ["21", "facade"];
         Assert(string.Equals(invokeHud!.Invoke(null, [hud, "SetLevel", facadeArgs]) as string, "done", StringComparison.Ordinal), "Generated alias-level method invoker should route through the member registry.");
         Assert(facadeArgs[1] is "il2cpp:facade", "Generated alias-level method invoker should preserve by-ref copy-back behavior.");
+        object?[] facadeOverloadArgs = ["22", "facade-overload"];
+        Assert(string.Equals(invokeHudOverload!.Invoke(null, [hud, "SetLevel", new[] { "int", "string&" }, facadeOverloadArgs]) as string, "done", StringComparison.Ordinal), "Generated alias-level overload invoker should route through cached parameter-specific member lookup.");
+        Assert(facadeOverloadArgs[1] is "il2cpp:facade-overload", "Generated alias-level overload invoker should preserve by-ref copy-back behavior.");
 
         MethodInfo? trySetScale = memberRegistryType.GetMethod("TrySetHudScale", [typeof(object), typeof(object)]);
         Assert(trySetScale is not null, "Generated member registry should expose TrySetHudScale.");
