@@ -14,6 +14,19 @@ namespace S1Interop.Generators;
 [Generator]
 public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 {
+    private static readonly string[] DefaultIl2CppRuntimeProbeTypeNames =
+    [
+        "Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase",
+        "Il2CppSystem.Object",
+        "Il2CppScheduleOne.GameManager"
+    ];
+
+    private static readonly string[] DefaultMonoRuntimeProbeTypeNames =
+    [
+        "ScheduleOne.GameManager",
+        "ScheduleOne.PlayerScripts.PlayerCamera"
+    ];
+
     private const string AttributeMetadataName = "S1Interop.S1InteropTypeAttribute";
     private const string MemberAttributeMetadataName = "S1Interop.S1InteropMemberAttribute";
     private const string UnityEventBridgeAttributeMetadataName = "S1Interop.S1InteropGenerateUnityEventBridgeAttribute";
@@ -308,6 +321,22 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             foreach (S1InteropTypeEntry entry in entries.OrderBy(entry => entry.Alias, StringComparer.Ordinal))
             {
                 builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(entry.MonoTypeName)}\") is not null)");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Mono;");
+                builder.AppendLine("            }");
+            }
+
+            foreach (string typeName in DefaultIl2CppRuntimeProbeTypeNames)
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(typeName)}\") is not null)");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Il2Cpp;");
+                builder.AppendLine("            }");
+            }
+
+            foreach (string typeName in DefaultMonoRuntimeProbeTypeNames)
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(typeName)}\") is not null)");
                 builder.AppendLine("            {");
                 builder.AppendLine("                return S1InteropRuntimeBackend.Mono;");
                 builder.AppendLine("            }");

@@ -177,6 +177,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
+        BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases();
+        count++;
         BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes();
         count++;
         S1InteropGeneratorProducesCompileTimeEventBridges();
@@ -6218,6 +6220,62 @@ internal sealed class S1InteropFixtureTests
         Assert(
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetTagsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetTagsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.HashSet<string>\", \"Il2CppSystem.Collections.Generic.HashSet<string>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
+    }
+
+    private void BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases()
+    {
+        const string il2CppSource =
+            """
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+
+            namespace Il2CppInterop.Runtime.InteropTypes
+            {
+                public class Il2CppObjectBase
+                {
+                }
+            }
+            """;
+        const string monoSource =
+            """
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+            """;
+
+        string generated = RunTypeRegistryGenerator(il2CppSource);
+        Assert(
+            generated.Contains("S1InteropTypeRegistry.Resolve(\"Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase\")", StringComparison.Ordinal) &&
+            generated.Contains("S1InteropTypeRegistry.Resolve(\"ScheduleOne.GameManager\")", StringComparison.Ordinal),
+            $"Backend-neutral runtime detection should emit default backend probes even when a new mod has no registered type aliases. Generated source:{Environment.NewLine}{generated}");
+
+        System.Reflection.Assembly monoAssembly = CompileAndLoadS1InteropGeneratedAssembly(monoSource);
+        Type monoRuntimeType = monoAssembly.GetType("S1Interop.Generated.S1InteropRuntime", throwOnError: true)!;
+        object? monoBackend = monoRuntimeType.GetProperty("Backend")?.GetValue(null);
+        object? isMono = monoRuntimeType.GetProperty("IsMono")?.GetValue(null);
+        Assert(string.Equals(monoBackend?.ToString(), "Mono", StringComparison.Ordinal), $"Backend-neutral runtime detection should select Mono from the default ScheduleOne marker. Backend={monoBackend}");
+        Assert(isMono is true, "Backend-neutral runtime IsMono should be true when the default Mono marker is loadable.");
+
+        System.Reflection.Assembly il2CppAssembly = CompileAndLoadS1InteropGeneratedAssembly(il2CppSource);
+        Type il2CppRuntimeType = il2CppAssembly.GetType("S1Interop.Generated.S1InteropRuntime", throwOnError: true)!;
+        object? il2CppBackend = il2CppRuntimeType.GetProperty("Backend")?.GetValue(null);
+        object? isIl2Cpp = il2CppRuntimeType.GetProperty("IsIl2Cpp")?.GetValue(null);
+        Assert(string.Equals(il2CppBackend?.ToString(), "Il2Cpp", StringComparison.Ordinal), $"Backend-neutral runtime detection should select Il2Cpp from the default Il2CppInterop marker. Backend={il2CppBackend}");
+        Assert(isIl2Cpp is true, "Backend-neutral runtime IsIl2Cpp should be true when the default Il2Cpp marker is loadable.");
     }
 
     private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()
