@@ -182,6 +182,8 @@ public static class DualRuntimeProjectScaffolder
             document.Root!.AddFirst(propertyGroup);
         }
 
+        AddPropertyIfMissing(propertyGroup, "Il2CppGamePath", "$(S1CPPDir)", "'$(Il2CppGamePath)' == '' and '$(S1CPPDir)' != ''");
+        AddPropertyIfMissing(propertyGroup, "MonoGamePath", "$(S1MonoDir)", "'$(MonoGamePath)' == '' and '$(S1MonoDir)' != ''");
         AddPropertyIfMissing(propertyGroup, "Il2CppClientGamePath", "$(Il2CppGamePath)", "'$(Il2CppClientGamePath)' == ''");
         AddPropertyIfMissing(propertyGroup, "Il2CppServerGamePath", "$(Il2CppGamePath)", "'$(Il2CppServerGamePath)' == ''");
     }
@@ -257,7 +259,9 @@ public static class DualRuntimeProjectScaffolder
     {
         XElement[] sourceGroups = document.Root!.Elements()
             .Where(IsNamed("ItemGroup"))
-            .Where(group => ConditionMentionsConfiguration(group.Attribute("Condition")?.Value, monoConfiguration))
+            .Where(group => ConditionMentionsConfiguration(group.Attribute("Condition")?.Value, monoConfiguration) ||
+                            ConditionMentionsMonoRuntime(group.Attribute("Condition")?.Value))
+            .Where(group => group.Elements().Any(IsNamed("Reference")))
             .ToArray();
 
         foreach (XElement sourceGroup in sourceGroups)
@@ -319,6 +323,11 @@ public static class DualRuntimeProjectScaffolder
             return "Il2CppFishNet.Runtime";
         }
 
+        if (include.Equals("Newtonsoft.Json", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Il2CppNewtonsoft.Json";
+        }
+
         if (include.Equals("com.rlabrecque.steamworks.net", StringComparison.OrdinalIgnoreCase))
         {
             return "Il2Cppcom.rlabrecque.steamworks.net";
@@ -363,6 +372,12 @@ public static class DualRuntimeProjectScaffolder
             rewritten = rewritten.Replace("FishNet.Runtime.dll", "Il2CppFishNet.Runtime.dll", StringComparison.OrdinalIgnoreCase);
         }
 
+        if (originalInclude.Equals("Newtonsoft.Json", StringComparison.OrdinalIgnoreCase) &&
+            !rewritten.Contains("Il2CppNewtonsoft.Json.dll", StringComparison.OrdinalIgnoreCase))
+        {
+            rewritten = rewritten.Replace("Newtonsoft.Json.dll", "Il2CppNewtonsoft.Json.dll", StringComparison.OrdinalIgnoreCase);
+        }
+
         return rewritten;
     }
 
@@ -371,9 +386,18 @@ public static class DualRuntimeProjectScaffolder
         AddReferenceIfMissing(itemGroup, "MelonLoader", @"$(MelonLoaderPath)\MelonLoader.dll");
         AddReferenceIfMissing(itemGroup, "0Harmony", @"$(MelonLoaderPath)\0Harmony.dll");
         AddReferenceIfMissing(itemGroup, "Il2CppInterop.Runtime", @"$(MelonLoaderPath)\Il2CppInterop.Runtime.dll");
+        AddReferenceIfMissing(itemGroup, "Newtonsoft.Json", @"$(MelonLoaderPath)\Newtonsoft.Json.dll");
         AddReferenceIfMissing(itemGroup, "Il2Cppmscorlib", @"$(ManagedPath)\Il2Cppmscorlib.dll");
         AddReferenceIfMissing(itemGroup, "Assembly-CSharp", @"$(ManagedPath)\Assembly-CSharp.dll");
+        AddReferenceIfMissing(itemGroup, "Il2CppFishNet.Runtime", @"$(ManagedPath)\Il2CppFishNet.Runtime.dll");
+        AddReferenceIfMissing(itemGroup, "Il2CppNewtonsoft.Json", @"$(ManagedPath)\Il2CppNewtonsoft.Json.dll");
+        AddReferenceIfMissing(itemGroup, "Unity.TextMeshPro", @"$(ManagedPath)\Unity.TextMeshPro.dll");
         AddReferenceIfMissing(itemGroup, "UnityEngine.CoreModule", @"$(ManagedPath)\UnityEngine.CoreModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.ImageConversionModule", @"$(ManagedPath)\UnityEngine.ImageConversionModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.InputLegacyModule", @"$(ManagedPath)\UnityEngine.InputLegacyModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.TextRenderingModule", @"$(ManagedPath)\UnityEngine.TextRenderingModule.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.UI", @"$(ManagedPath)\UnityEngine.UI.dll");
+        AddReferenceIfMissing(itemGroup, "UnityEngine.UIModule", @"$(ManagedPath)\UnityEngine.UIModule.dll");
     }
 
     private static void AddReferenceIfMissing(XElement itemGroup, string include, string hintPath)
@@ -527,6 +551,10 @@ public static class DualRuntimeProjectScaffolder
         return ConfigurationConditionRegex.Matches(condition).Any(match =>
             string.Equals(match.Groups["name"].Value, configuration, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool ConditionMentionsMonoRuntime(string? condition) =>
+        !string.IsNullOrWhiteSpace(condition) &&
+        condition.Contains("IsMono", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> SplitMsBuildList(string? value) =>
         string.IsNullOrWhiteSpace(value)

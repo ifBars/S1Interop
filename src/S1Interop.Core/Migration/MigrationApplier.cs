@@ -92,6 +92,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("rewrite_member_access_fallbacks", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_direct_member_reflection_lookups", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_player_camera_close_interface", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("injected_type_missing_registertype", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("install_build_validation_hook", StringComparison.OrdinalIgnoreCase);
@@ -113,9 +114,11 @@ public sealed class MigrationApplier
                 "missing_il2cppinterop_reference" => ApplyMissingIl2CppInteropReference(document, operation.Configuration),
                 "missing_runtime_define" => ApplyMissingRuntimeDefine(document, operation),
                 "add_il2cpp_configuration" => ApplyDualRuntimeScaffold(projectPath, document, operation, backupRoot, fileChanges),
+                "condition_imported_mono_runtime_flags" => ApplyImportedMonoRuntimeFlagConditioning(projectPath, document, backupRoot, fileChanges),
                 "install_s1interop_generator_package" => ApplyS1InteropGeneratorPackageReference(document),
                 "conditionalize_scheduleone_usings" => ApplyScheduleOneUsingConditionalization(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_fully_qualified_scheduleone_types" => ApplyFullyQualifiedScheduleOneTypeRewrite(projectPath, operation.FilePath, backupRoot, fileChanges),
+                "injected_type_missing_registertype" => ApplyInjectedTypeRegistration(operation, backupRoot, fileChanges),
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
                 "injected_member_requires_hidefromil2cpp" => ApplyHideFromIl2CppAttribute(operation, backupRoot, fileChanges),
                 "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
@@ -158,8 +161,134 @@ public sealed class MigrationApplier
     {
         bool projectChanged = DualRuntimeProjectScaffolder.Apply(document, GetMonoConfigurationsFromEvidence(operation.Evidence));
         EnsureDualRuntimeLocalProps(projectPath, backupRoot, fileChanges);
+        ConditionImportedMonoRuntimeFlags(projectPath, document, backupRoot, fileChanges);
         ApplySolutionConfigurationScaffold(projectPath, document, backupRoot, fileChanges);
         return projectChanged;
+    }
+
+    private static bool ApplyImportedMonoRuntimeFlagConditioning(
+        string projectPath,
+        XDocument document,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        int before = fileChanges.Count(change => change.FilePath.EndsWith("conditions.props", StringComparison.OrdinalIgnoreCase));
+        bool projectChanged = ConditionMonoReferenceImports(document);
+        ConditionImportedMonoRuntimeFlags(projectPath, document, backupRoot, fileChanges);
+        int after = fileChanges.Count(change => change.FilePath.EndsWith("conditions.props", StringComparison.OrdinalIgnoreCase));
+        return projectChanged || after > before;
+    }
+
+    private static bool ConditionMonoReferenceImports(XDocument document)
+    {
+        bool changed = false;
+        string monoCondition = BuildNonIl2CppConfigurationCondition(document);
+        foreach (XElement import in document.Root!.Elements().Where(IsNamed("Import")))
+        {
+            string project = import.Attribute("Project")?.Value ?? string.Empty;
+            if (!project.Contains("Mono", StringComparison.OrdinalIgnoreCase) ||
+                project.Contains("$(", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            XAttribute? condition = import.Attribute("Condition");
+            if (condition is null)
+            {
+                import.SetAttributeValue("Condition", monoCondition);
+                changed = true;
+                continue;
+            }
+
+            if (condition.Value.Contains("S1InteropTargetRuntime", StringComparison.OrdinalIgnoreCase))
+            {
+                condition.Value = monoCondition;
+                changed = true;
+            }
+            else if (!condition.Value.Contains("Il2cpp", StringComparison.OrdinalIgnoreCase))
+            {
+                condition.Value = $"({condition.Value}) and {monoCondition}";
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static string BuildNonIl2CppConfigurationCondition(XDocument document)
+    {
+        string[] il2CppConfigurations = document.Descendants()
+            .Where(IsNamed("Configurations"))
+            .SelectMany(element => SplitMsBuildList(element.Value))
+            .Where(IsIl2CppConfiguration)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return il2CppConfigurations.Length == 0
+            ? "'$(S1InteropTargetRuntime)' != 'Il2Cpp'"
+            : string.Join(" and ", il2CppConfigurations.Select(configuration => $"'$(Configuration)' != '{configuration}'"));
+    }
+
+    private static void ConditionImportedMonoRuntimeFlags(
+        string projectPath,
+        XDocument projectDocument,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        string projectDirectory = Path.GetDirectoryName(projectPath)!;
+        foreach (XElement import in projectDocument.Root!.Elements().Where(IsNamed("Import")))
+        {
+            string? importProject = import.Attribute("Project")?.Value;
+            if (string.IsNullOrWhiteSpace(importProject) ||
+                importProject.Contains("$(", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string importedPath = Path.GetFullPath(Path.Combine(projectDirectory, importProject));
+            if (!importedPath.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(importedPath))
+            {
+                continue;
+            }
+
+            XDocument importedDocument;
+            try
+            {
+                importedDocument = XDocument.Load(importedPath, LoadOptions.PreserveWhitespace);
+            }
+            catch
+            {
+                continue;
+            }
+
+            bool changed = false;
+            string monoRuntimeCondition = BuildNonIl2CppConfigurationCondition(projectDocument);
+            foreach (XElement isMono in importedDocument.Descendants().Where(IsNamed("IsMono")))
+            {
+                if (!isMono.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                XAttribute? condition = isMono.Attribute("Condition");
+                if (condition is null ||
+                    condition.Value.Contains("S1InteropTargetRuntime", StringComparison.OrdinalIgnoreCase))
+                {
+                    isMono.SetAttributeValue("Condition", monoRuntimeCondition);
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                continue;
+            }
+
+            TrackFile(importedPath, backupRoot, fileChanges);
+            importedDocument.Save(importedPath);
+            UpdateTrackedFileHash(importedPath, fileChanges);
+        }
     }
 
     private static IReadOnlyList<string>? GetMonoConfigurationsFromEvidence(string? evidence)
@@ -196,6 +325,9 @@ public sealed class MigrationApplier
             "rewrite_member_access_fallbacks" => 20,
             "rewrite_direct_member_reflection_lookups" => 20,
             "rewrite_player_camera_close_interface" => 20,
+            "injected_type_missing_registertype" => 20,
+            "injected_type_missing_intptr_constructor" => 21,
+            "injected_member_requires_hidefromil2cpp" => 22,
             _ => 0
         };
 
@@ -1535,7 +1667,7 @@ public sealed class MigrationApplier
         int classLine = FindTargetClassLine(lines, target);
         if (classLine < 0 ||
             !TryReadClassDeclaration(lines[classLine], out string classIndent, out string baseType) ||
-            !IsMonoBehaviourBase(baseType) ||
+            !IsIl2CppInjectedBase(baseType) ||
             HasIntPtrConstructor(lines, classLine, target.TypeName))
         {
             return false;
@@ -1553,6 +1685,56 @@ public sealed class MigrationApplier
             $"{memberIndent}#if IL2CPP",
             $"{memberIndent}public {target.TypeName}(System.IntPtr ptr) : base(ptr) {{ }}",
             $"{memberIndent}#endif"
+        ]);
+
+        TrackFile(operation.FilePath, backupRoot, fileChanges);
+        string rewritten = string.Join(newline, lines);
+        if (hadTrailingNewline)
+        {
+            rewritten += newline;
+        }
+
+        File.WriteAllText(operation.FilePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(operation.FilePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyInjectedTypeRegistration(
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(operation.FilePath))
+        {
+            return false;
+        }
+
+        SourceClassTarget target = ParseSourceClassTarget(operation);
+        if (target.TypeName is null)
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(operation.FilePath);
+        string newline = original.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        bool hadTrailingNewline = original.EndsWith("\r\n", StringComparison.Ordinal) ||
+                                  original.EndsWith('\n');
+        List<string> lines = File.ReadAllLines(operation.FilePath).ToList();
+
+        int classLine = FindTargetClassLine(lines, target);
+        if (classLine < 0 ||
+            !TryReadClassDeclaration(lines[classLine], out string classIndent, out string baseType) ||
+            !IsIl2CppInjectedBase(baseType) ||
+            HasRegisterTypeAttribute(lines, classLine))
+        {
+            return false;
+        }
+
+        lines.InsertRange(classLine,
+        [
+            $"{classIndent}#if IL2CPP",
+            $"{classIndent}[MelonLoader.RegisterTypeInIl2Cpp]",
+            $"{classIndent}#endif"
         ]);
 
         TrackFile(operation.FilePath, backupRoot, fileChanges);
@@ -1970,6 +2152,11 @@ public sealed class MigrationApplier
 
     private static string GetTargetFrameworkForOperation(MigrationOperation operation)
     {
+        if (operation.Configuration is not null && IsIl2CppConfiguration(operation.Configuration))
+        {
+            return "net6.0";
+        }
+
         if (operation.Evidence?.Contains("Runtime=Il2Cpp", StringComparison.OrdinalIgnoreCase) == true)
         {
             return "net6.0";
@@ -1980,9 +2167,7 @@ public sealed class MigrationApplier
             return "netstandard2.1";
         }
 
-        return operation.Configuration is not null && IsIl2CppConfiguration(operation.Configuration)
-            ? "net6.0"
-            : "netstandard2.1";
+        return "netstandard2.1";
     }
 
     private static SourceMemberTarget ParseSourceMemberTarget(MigrationOperation operation)
@@ -2086,10 +2271,41 @@ public sealed class MigrationApplier
         return true;
     }
 
-    private static bool IsMonoBehaviourBase(string baseType) =>
-        baseType.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(part => part.Equals("MonoBehaviour", StringComparison.Ordinal) ||
-                         part.EndsWith(".MonoBehaviour", StringComparison.Ordinal));
+    private static bool IsIl2CppInjectedBase(string baseType)
+    {
+        string[] baseTypes = baseType.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (string candidate in baseTypes)
+        {
+            string simpleName = candidate.Split('.').Last();
+            if (simpleName is "MonoBehaviour" or
+                "InteractableObject" or
+                "Equippable" or
+                "VehicleData")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasRegisterTypeAttribute(IReadOnlyList<string> lines, int classLine)
+    {
+        for (int index = Math.Max(0, classLine - 8); index < classLine; index++)
+        {
+            if (lines[index].Contains("RegisterTypeInIl2Cpp", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (index < classLine - 1 && ClassDeclarationRegex.IsMatch(lines[index]))
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
 
     private static bool HasIntPtrConstructor(IReadOnlyList<string> lines, int classLine, string typeName)
     {

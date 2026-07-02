@@ -141,13 +141,26 @@ public sealed class SourceInteropAnalyzer
 
         foreach (ClassSpan span in spans)
         {
-            if (!injectedTypeNames.Contains(span.Name))
+            bool hasRegisterTypeAttribute = HasRegisterTypeAttribute(lines, span.StartLine);
+            bool isLikelyInjectedType = injectedTypeNames.Contains(span.Name);
+            if (!isLikelyInjectedType)
             {
                 continue;
             }
 
             InjectedTypeAnalysis injectedType = AnalyzeInjectedType(lines, sourceFile, span);
             injectedTypes.Add(injectedType);
+
+            if (!hasRegisterTypeAttribute)
+            {
+                diagnostics.Add(new InteropDiagnostic(
+                    "injected_type_missing_registertype",
+                    DiagnosticSeverity.Error,
+                    "Project-owned Unity component types that must exist on IL2CPP should be guarded with RegisterTypeInIl2Cpp.",
+                    projectPath,
+                    null,
+                    $"{sourceFile}:{span.StartLine + 1}: {span.Name}"));
+            }
 
             if (!injectedType.HasIntPtrConstructor)
             {
@@ -702,7 +715,8 @@ public sealed class SourceInteropAnalyzer
             string[] lines = File.ReadAllLines(sourceFile);
             foreach (ClassSpan span in DiscoverClassSpans(lines))
             {
-                if (HasRegisterTypeAttribute(lines, span.StartLine))
+                if (HasRegisterTypeAttribute(lines, span.StartLine) ||
+                    IsLikelyIl2CppInjectedBase(span.BaseType))
                 {
                     names.Add(span.Name);
                 }
@@ -710,6 +724,24 @@ public sealed class SourceInteropAnalyzer
         }
 
         return names;
+    }
+
+    private static bool IsLikelyIl2CppInjectedBase(string baseType)
+    {
+        string[] baseTypes = baseType.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (string candidate in baseTypes)
+        {
+            string simpleName = candidate.Split('.').Last();
+            if (simpleName is "MonoBehaviour" or
+                "InteractableObject" or
+                "Equippable" or
+                "VehicleData")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsGeneratedOrBuildOutput(string projectDirectory, string file)

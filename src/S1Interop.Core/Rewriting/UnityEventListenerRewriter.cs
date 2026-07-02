@@ -69,6 +69,11 @@ public sealed class UnityEventListenerRewriter
             changed = true;
         }
 
+        if (RemoveDeadWrappedUnityActionDeclarations(lines, wrappedUnityActionNames))
+        {
+            changed = true;
+        }
+
         if (!changed)
         {
             return source;
@@ -76,6 +81,57 @@ public sealed class UnityEventListenerRewriter
 
         string rewritten = string.Join(newline, lines);
         return hadTrailingNewline ? rewritten + newline : rewritten;
+    }
+
+    private static bool RemoveDeadWrappedUnityActionDeclarations(
+        string[] lines,
+        IReadOnlyDictionary<string, string> wrappedUnityActionNames)
+    {
+        if (wrappedUnityActionNames.Count == 0)
+        {
+            return false;
+        }
+
+        bool changed = false;
+        for (int index = 0; index < lines.Length; index++)
+        {
+            Match match = LocalWrappedUnityActionDeclarationRegex.Match(lines[index]);
+            if (!match.Success)
+            {
+                match = WrappedUnityActionAssignmentRegex.Match(lines[index]);
+            }
+
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            string wrapperName = match.Groups["name"].Value;
+            if (!wrappedUnityActionNames.ContainsKey(wrapperName) ||
+                IsIdentifierReferencedAfterLine(lines, wrapperName, index))
+            {
+                continue;
+            }
+
+            lines[index] = string.Empty;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static bool IsIdentifierReferencedAfterLine(string[] lines, string identifier, int declarationLineIndex)
+    {
+        string pattern = $@"\b{Regex.Escape(identifier)}\b";
+        for (int index = declarationLineIndex + 1; index < lines.Length; index++)
+        {
+            if (Regex.IsMatch(lines[index], pattern))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryRewriteLine(

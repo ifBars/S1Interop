@@ -122,7 +122,7 @@ public sealed class CsprojAnalyzer
         IReadOnlyList<ReferenceInfo> references = GetReferences(projectElements, configurationName, properties);
         IReadOnlyList<PackageReferenceInfo> packageReferences = GetPackageReferences(projectElements, configurationName, properties);
         RuntimeScores scores = ScoreRuntime(configurationName, targetFramework, defines, references, packageReferences);
-        RuntimeKind runtime = ChooseRuntime(scores);
+        RuntimeKind runtime = ChooseRuntime(configurationName, scores);
 
         return new ConfigurationAnalysis(
             configurationName,
@@ -349,8 +349,19 @@ public sealed class CsprojAnalyzer
         return containsMono ? RuntimeNameIntent.Mono : RuntimeNameIntent.Il2Cpp;
     }
 
-    private static RuntimeKind ChooseRuntime(RuntimeScores scores)
+    private static RuntimeKind ChooseRuntime(string configurationName, RuntimeScores scores)
     {
+        RuntimeNameIntent nameIntent = GetRuntimeNameIntent(configurationName);
+        if (nameIntent == RuntimeNameIntent.Mono)
+        {
+            return RuntimeKind.Mono;
+        }
+
+        if (nameIntent == RuntimeNameIntent.Il2Cpp)
+        {
+            return RuntimeKind.Il2Cpp;
+        }
+
         if (scores.CrossCompat >= 5)
         {
             return RuntimeKind.CrossCompat;

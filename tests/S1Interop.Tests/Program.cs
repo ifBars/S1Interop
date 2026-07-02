@@ -89,6 +89,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         DualRuntimeMigrationScaffoldsAnalyzerInferredDebugReleaseMonoProject();
         count++;
+        DualRuntimeMigrationConditionsImportedMonoRuntimeFlag();
+        count++;
         DualRuntimeMigrationInstallsGeneratorPackageWhenAttributesAreDeclared();
         count++;
         DualRuntimeMigrationDoesNotReprefixExistingIl2CppNamedConfigurations();
@@ -140,6 +142,8 @@ internal sealed class S1InteropFixtureTests
         VerifyMigrationReportsResidualDiagnosticsOnBrokenInjectedType();
         count++;
         MigrationApplyAddsIntPtrConstructorToMonoBehaviourInjectedType();
+        count++;
+        MigrationApplyRegistersMonoOnlyInjectedComponentTypes();
         count++;
         BuildHookInstallsReversibleValidationTarget();
         count++;
@@ -714,7 +718,7 @@ internal sealed class S1InteropFixtureTests
 
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\", Kind = S1Interop.S1InteropMemberKind.Field)]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal),
                 "Generated member-access targets should include direct member reflection declarations and static metadata.");
             string rewrittenSource = File.ReadAllText(tempSource);
@@ -1141,6 +1145,9 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(wrappedActionButton.onClick, listener);", StringComparison.Ordinal),
                 "Local UnityAction wrapper variables should be rewritten through the bridge using their original Action listener.");
+            Assert(
+                !migratedSource.Contains("var uAction = new UnityAction(listener);", StringComparison.Ordinal),
+                "Dead local UnityAction wrapper declarations should be removed after bridge rewrites.");
             Assert(
                 migratedSource.Contains("S1Interop.Generated.S1InteropUnityEventBridge.Add(multilineButton.onClick, new Action(() =>", StringComparison.Ordinal),
                 "Multi-line Action listener should rewrite its opening line through the bridge.");
@@ -2042,6 +2049,69 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RestoredFiles.Contains(tempSolution), "Rollback should restore Debug/Release mono-only solution file.");
             Assert(!File.ReadAllText(tempProject).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from project.");
             Assert(!File.ReadAllText(tempSolution).Contains("Il2cpp_Debug", StringComparison.Ordinal), "Rollback should remove scaffolded IL2CPP configs from solution.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void DualRuntimeMigrationConditionsImportedMonoRuntimeFlag()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ImportedMonoPropsMod.csproj");
+            string conditionsProps = Path.Combine(tempRoot, "build", "conditions.props");
+            Directory.CreateDirectory(Path.GetDirectoryName(conditionsProps)!);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Configurations>Debug;Release</Configurations>
+                    <DefineConstants>$(DefineConstants);MONO</DefineConstants>
+                  </PropertyGroup>
+                  <Import Project="build\conditions.props" />
+                  <ItemGroup Condition="'$(IsMono)' == 'true'">
+                    <Reference Include="Assembly-CSharp">
+                      <HintPath>$(GamePath)\Schedule I_Data\Managed\Assembly-CSharp.dll</HintPath>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                conditionsProps,
+                """
+                <Project>
+                  <PropertyGroup>
+                    <IsMono>true</IsMono>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: true));
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            string importedText = File.ReadAllText(conditionsProps);
+            Assert(
+                importedText.Contains("$(Configuration)", StringComparison.Ordinal) &&
+                importedText.Contains("Il2cpp_Debug", StringComparison.Ordinal),
+                "Dual-runtime migration should condition imported IsMono=true props on early configuration names.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            ProjectAnalysis project = after.Projects.Single();
+            AssertHasRuntime(project, "Il2cpp_Debug", RuntimeKind.Il2Cpp);
+            AssertHasRuntime(project, "Il2cpp_Release", RuntimeKind.Il2Cpp);
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(conditionsProps), "Rollback should restore imported conditions.props.");
+            Assert(
+                File.ReadAllText(conditionsProps).Contains("<IsMono>true</IsMono>", StringComparison.Ordinal),
+                "Rollback should restore the original unconditioned IsMono value.");
         }
         finally
         {
@@ -4448,6 +4518,92 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 !File.ReadAllText(tempSource).Contains("public Overlay(System.IntPtr ptr)", StringComparison.Ordinal),
                 "Rollback should remove the generated IntPtr constructor.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyRegistersMonoOnlyInjectedComponentTypes()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MonoOnlyInjectedComponent.csproj");
+            string tempSource = Path.Combine(tempRoot, "EquippableGasolineCan.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace ScheduleOne.Equipping
+                {
+                    public class Equippable
+                    {
+                        public Equippable()
+                        {
+                        }
+
+                        public Equippable(System.IntPtr ptr)
+                        {
+                        }
+                    }
+                }
+
+                namespace SyntheticMod;
+
+                public class Equippable_GasolineCan : ScheduleOne.Equipping.Equippable
+                {
+                    public void BeginRefuelInteraction()
+                    {
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "injected_type_missing_registertype"),
+                "Mono-only Equippable fixture should plan a RegisterTypeInIl2Cpp migration.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "injected_type_missing_intptr_constructor"),
+                "Mono-only Equippable fixture should plan an IntPtr constructor migration.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "injected_type_missing_registertype"),
+                "Migration apply should add the RegisterTypeInIl2Cpp attribute.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "injected_type_missing_intptr_constructor"),
+                "Migration apply should add the IntPtr constructor.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("[MelonLoader.RegisterTypeInIl2Cpp]", StringComparison.Ordinal),
+                "Migrated source should contain a guarded RegisterTypeInIl2Cpp attribute.");
+            Assert(
+                migratedSource.Contains("public Equippable_GasolineCan(System.IntPtr ptr) : base(ptr) { }", StringComparison.Ordinal),
+                "Migrated source should contain a guarded System.IntPtr constructor.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan secondPlan = new MigrationPlanner().Plan(after).Projects.Single();
+            Assert(
+                secondPlan.Operations.All(operation =>
+                    operation.RuleId != "injected_type_missing_registertype" &&
+                    operation.RuleId != "injected_type_missing_intptr_constructor"),
+                "A second migration plan should not duplicate injected type registration or constructor operations.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the mono-only injected component source file.");
         }
         finally
         {

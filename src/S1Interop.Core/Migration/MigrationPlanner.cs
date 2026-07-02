@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace S1Interop.Core;
 
@@ -97,6 +98,15 @@ public sealed class MigrationPlanner
                     "Add the canonical MONO or IL2CPP DefineConstants symbol required by source conditional compilation.",
                     diagnostic.Evidence),
 
+                "injected_type_missing_registertype" => new MigrationOperation(
+                    diagnostic.RuleId,
+                    diagnostic.Evidence is null ? project.ProjectPath : GetDiagnosticFilePath(diagnostic.Evidence, project.ProjectPath),
+                    diagnostic.Configuration,
+                    "low",
+                    true,
+                    "Add a guarded RegisterTypeInIl2Cpp attribute to project-owned Unity component types used by IL2CPP.",
+                    diagnostic.Evidence),
+
                 "injected_type_missing_intptr_constructor" => new MigrationOperation(
                     diagnostic.RuleId,
                     diagnostic.Evidence is null ? project.ProjectPath : GetDiagnosticFilePath(diagnostic.Evidence, project.ProjectPath),
@@ -163,6 +173,17 @@ public sealed class MigrationPlanner
                     true,
                     "Move ordinary ScheduleOne namespace imports into the generated facade and guard alias/static ScheduleOne usings that must remain in source."));
             }
+        }
+        if (ProjectHasUnconditionedImportedMonoRuntimeFlag(project.ProjectPath) ||
+            ProjectHasStaleMonoReferenceImport(project.ProjectPath))
+        {
+            operations.Add(new MigrationOperation(
+                "condition_imported_mono_runtime_flags",
+                project.ProjectPath,
+                null,
+                "low",
+                true,
+                "Condition project-local imported IsMono=true props on S1InteropTargetRuntime so IL2CPP configurations do not import Mono-only references."));
         }
 
         if (options.BuildHook)
@@ -457,6 +478,84 @@ public sealed class MigrationPlanner
                 "Add MONO because dual-runtime source rewriting emits MONO guards for ScheduleOne namespace compatibility.",
                 $"generated ScheduleOne using guards require MONO; DefineConstants={string.Join(";", configuration.DefineConstants)}"));
         }
+    }
+
+    private static bool ProjectHasIl2CppConfiguration(ProjectAnalysis project) =>
+        project.Configurations.Any(configuration =>
+            configuration.Runtime == RuntimeKind.Il2Cpp ||
+            configuration.Name.Contains("il2cpp", StringComparison.OrdinalIgnoreCase));
+
+    private static bool ProjectHasUnconditionedImportedMonoRuntimeFlag(string projectPath)
+    {
+        string projectDirectory = Path.GetDirectoryName(projectPath)!;
+        XDocument document;
+        try
+        {
+            document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        }
+        catch
+        {
+            return false;
+        }
+
+        foreach (XElement import in document.Root!.Elements().Where(element => element.Name.LocalName.Equals("Import", StringComparison.OrdinalIgnoreCase)))
+        {
+            string? importProject = import.Attribute("Project")?.Value;
+            if (string.IsNullOrWhiteSpace(importProject) ||
+                importProject.Contains("$(", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string importedPath = Path.GetFullPath(Path.Combine(projectDirectory, importProject));
+            if (!importedPath.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(importedPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                XDocument importedDocument = XDocument.Load(importedPath, LoadOptions.PreserveWhitespace);
+                if (importedDocument.Descendants().Any(element =>
+                        element.Name.LocalName.Equals("IsMono", StringComparison.OrdinalIgnoreCase) &&
+                        element.Attribute("Condition") is null &&
+                        element.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                continue;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ProjectHasStaleMonoReferenceImport(string projectPath)
+    {
+        XDocument document;
+        try
+        {
+            document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        }
+        catch
+        {
+            return false;
+        }
+
+        return document.Root!.Elements()
+            .Where(element => element.Name.LocalName.Equals("Import", StringComparison.OrdinalIgnoreCase))
+            .Any(import =>
+            {
+                string project = import.Attribute("Project")?.Value ?? string.Empty;
+                string condition = import.Attribute("Condition")?.Value ?? string.Empty;
+                return project.Contains("Mono", StringComparison.OrdinalIgnoreCase) &&
+                       !project.Contains("$(", StringComparison.Ordinal) &&
+                       !condition.Contains("Il2cpp", StringComparison.OrdinalIgnoreCase);
+            });
     }
 
     private static MigrationOperation CreateTargetFrameworkOperation(ProjectAnalysis project, InteropDiagnostic diagnostic)
