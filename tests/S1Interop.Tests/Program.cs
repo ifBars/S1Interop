@@ -1889,11 +1889,13 @@ internal sealed class S1InteropFixtureTests
                 projectSource.Contains("PrivateAssets", StringComparison.Ordinal),
                 "s1interop init should install the S1Interop generator package privately.");
             Assert(
-                starterSource.Contains("S1InteropGenerateUnityEventBridge", StringComparison.Ordinal) &&
-                starterSource.Contains("S1InteropGenerateDelegateEventBridge", StringComparison.Ordinal) &&
+                starterSource.Contains("// [assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
+                starterSource.Contains("// [assembly: S1Interop.S1InteropGenerateDelegateEventBridge]", StringComparison.Ordinal) &&
+                !starterSource.Contains($"{Environment.NewLine}[assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
+                !starterSource.Contains($"{Environment.NewLine}[assembly: S1Interop.S1InteropGenerateDelegateEventBridge]", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
-                "Backend-neutral starter should seed generator bridge attributes and editable type/member examples.");
+                "Backend-neutral starter should keep bridge generation opt-in while seeding editable type/member examples.");
 
             string manifestPath = ExtractManifestPath(apply.Output);
             ProcessResult rollback = RunDotNet("run", "--project", cliProject, "--", "migrate", "rollback", manifestPath);
@@ -1952,10 +1954,13 @@ internal sealed class S1InteropFixtureTests
                 projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
                 projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal) &&
                 projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'==''\">Mono</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
+                projectSource.Contains("<GamePath Condition=\"'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'\">$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal) &&
+                projectSource.Contains("<ManagedPath Condition=\"'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''\">$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"0Harmony\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and reference MelonLoader through local paths.");
+                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and select Mono or IL2CPP references without forcing backend-specific generated code.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
                 coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
@@ -1964,10 +1969,11 @@ internal sealed class S1InteropFixtureTests
                 coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal),
                 "Generated core source should be a real MelonLoader mod entry point with a sanitized project namespace/name.");
             Assert(
-                starterSource.Contains("S1InteropGenerateUnityEventBridge", StringComparison.Ordinal) &&
+                starterSource.Contains("// [assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
+                !starterSource.Contains($"{Environment.NewLine}[assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
                 starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
-                "Generated starter should seed backend-neutral generator attributes and examples.");
+                "Generated starter should seed backend-neutral type/member examples and leave bridge generation opt-in.");
             Assert(
                 localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
                 localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
@@ -1975,8 +1981,10 @@ internal sealed class S1InteropFixtureTests
                 "Generated local path scaffolding should show both runtime game paths while keeping local.build.props ignored.");
 
             string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+            string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
             string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
-            if (File.Exists(monoMelonLoader))
+            string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+            if (File.Exists(monoMelonLoader) || File.Exists(il2CppMelonLoader))
             {
                 string packageSource = Path.Combine(tempRoot, "NuGet");
                 Directory.CreateDirectory(packageSource);
@@ -1984,14 +1992,30 @@ internal sealed class S1InteropFixtureTests
                 ProcessResult pack = RunDotNet("pack", generatorProject, "-c", "Debug", "-o", packageSource, "--nologo", "-v:minimal");
                 Assert(pack.ExitCode == 0, $"Packing local S1Interop.Generators feed for new-project build should succeed. Output: {pack.Output}");
 
-                ProcessResult scaffoldBuild = RunDotNet(
-                    "build",
-                    projectPath,
-                    "--nologo",
-                    "-v:minimal",
-                    $"-p:MonoGamePath={monoGamePath}",
-                    $"-p:RestoreAdditionalProjectSources={packageSource}");
-                Assert(scaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local Mono game path. Output: {scaffoldBuild.Output}");
+                if (File.Exists(monoMelonLoader))
+                {
+                    ProcessResult monoScaffoldBuild = RunDotNet(
+                        "build",
+                        projectPath,
+                        "--nologo",
+                        "-v:minimal",
+                        $"-p:MonoGamePath={monoGamePath}",
+                        $"-p:RestoreAdditionalProjectSources={packageSource}");
+                    Assert(monoScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local Mono game path. Output: {monoScaffoldBuild.Output}");
+                }
+
+                if (File.Exists(il2CppMelonLoader))
+                {
+                    ProcessResult il2CppScaffoldBuild = RunDotNet(
+                        "build",
+                        projectPath,
+                        "--nologo",
+                        "-v:minimal",
+                        "-p:S1InteropReferenceRuntime=Il2Cpp",
+                        $"-p:Il2CppGamePath={il2CppGamePath}",
+                        $"-p:RestoreAdditionalProjectSources={packageSource}");
+                    Assert(il2CppScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local IL2CPP game path without changing source. Output: {il2CppScaffoldBuild.Output}");
+                }
             }
 
             ProcessResult secondApply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");

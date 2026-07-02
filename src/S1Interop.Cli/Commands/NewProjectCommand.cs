@@ -102,8 +102,12 @@ internal static class NewProjectCommand
             <RootNamespace>{projectName}</RootNamespace>
             <AssemblyName>{projectName}</AssemblyName>
             <Version>0.1.0</Version>
+            <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'==''">Mono</S1InteropReferenceRuntime>
+            <GamePath Condition="'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(Il2CppGamePath)</GamePath>
             <GamePath Condition="'$(GamePath)'==''">$(MonoGamePath)</GamePath>
+            <ManagedPath Condition="'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''">$(GamePath)\MelonLoader\Il2CppAssemblies</ManagedPath>
             <ManagedPath Condition="'$(ManagedPath)'=='' and '$(GamePath)'!=''">$(GamePath)\Schedule I_Data\Managed</ManagedPath>
+            <MelonLoaderPath Condition="'$(MelonLoaderPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''">$(GamePath)\MelonLoader\net6</MelonLoaderPath>
             <MelonLoaderPath Condition="'$(MelonLoaderPath)'=='' and '$(GamePath)'!=''">$(GamePath)\MelonLoader\net35</MelonLoaderPath>
           </PropertyGroup>
 
@@ -180,6 +184,13 @@ internal static class NewProjectCommand
 
         Before building locally, copy `local.build.props.example` to `local.build.props` and set your own game paths.
         `local.build.props` is ignored so machine-specific paths do not get committed.
+
+        The default build uses Mono reference assemblies and keeps generated S1Interop helpers runtime-detecting.
+        To sanity-check the same source against IL2CPP references, build with:
+
+        ```powershell
+        dotnet build -p:S1InteropReferenceRuntime=Il2Cpp
+        ```
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
 
