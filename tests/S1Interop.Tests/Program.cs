@@ -232,6 +232,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         BackendNeutralRegistryCompilesRealS1FuelModFacadeTargets();
         count++;
+        BackendNeutralScaffoldBuildsRealS1FuelModFacadeTargetsAgainstBothReferenceSurfaces();
+        count++;
         SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
         count++;
         MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
@@ -1986,11 +1988,7 @@ internal sealed class S1InteropFixtureTests
             string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
             if (File.Exists(monoMelonLoader) || File.Exists(il2CppMelonLoader))
             {
-                string packageSource = Path.Combine(tempRoot, "NuGet");
-                Directory.CreateDirectory(packageSource);
-                string generatorProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Generators", "S1Interop.Generators.csproj");
-                ProcessResult pack = RunDotNet("pack", generatorProject, "-c", "Debug", "-o", packageSource, "--nologo", "-v:minimal");
-                Assert(pack.ExitCode == 0, $"Packing local S1Interop.Generators feed for new-project build should succeed. Output: {pack.Output}");
+                string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
 
                 if (File.Exists(monoMelonLoader))
                 {
@@ -3420,6 +3418,73 @@ internal sealed class S1InteropFixtureTests
                     generated.Contains($"public static object? Create{alias.Alias}(params object?[] args) => Create({alias.Alias}Name, args);", StringComparison.Ordinal) &&
                     generated.Contains($"public static object? Get{alias.Alias}Static(string memberName) => S1InteropMemberRegistry.GetValue({alias.Alias}Name, memberName, null);", StringComparison.Ordinal)),
                 $"Backend-neutral registry should emit object-based facade helpers for copied S1FuelMod aliases. Generated source:{Environment.NewLine}{generated}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void BackendNeutralScaffoldBuildsRealS1FuelModFacadeTargetsAgainstBothReferenceSurfaces()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
+        string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+        string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+        if (!Directory.Exists(sourceDirectory) || !File.Exists(monoMelonLoader) || !File.Exists(il2CppMelonLoader))
+        {
+            Console.WriteLine("Skipping S1FuelMod backend-neutral scaffold build fixture because S1FuelMod or local game roots are not available.");
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceCopy = Path.Combine(tempRoot, "S1FuelModSource");
+            Directory.CreateDirectory(sourceCopy);
+            CopyFixtureDirectory(sourceDirectory, sourceCopy);
+            string copiedProject = Path.Combine(sourceCopy, "S1FuelMod.csproj");
+            WorkspaceAnalysis workspace = analyzer.Analyze(copiedProject);
+            SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(workspace.Projects.Single());
+            SdkTypeAlias[] aliases = facadePlan.TypeAliases.Take(16).ToArray();
+            Assert(aliases.Length > 0, "Copied S1FuelMod should expose facade aliases for fresh backend-neutral scaffold validation.");
+
+            string scaffoldDirectory = Path.Combine(tempRoot, "FreshS1FuelFacadeMod");
+            string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
+            ProcessResult create = RunDotNet("run", "--project", cliProject, "--", "new", scaffoldDirectory, "--apply");
+            Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for real facade alias validation. Output: {create.Output}");
+
+            string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshS1FuelFacadeMod.csproj");
+            string starterPath = Path.Combine(scaffoldDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            File.WriteAllText(starterPath, BuildBackendNeutralRegistrySource(aliases));
+            string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+
+            ProcessResult monoBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                $"-p:MonoGamePath={monoGamePath}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(monoBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real S1FuelMod aliases should build against Mono references. Output: {monoBuild.Output}");
+
+            ProcessResult il2CppBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                "-p:S1InteropReferenceRuntime=Il2Cpp",
+                $"-p:Il2CppGamePath={il2CppGamePath}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(il2CppBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real S1FuelMod aliases should build against IL2CPP references without source changes. Output: {il2CppBuild.Output}");
+
+            string starterSource = File.ReadAllText(starterPath);
+            Assert(
+                aliases.All(alias =>
+                    starterSource.Contains($"[assembly: S1Interop.S1InteropType(\"{EscapeCSharpString(alias.MonoType)}\", Alias = \"{EscapeCSharpString(alias.Alias)}\", Il2CppTypeName = \"{EscapeCSharpString(alias.Il2CppType)}\")]", StringComparison.Ordinal)),
+                "Fresh backend-neutral scaffold should use real copied S1FuelMod aliases as assembly-level runtime-resolved declarations.");
         }
         finally
         {
@@ -7732,6 +7797,16 @@ internal sealed class S1InteropFixtureTests
         }
 
         return new ProcessResult(process.ExitCode, output + error);
+    }
+
+    private string CreateLocalGeneratorPackageSource(string tempRoot)
+    {
+        string packageSource = Path.Combine(tempRoot, "NuGet");
+        Directory.CreateDirectory(packageSource);
+        string generatorProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Generators", "S1Interop.Generators.csproj");
+        ProcessResult pack = RunDotNet("pack", generatorProject, "-c", "Debug", "-o", packageSource, "--nologo", "-v:minimal");
+        Assert(pack.ExitCode == 0, $"Packing local S1Interop.Generators feed should succeed. Output: {pack.Output}");
+        return packageSource;
     }
 
     private static IReadOnlyList<string> ConfigurationDefines(string projectPath, string configuration)
