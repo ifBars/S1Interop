@@ -16,6 +16,37 @@ public sealed class MemberAccessTargetCatalog
         @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
 
+    private static readonly Regex FieldOrPropertyHelperRegex = new(
+        @"(?<helper>[A-Za-z_][A-Za-z0-9_.]*)\s*\.\s*Try(?<operation>Get|Set)(?<static>Static)?FieldOrProperty\s*\(\s*(?<target>[_A-Za-z][A-Za-z0-9_]*)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex IdentifierTypeRegex = new(
+        @"(?<![A-Za-z0-9_])(?:(?:public|private|protected|internal|static|readonly|volatile|new|sealed|unsafe)\s+)*(?<type>[A-Za-z_][A-Za-z0-9_.]*)(?:\?)?(?:\s*<[^>\r\n;()]+>)?\s+(?<name>[_A-Za-z][A-Za-z0-9_]*)\b",
+        RegexOptions.Compiled);
+
+    private static readonly HashSet<string> IgnoredTypeNames = new(StringComparer.Ordinal)
+    {
+        "bool",
+        "byte",
+        "char",
+        "const",
+        "decimal",
+        "double",
+        "dynamic",
+        "float",
+        "int",
+        "long",
+        "object",
+        "sbyte",
+        "short",
+        "string",
+        "uint",
+        "ulong",
+        "ushort",
+        "var",
+        "void"
+    };
+
     public IReadOnlyList<MemberAccessTarget> Discover(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -40,28 +71,33 @@ public sealed class MemberAccessTargetCatalog
 
         string[] lines = File.ReadAllLines(sourceFile);
         Dictionary<string, string> scheduleOneUsings = DiscoverScheduleOneUsings(lines);
+        string[] scheduleOneNamespaces = DiscoverScheduleOneNamespaces(scheduleOneUsings);
+        Dictionary<string, string> identifierTypes = DiscoverIdentifierTypes(lines, scheduleOneUsings, scheduleOneNamespaces);
         var targets = new List<MemberAccessTarget>();
 
         for (int index = 0; index < lines.Length; index++)
         {
             Match match = TypeOfFieldOrPropertyRegex.Match(lines[index]);
-            if (!match.Success)
+            if (match.Success)
             {
-                continue;
+                string ownerTypeName = ResolveRuntimeTypeName(match.Groups["type"].Value, scheduleOneUsings);
+                string ownerAlias = GetSimpleTypeName(ownerTypeName);
+                string memberName = match.Groups["member"].Value;
+                targets.Add(new MemberAccessTarget(
+                    Path.GetFullPath(sourceFile),
+                    index + 1,
+                    ownerAlias,
+                    ownerTypeName,
+                    memberName,
+                    SanitizeAlias(memberName),
+                    IsStatic: IsStaticMemberLookup(lines, index),
+                    Kind: GetMemberAccessKind(match.Groups["kind"].Value)));
             }
 
-            string ownerTypeName = ResolveRuntimeTypeName(match.Groups["type"].Value, scheduleOneUsings);
-            string ownerAlias = GetSimpleTypeName(ownerTypeName);
-            string memberName = match.Groups["member"].Value;
-            targets.Add(new MemberAccessTarget(
-                Path.GetFullPath(sourceFile),
-                index + 1,
-                ownerAlias,
-                ownerTypeName,
-                memberName,
-                SanitizeAlias(memberName),
-                IsStatic: IsStaticMemberLookup(lines, index),
-                Kind: GetMemberAccessKind(match.Groups["kind"].Value)));
+            foreach (MemberAccessTarget target in DiscoverHelperTargets(sourceFile, lines[index], index + 1, identifierTypes))
+            {
+                targets.Add(target);
+            }
         }
 
         return CreateUniqueAliases(targets);
@@ -153,6 +189,90 @@ public sealed class MemberAccessTargetCatalog
         return usings;
     }
 
+    private static string[] DiscoverScheduleOneNamespaces(IReadOnlyDictionary<string, string> scheduleOneUsings)
+    {
+        return scheduleOneUsings
+            .Values
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static Dictionary<string, string> DiscoverIdentifierTypes(
+        IReadOnlyList<string> lines,
+        IReadOnlyDictionary<string, string> scheduleOneUsings,
+        IReadOnlyList<string> scheduleOneNamespaces)
+    {
+        var identifierTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string line in lines)
+        {
+            string code = StripLineComment(line);
+            foreach (Match match in IdentifierTypeRegex.Matches(code))
+            {
+                string typeName = match.Groups["type"].Value;
+                if (!CanResolveHelperTargetType(typeName, scheduleOneUsings))
+                {
+                    continue;
+                }
+
+                string identifier = match.Groups["name"].Value;
+                identifierTypes[identifier] = ResolveHelperTargetTypeName(typeName, scheduleOneUsings, scheduleOneNamespaces);
+            }
+        }
+
+        return identifierTypes;
+    }
+
+    private static IEnumerable<MemberAccessTarget> DiscoverHelperTargets(
+        string sourceFile,
+        string line,
+        int lineNumber,
+        IReadOnlyDictionary<string, string> identifierTypes)
+    {
+        foreach (Match match in FieldOrPropertyHelperRegex.Matches(line))
+        {
+            string targetName = match.Groups["target"].Value;
+            if (!identifierTypes.TryGetValue(targetName, out string? ownerTypeName))
+            {
+                continue;
+            }
+
+            string ownerAlias = GetSimpleTypeName(ownerTypeName);
+            string memberName = match.Groups["member"].Value;
+            yield return new MemberAccessTarget(
+                Path.GetFullPath(sourceFile),
+                lineNumber,
+                ownerAlias,
+                ownerTypeName,
+                memberName,
+                SanitizeAlias(memberName),
+                IsStatic: match.Groups["static"].Success,
+                Kind: MemberAccessKind.FieldOrProperty);
+        }
+    }
+
+    private static bool CanResolveHelperTargetType(
+        string typeName,
+        IReadOnlyDictionary<string, string> scheduleOneUsings)
+    {
+        if (IgnoredTypeNames.Contains(typeName) ||
+            typeName.StartsWith("System.", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return typeName.StartsWith("ScheduleOne.", StringComparison.Ordinal) ||
+               scheduleOneUsings.ContainsKey(typeName) ||
+               scheduleOneUsings.Count == 1 ||
+               TryInferNamespaceByLeaf(typeName, scheduleOneUsings.Values, out _);
+    }
+
+    private static string StripLineComment(string line)
+    {
+        int commentIndex = line.IndexOf("//", StringComparison.Ordinal);
+        return commentIndex < 0 ? line : line[..commentIndex];
+    }
+
     private static string ResolveRuntimeTypeName(
         string sourceType,
         IReadOnlyDictionary<string, string> scheduleOneUsings)
@@ -176,6 +296,75 @@ public sealed class MemberAccessTargetCatalog
         }
 
         return sourceType;
+    }
+
+    private static string ResolveHelperTargetTypeName(
+        string sourceType,
+        IReadOnlyDictionary<string, string> scheduleOneUsings,
+        IReadOnlyList<string> scheduleOneNamespaces)
+    {
+        string resolved = ResolveRuntimeTypeName(sourceType, scheduleOneUsings);
+        if (!string.Equals(resolved, sourceType, StringComparison.Ordinal) ||
+            sourceType.StartsWith("ScheduleOne.", StringComparison.Ordinal) ||
+            sourceType.Contains('.', StringComparison.Ordinal))
+        {
+            return resolved;
+        }
+
+        if (scheduleOneNamespaces.Count == 1)
+        {
+            return $"{scheduleOneNamespaces[0]}.{sourceType}";
+        }
+
+        return TryInferNamespaceByLeaf(sourceType, scheduleOneNamespaces, out string? namespaceName)
+            ? $"{namespaceName}.{sourceType}"
+            : sourceType;
+    }
+
+    private static bool TryInferNamespaceByLeaf(
+        string typeName,
+        IEnumerable<string> namespaceNames,
+        out string? namespaceName)
+    {
+        namespaceName = null;
+        string[] matches = namespaceNames
+            .Where(candidate => NamespaceLeafMatchesType(candidate, typeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        namespaceName = matches[0];
+        return true;
+    }
+
+    private static bool NamespaceLeafMatchesType(string namespaceName, string typeName)
+    {
+        string leaf = namespaceName[(namespaceName.LastIndexOf('.') + 1)..];
+        if (typeName.StartsWith(leaf, StringComparison.Ordinal) ||
+            typeName.EndsWith(leaf, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (leaf.EndsWith("s", StringComparison.Ordinal))
+        {
+            string singular = leaf[..^1];
+            return singular.Length > 2 &&
+                   (typeName.StartsWith(singular, StringComparison.Ordinal) ||
+                    typeName.EndsWith(singular, StringComparison.Ordinal));
+        }
+
+        const string scriptsSuffix = "Scripts";
+        if (leaf.EndsWith(scriptsSuffix, StringComparison.Ordinal))
+        {
+            string prefix = leaf[..^scriptsSuffix.Length];
+            return prefix.Length > 2 && typeName.StartsWith(prefix, StringComparison.Ordinal);
+        }
+
+        return false;
     }
 
     private static string GetSimpleTypeName(string typeName)

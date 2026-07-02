@@ -63,6 +63,8 @@ internal sealed class S1InteropFixtureTests
         count++;
         SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
         count++;
+        MemberAccessTargetCatalogDiscoversTypedFieldPropertyHelperCalls();
+        count++;
         MigrationRewritesDynamicInstanceReflectionFallbackWithoutTargets();
         count++;
         SourceInteropAnalyzerReportsDirectMemberReflectionLookupRisk();
@@ -725,6 +727,64 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MemberAccessTargetCatalogDiscoversTypedFieldPropertyHelperCalls()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempSource = Path.Combine(tempRoot, "FuelReflection.cs");
+            File.WriteAllText(
+                tempSource,
+                """
+                using ScheduleOne.Vehicles;
+                using ScheduleOne.DevUtilities;
+
+                namespace ReflectionFallbackMod;
+
+                public sealed class FuelReflection
+                {
+                    private LandVehicle? _landVehicle;
+
+                    public object? ReadVehicleName()
+                    {
+                        return ReflectionUtils.TryGetFieldOrProperty(_landVehicle, "vehicleName");
+                    }
+
+                    public static void CutThrottle(LandVehicle vehicle)
+                    {
+                        ReflectionUtils.TrySetFieldOrProperty(vehicle, "currentThrottle", 0f);
+                    }
+                }
+                """);
+
+            MemberAccessTarget[] targets = new MemberAccessTargetCatalog()
+                .DiscoverFileTargets(tempSource)
+                .ToArray();
+
+            Assert(
+                targets.Any(target =>
+                    target.OwnerAlias == "LandVehicle" &&
+                    target.OwnerTypeName == "ScheduleOne.Vehicles.LandVehicle" &&
+                    target.MemberName == "vehicleName" &&
+                    target.Kind == MemberAccessKind.FieldOrProperty &&
+                    !target.IsStatic),
+                "Member-access discovery should infer typed ReflectionUtils.TryGetFieldOrProperty targets from ScheduleOne field declarations.");
+            Assert(
+                targets.Any(target =>
+                    target.OwnerAlias == "LandVehicle" &&
+                    target.OwnerTypeName == "ScheduleOne.Vehicles.LandVehicle" &&
+                    target.MemberName == "currentThrottle" &&
+                    target.Kind == MemberAccessKind.FieldOrProperty &&
+                    !target.IsStatic),
+                "Member-access discovery should infer typed ReflectionUtils.TrySetFieldOrProperty targets from ScheduleOne method parameters.");
         }
         finally
         {
@@ -3448,22 +3508,33 @@ internal sealed class S1InteropFixtureTests
             string copiedProject = Path.Combine(sourceCopy, "S1FuelMod.csproj");
             WorkspaceAnalysis workspace = analyzer.Analyze(copiedProject);
             SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(workspace.Projects.Single());
+            MemberAccessTarget[] memberTargets = new MemberAccessTargetCatalog()
+                .Discover(copiedProject)
+                .Where(target =>
+                    target.OwnerAlias.Equals("LandVehicle", StringComparison.Ordinal) &&
+                    target.MemberName.Equals("vehicleName", StringComparison.Ordinal))
+                .ToArray();
             SdkTypeAlias[] aliases = facadePlan.TypeAliases
                 .Take(16)
-                .Append(new SdkTypeAlias("LandVehicle", "ScheduleOne.Vehicles.LandVehicle", "Il2CppScheduleOne.Vehicles.LandVehicle", GenerateGlobalUsing: false))
+                .Concat(memberTargets.Select(target => new SdkTypeAlias(target.OwnerAlias, target.OwnerTypeName, $"Il2Cpp{target.OwnerTypeName}", GenerateGlobalUsing: false)))
                 .GroupBy(alias => alias.Alias, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .ToArray();
             Assert(aliases.Length > 0, "Copied S1FuelMod should expose facade aliases for fresh backend-neutral scaffold validation.");
-            var memberDeclarations = new[]
-            {
-                new S1InteropMemberDeclaration(
-                    "LandVehicle",
-                    "vehicleName",
+            Assert(
+                memberTargets.Length > 0,
+                "Copied S1FuelMod should expose LandVehicle.vehicleName as a generated member target from ReflectionUtils.TryGetFieldOrProperty usage.");
+            Assert(
+                memberTargets.All(target => target.OwnerTypeName.Equals("ScheduleOne.Vehicles.LandVehicle", StringComparison.Ordinal)),
+                "Copied S1FuelMod helper-call discovery should resolve LandVehicle through the ScheduleOne.Vehicles namespace instead of leaving a simple runtime type name.");
+            S1InteropMemberDeclaration[] memberDeclarations = memberTargets
+                .Select(target => new S1InteropMemberDeclaration(
+                    target.OwnerAlias,
+                    target.MemberName,
                     "S1FuelVehicleName",
-                    "S1Interop.S1InteropMemberKind.FieldOrProperty",
-                    IsStatic: false),
-            };
+                    $"S1Interop.S1InteropMemberKind.{target.Kind}",
+                    target.IsStatic))
+                .ToArray();
 
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshS1FuelFacadeMod");
             string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
