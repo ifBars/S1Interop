@@ -5830,6 +5830,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Phone", "deviceUniqueIdentifier", Alias = "DeviceIdProperty", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
             [assembly: S1Interop.S1InteropMember("Phone", "SetPacket", Alias = "SetPacket", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
+            [assembly: S1Interop.S1InteropMember("Phone", "SetLabels", Alias = "SetLabels", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string[]" })]
 
             namespace SyntheticMod
             {
@@ -5999,6 +6000,9 @@ internal sealed class S1InteropFixtureTests
         Assert(
             runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetPacketMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetPacketName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"byte[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed array parameter names to IL2CPP array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetLabelsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetLabelsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"string[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<string>\") });", StringComparison.Ordinal),
+            $"Backend-neutral member registry should route managed reference-array parameter names to IL2CPP reference array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
     private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()
@@ -6011,6 +6015,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int", "string&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetData", Alias = "HudSetData", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid", "System.Collections.Generic.List<string>" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetBytes", Alias = "HudSetBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetLabels", Alias = "HudSetLabels", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string[]" })]
 
             namespace SyntheticMod
             {
@@ -6028,6 +6033,7 @@ internal sealed class S1InteropFixtureTests
                     public string? LastName { get; private set; }
                     public string? LastData { get; private set; }
                     public string? LastBytes { get; private set; }
+                    public string? LastLabels { get; private set; }
 
                     public string SetLevel(int level, ref string name)
                     {
@@ -6047,6 +6053,12 @@ internal sealed class S1InteropFixtureTests
                     {
                         LastBytes = bytes.Length + ":" + bytes[0] + ":" + bytes[1];
                         return LastBytes;
+                    }
+
+                    public string SetLabels(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<string> labels)
+                    {
+                        LastLabels = labels.Length + ":" + labels[0] + ":" + labels[1];
+                        return LastLabels;
                     }
                 }
             }
@@ -6249,6 +6261,13 @@ internal sealed class S1InteropFixtureTests
         Assert(
             string.Equals(setBytesResult as string, "2:7:9", StringComparison.Ordinal),
             $"Generated method invoker should convert managed byte arrays to fake IL2CPP struct arrays. Result={setBytesResult}");
+
+        MethodInfo? invokeSetLabels = memberRegistryType.GetMethod("InvokeHudSetLabels", [typeof(object), typeof(object[])]);
+        Assert(invokeSetLabels is not null, "Generated member registry should expose InvokeHudSetLabels.");
+        object? setLabelsResult = invokeSetLabels!.Invoke(null, [hud, new object?[] { new[] { "north", "south" } }]);
+        Assert(
+            string.Equals(setLabelsResult as string, "2:north:south", StringComparison.Ordinal),
+            $"Generated method invoker should convert managed string arrays to fake IL2CPP reference arrays. Result={setLabelsResult}");
 
         Type objectBaseType = assembly.GetType("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", throwOnError: true)!;
         object proxy = Activator.CreateInstance(objectBaseType, [hud])!;
