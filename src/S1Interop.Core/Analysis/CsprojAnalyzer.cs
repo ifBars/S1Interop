@@ -498,6 +498,17 @@ public sealed class CsprojAnalyzer
         IReadOnlyList<MsBuildElement> projectElements,
         List<InteropDiagnostic> diagnostics)
     {
+        if (HasLocalBuildProps(projectPath) && !ImportsLocalBuildProps(document))
+        {
+            diagnostics.Add(new InteropDiagnostic(
+                "missing_local_build_props_import",
+                DiagnosticSeverity.Warning,
+                "Generated local.build.props exists but the project does not import it, so local Mono/IL2CPP game paths will not affect builds.",
+                projectPath,
+                null,
+                "local.build.props"));
+        }
+
         var seenEvidence = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (XElement element in document.Descendants().Where(element => !element.HasElements))
         {
@@ -701,9 +712,23 @@ public sealed class CsprojAnalyzer
     private static bool HasLocalReferencePropertyScaffold(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
-        return File.Exists(Path.Combine(projectDirectory, "local.build.props")) ||
+        return HasLocalBuildProps(projectPath) ||
                File.Exists(Path.Combine(projectDirectory, "local.build.props.example"));
     }
+
+    private static bool HasLocalBuildProps(string projectPath)
+    {
+        string projectDirectory = Path.GetDirectoryName(projectPath)!;
+        return File.Exists(Path.Combine(projectDirectory, "local.build.props"));
+    }
+
+    private static bool ImportsLocalBuildProps(XDocument document) =>
+        document.Root?.Elements()
+            .Where(IsNamed("Import"))
+            .Any(import => string.Equals(
+                import.Attribute("Project")?.Value.Trim().Replace('\\', '/'),
+                "local.build.props",
+                StringComparison.OrdinalIgnoreCase)) == true;
 
     private static string FormatReferenceEvidence(ReferenceInfo reference)
     {

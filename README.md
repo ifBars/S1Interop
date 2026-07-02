@@ -123,10 +123,14 @@ dotnet restore .\YourMod.csproj --source .\artifacts\packages --source https://a
 
 ```powershell
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
+dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- new .\MyBackendNeutralMod --apply
+dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- init . --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- lint .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dual-runtime --dry-run
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
+
+Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Both paths create or use an editable `S1Interop.Generated/S1Interop.BackendNeutral.cs` file where you can add `S1InteropType` and `S1InteropMember` declarations as your mod starts touching game APIs.
 
 Use `--apply` only after reviewing the dry-run output.
 
@@ -144,6 +148,8 @@ Then run:
 
 ```powershell
 .\.tools\s1interop analyze .
+.\.tools\s1interop new .\MyBackendNeutralMod --apply
+.\.tools\s1interop init . --apply
 .\.tools\s1interop migrate . --dual-runtime --dry-run
 .\.tools\s1interop verify-migration . --dual-runtime
 ```
@@ -162,6 +168,8 @@ If migration creates `local.build.props`, fill in the generated `MonoGamePath` a
 
 ```text
 s1interop analyze [path=.] [--configuration name] [--format text|json]
+s1interop new <path> [--dry-run|--apply] [--format text|json]
+s1interop init [path=.] [--dry-run|--apply] [--format text|json]
 s1interop lint [path=.] [--configuration name] [--format text|json]
 s1interop sdkgen [path=.] [--dry-run|--apply] [--format text|json]
 s1interop build-hook [path=.] [--dry-run|--apply] [--format text|json]

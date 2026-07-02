@@ -83,18 +83,21 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("generate_delegate_event_bridge", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_harmony_method_targets", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_member_access_targets", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("generate_backend_neutral_starter", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("generate_source_risk_report", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("conditionalize_scheduleone_usings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_unity_event_listeners", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_delegate_arguments", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_harmony_overload_bindings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_member_access_fallbacks", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_direct_member_reflection_lookups", StringComparison.OrdinalIgnoreCase) &&
-                !operation.RuleId.Equals("rewrite_player_camera_close_interface", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_il2cpp_object_casts", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_registertype", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("game_constructor_requires_il2cpp_signature", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("install_build_validation_hook", StringComparison.OrdinalIgnoreCase);
             if (mutatesProjectDocument && !projectTracked)
             {
@@ -111,6 +114,7 @@ public sealed class MigrationApplier
                 "local_path_in_project" => ApplyLocalPathMove(projectPath, document, backupRoot, fileChanges),
                 "global_usings_require_langversion" => ApplyGlobalUsingsLangVersion(document),
                 "missing_local_reference_properties" => ApplyLocalReferencePropertyScaffold(projectPath, document, backupRoot, fileChanges),
+                "missing_local_build_props_import" => ApplyLocalBuildPropsImport(document),
                 "missing_il2cppinterop_reference" => ApplyMissingIl2CppInteropReference(document, operation.Configuration),
                 "missing_runtime_define" => ApplyMissingRuntimeDefine(document, operation),
                 "add_il2cpp_configuration" => ApplyDualRuntimeScaffold(projectPath, document, operation, backupRoot, fileChanges),
@@ -121,19 +125,21 @@ public sealed class MigrationApplier
                 "injected_type_missing_registertype" => ApplyInjectedTypeRegistration(operation, backupRoot, fileChanges),
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
                 "injected_member_requires_hidefromil2cpp" => ApplyHideFromIl2CppAttribute(operation, backupRoot, fileChanges),
+                "game_constructor_requires_il2cpp_signature" => ApplyGameConstructorSignature(operation, backupRoot, fileChanges),
                 "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
                 "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
                 "generate_harmony_method_targets" => ApplyHarmonyMethodTargets(projectPlan, document, operation, backupRoot, fileChanges),
                 "generate_member_access_targets" => ApplyMemberAccessTargets(projectPlan, document, operation, backupRoot, fileChanges),
-                "generate_player_camera_compat_bridge" => ApplyPlayerCameraCompatBridge(projectPlan, document, operation, backupRoot, fileChanges),
+                "generate_backend_neutral_starter" => ApplyBackendNeutralStarter(operation, backupRoot, fileChanges),
                 "generate_source_risk_report" => ApplySourceRiskReport(projectPlan, operation, backupRoot, fileChanges),
                 "rewrite_unity_event_listeners" => ApplyUnityEventListenerRewrite(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_delegate_assignments" => ApplyDelegateAssignmentRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_delegate_arguments" => ApplyDelegateArgumentRewrite(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_harmony_overload_bindings" => ApplyHarmonyOverloadBindingRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_member_access_fallbacks" => ApplyMemberAccessFallbackRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_direct_member_reflection_lookups" => ApplyDirectMemberReflectionLookupRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
-                "rewrite_player_camera_close_interface" => ApplyPlayerCameraCloseInterfaceRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_il2cpp_object_casts" => ApplyIl2CppObjectCastRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
             };
@@ -316,18 +322,20 @@ public sealed class MigrationApplier
             "generate_unity_event_bridge" => 10,
             "generate_harmony_method_targets" => 10,
             "generate_member_access_targets" => 10,
-            "generate_player_camera_compat_bridge" => 10,
+            "generate_backend_neutral_starter" => 10,
             "install_s1interop_generator_package" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
             "conditionalize_scheduleone_usings" => 20,
             "rewrite_unity_event_listeners" => 20,
             "rewrite_harmony_overload_bindings" => 20,
+            "rewrite_delegate_arguments" => 20,
             "rewrite_member_access_fallbacks" => 20,
             "rewrite_direct_member_reflection_lookups" => 20,
-            "rewrite_player_camera_close_interface" => 20,
+            "rewrite_il2cpp_object_casts" => 20,
             "injected_type_missing_registertype" => 20,
             "injected_type_missing_intptr_constructor" => 21,
             "injected_member_requires_hidefromil2cpp" => 22,
+            "game_constructor_requires_il2cpp_signature" => 23,
             _ => 0
         };
 
@@ -653,7 +661,8 @@ public sealed class MigrationApplier
             }
 
             property.Element.Value = $"$({localPropertyName})";
-            if (property.Element.Attribute("Condition") is null)
+            if (property.Element.Attribute("Condition") is null &&
+                string.IsNullOrWhiteSpace(property.PropertyGroupCondition))
             {
                 property.Element.SetAttributeValue("Condition", $"'$({property.PropertyName})'==''");
             }
@@ -703,6 +712,14 @@ public sealed class MigrationApplier
         WriteLocalProps(examplePropsPath, properties, includeValues: false, backupRoot, fileChanges);
         EnsureGitIgnoreEntry(gitIgnorePath, "local.build.props", backupRoot, fileChanges);
         return true;
+    }
+
+    private static bool ApplyLocalBuildPropsImport(XDocument document)
+    {
+        int before = document.Root!.Elements().Where(IsNamed("Import")).Count();
+        EnsureLocalBuildPropsImport(document);
+        int after = document.Root!.Elements().Where(IsNamed("Import")).Count();
+        return after > before;
     }
 
     private static void EnsureDualRuntimeLocalProps(
@@ -1306,6 +1323,24 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyBackendNeutralStarter(
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        string source = new BackendNeutralStarterGenerator().GenerateSource();
+        if (File.Exists(operation.FilePath) && string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(operation.FilePath, backupRoot, fileChanges);
+        Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
+        File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
+        UpdateTrackedFileHash(operation.FilePath, fileChanges);
+        return true;
+    }
+
     private static bool ApplyHarmonyMethodTargets(
         ProjectMigrationPlan projectPlan,
         XDocument document,
@@ -1347,27 +1382,6 @@ public sealed class MigrationApplier
         }
 
         string source = new MemberAccessTargetGenerator().GenerateSource(targets);
-        bool changed = false;
-        if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
-        {
-            TrackFile(operation.FilePath, backupRoot, fileChanges);
-            Directory.CreateDirectory(Path.GetDirectoryName(operation.FilePath)!);
-            File.WriteAllText(operation.FilePath, source, Encoding.UTF8);
-            UpdateTrackedFileHash(operation.FilePath, fileChanges);
-            changed = true;
-        }
-
-        return EnsureGeneratedFacadeCompileInclude(document, projectPlan.ProjectPath, operation.FilePath) || changed;
-    }
-
-    private static bool ApplyPlayerCameraCompatBridge(
-        ProjectMigrationPlan projectPlan,
-        XDocument document,
-        MigrationOperation operation,
-        string backupRoot,
-        List<MigrationFileChange> fileChanges)
-    {
-        string source = PlayerCameraCompatGenerator.GenerateSource();
         bool changed = false;
         if (!File.Exists(operation.FilePath) || !string.Equals(File.ReadAllText(operation.FilePath), source, StringComparison.Ordinal))
         {
@@ -1427,6 +1441,29 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyDelegateArgumentRewrite(
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = new DelegateArgumentRewriter().RewriteSource(original);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
     private static bool ApplyHarmonyOverloadBindingRewrite(
         string projectPath,
         string sourcePath,
@@ -1468,13 +1505,8 @@ public sealed class MigrationApplier
             return false;
         }
 
-        IReadOnlyList<MemberAccessTarget> targets = new MemberAccessTargetCatalog().Discover(projectPath);
-        if (targets.Count == 0)
-        {
-            return false;
-        }
-
         string original = File.ReadAllText(sourcePath);
+        IReadOnlyList<MemberAccessTarget> targets = new MemberAccessTargetCatalog().Discover(projectPath);
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(original, sourcePath, targets);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
@@ -1517,7 +1549,7 @@ public sealed class MigrationApplier
         return true;
     }
 
-    private static bool ApplyPlayerCameraCloseInterfaceRewrite(
+    private static bool ApplyIl2CppObjectCastRewrite(
         string sourcePath,
         string backupRoot,
         List<MigrationFileChange> fileChanges)
@@ -1528,7 +1560,7 @@ public sealed class MigrationApplier
         }
 
         string original = File.ReadAllText(sourcePath);
-        string rewritten = PlayerCameraCompatRewriter.RewriteSource(original);
+        string rewritten = new Il2CppObjectCastRewriter().RewriteSource(original);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;
@@ -1680,12 +1712,24 @@ public sealed class MigrationApplier
         }
 
         string memberIndent = GetMemberIndent(lines, openingBraceLine, classIndent);
-        lines.InsertRange(openingBraceLine + 1,
+        List<string> constructorLines =
         [
             $"{memberIndent}#if IL2CPP",
-            $"{memberIndent}public {target.TypeName}(System.IntPtr ptr) : base(ptr) {{ }}",
-            $"{memberIndent}#endif"
-        ]);
+            $"{memberIndent}public {target.TypeName}(System.IntPtr ptr) : base(ptr) {{ }}"
+        ];
+
+        if (!HasParameterlessConstructor(lines, classLine, target.TypeName))
+        {
+            constructorLines.Add(string.Empty);
+            constructorLines.Add(
+                $"{memberIndent}public {target.TypeName}() : base(Il2CppInterop.Runtime.Injection.ClassInjector.DerivedConstructorPointer<{target.TypeName}>())");
+            constructorLines.Add($"{memberIndent}{{");
+            constructorLines.Add($"{memberIndent}    Il2CppInterop.Runtime.Injection.ClassInjector.DerivedConstructorBody(this);");
+            constructorLines.Add($"{memberIndent}}}");
+        }
+
+        constructorLines.Add($"{memberIndent}#endif");
+        lines.InsertRange(openingBraceLine + 1, constructorLines);
 
         TrackFile(operation.FilePath, backupRoot, fileChanges);
         string rewritten = string.Join(newline, lines);
@@ -1783,6 +1827,40 @@ public sealed class MigrationApplier
             $"{indent}[Il2CppInterop.Runtime.Attributes.HideFromIl2Cpp]",
             $"{indent}#endif"
         ]);
+
+        TrackFile(operation.FilePath, backupRoot, fileChanges);
+        string rewritten = string.Join(newline, lines);
+        if (hadTrailingNewline)
+        {
+            rewritten += newline;
+        }
+
+        File.WriteAllText(operation.FilePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(operation.FilePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyGameConstructorSignature(
+        MigrationOperation operation,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(operation.FilePath))
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(operation.FilePath);
+        string newline = original.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        bool hadTrailingNewline = original.EndsWith("\r\n", StringComparison.Ordinal) ||
+                                  original.EndsWith('\n');
+        List<string> lines = File.ReadAllLines(operation.FilePath).ToList();
+        bool changed = ConditionalizeGameConstructorSignatures(lines);
+        changed = ConditionalizeGameConstructorFactoryHelpers(lines) || changed;
+        if (!changed)
+        {
+            return false;
+        }
 
         TrackFile(operation.FilePath, backupRoot, fileChanges);
         string rewritten = string.Join(newline, lines);
@@ -2289,6 +2367,165 @@ public sealed class MigrationApplier
         return false;
     }
 
+    private static bool ConditionalizeGameConstructorSignatures(List<string> lines)
+    {
+        bool changed = false;
+        for (int index = 0; index < lines.Count; index++)
+        {
+            if (!TryReadClassDeclaration(lines[index], out string classIndent, out string baseType) ||
+                !IsLikelyGameBackedBase(baseType))
+            {
+                continue;
+            }
+
+            Match classMatch = ClassDeclarationRegex.Match(lines[index]);
+            if (!classMatch.Success)
+            {
+                continue;
+            }
+
+            string typeName = classMatch.Groups["name"].Value;
+            int classEndLine = FindClassEndLine(lines, index);
+            for (int memberIndex = index + 1; memberIndex <= classEndLine && memberIndex < lines.Count; memberIndex++)
+            {
+                string line = lines[memberIndex];
+                if (!line.Contains($" {typeName}(", StringComparison.Ordinal) ||
+                    !line.Contains("Guid", StringComparison.Ordinal) ||
+                    !line.Contains("List<", StringComparison.Ordinal) ||
+                    IsAlreadyRuntimeGuarded(lines, memberIndex))
+                {
+                    continue;
+                }
+
+                int baseLine = memberIndex + 1 < lines.Count && lines[memberIndex + 1].Contains(": base(", StringComparison.Ordinal)
+                    ? memberIndex + 1
+                    : -1;
+                if (baseLine < 0)
+                {
+                    continue;
+                }
+
+                string indent = GetIndent(line);
+                string il2CppLine = ReplaceGameConstructorIl2CppSignatureTypes(line);
+                string baseLineText = lines[baseLine];
+                lines.RemoveAt(baseLine);
+                lines.RemoveAt(memberIndex);
+                lines.InsertRange(memberIndex,
+                [
+                    $"{indent}#if IL2CPP",
+                    il2CppLine,
+                    baseLineText,
+                    $"{indent}#else",
+                    line,
+                    baseLineText,
+                    $"{indent}#endif"
+                ]);
+                changed = true;
+                break;
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool ConditionalizeGameConstructorFactoryHelpers(List<string> lines)
+    {
+        bool changed = false;
+        for (int index = 0; index < lines.Count; index++)
+        {
+            string line = lines[index];
+            if (line.Contains("?? new List<", StringComparison.Ordinal) &&
+                !IsAlreadyRuntimeGuarded(lines, index))
+            {
+                string indent = GetIndent(line);
+                lines.RemoveAt(index);
+                lines.InsertRange(index,
+                [
+                    $"{indent}#if IL2CPP",
+                    line.Replace("new List<", "new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal),
+                    $"{indent}#else",
+                    line,
+                    $"{indent}#endif"
+                ]);
+                changed = true;
+                index += 4;
+                continue;
+            }
+
+            if (line.Contains("new Guid(", StringComparison.Ordinal) &&
+                !line.Contains("Il2CppSystem.Guid", StringComparison.Ordinal) &&
+                !IsAlreadyRuntimeGuarded(lines, index))
+            {
+                string indent = GetIndent(line);
+                lines.RemoveAt(index);
+                lines.InsertRange(index,
+                [
+                    $"{indent}#if IL2CPP",
+                    line.Replace("new Guid(", "new Il2CppSystem.Guid(", StringComparison.Ordinal),
+                    $"{indent}#else",
+                    line,
+                    $"{indent}#endif"
+                ]);
+                changed = true;
+                index += 4;
+            }
+        }
+
+        return changed;
+    }
+
+    private static string ReplaceGameConstructorIl2CppSignatureTypes(string line) =>
+        line.Replace("Guid ", "Il2CppSystem.Guid ", StringComparison.Ordinal)
+            .Replace("List<", "Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal);
+
+    private static bool IsLikelyGameBackedBase(string baseType) =>
+        baseType
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(candidate => IsIl2CppInjectedBase(candidate) ||
+                              IsKnownGameDataBase(candidate) ||
+                              candidate.Contains("ScheduleOne.", StringComparison.Ordinal) ||
+                              candidate.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal));
+
+    private static bool IsKnownGameDataBase(string candidate)
+    {
+        string simpleName = candidate.Split('.').Last();
+        return simpleName is "VehicleData" or "GameData";
+    }
+
+    private static bool IsAlreadyRuntimeGuarded(IReadOnlyList<string> lines, int lineIndex)
+    {
+        var runtimeGuardStack = new Stack<bool>();
+        for (int index = 0; index <= lineIndex && index < lines.Count; index++)
+        {
+            string trimmed = lines[index].TrimStart();
+            if (trimmed.StartsWith("#if ", StringComparison.Ordinal))
+            {
+                runtimeGuardStack.Push(IsRuntimeGuardDirective(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#elif ", StringComparison.Ordinal))
+            {
+                bool previous = runtimeGuardStack.Count > 0 && runtimeGuardStack.Pop();
+                runtimeGuardStack.Push(previous || IsRuntimeGuardDirective(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#endif", StringComparison.Ordinal) && runtimeGuardStack.Count > 0)
+            {
+                runtimeGuardStack.Pop();
+            }
+        }
+
+        return runtimeGuardStack.Contains(true);
+    }
+
+    private static bool IsRuntimeGuardDirective(string directive) =>
+        directive.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase) ||
+        directive.Contains("MONO", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetIndent(string line) => line[..^line.TrimStart().Length];
+
     private static bool HasRegisterTypeAttribute(IReadOnlyList<string> lines, int classLine)
     {
         for (int index = Math.Max(0, classLine - 8); index < classLine; index++)
@@ -2317,6 +2554,28 @@ public sealed class MigrationApplier
 
         Regex constructorRegex = new(
             $@"^\s*(?:public|protected|internal|private)\s+{Regex.Escape(typeName)}\s*\(\s*(?:System\.)?IntPtr\s+\w+\s*\)\s*:\s*base\s*\(\s*\w+\s*\)",
+            RegexOptions.Compiled);
+        for (int index = classLine + 1; index <= endLine; index++)
+        {
+            if (constructorRegex.IsMatch(lines[index]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasParameterlessConstructor(IReadOnlyList<string> lines, int classLine, string typeName)
+    {
+        int endLine = FindClassEndLine(lines, classLine);
+        if (endLine < 0)
+        {
+            return true;
+        }
+
+        Regex constructorRegex = new(
+            $@"^\s*(?:public|protected|internal|private)\s+{Regex.Escape(typeName)}\s*\(\s*\)",
             RegexOptions.Compiled);
         for (int index = classLine + 1; index <= endLine; index++)
         {

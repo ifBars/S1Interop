@@ -15,6 +15,11 @@ internal static class CliCommandDispatcher
             return VerifyMigrationCommand.Run(command);
         }
 
+        if (command.Name.Equals("new", StringComparison.OrdinalIgnoreCase))
+        {
+            return NewProjectCommand.Run(command);
+        }
+
         WorkspaceAnalysis analysis;
         try
         {

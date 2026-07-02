@@ -15,6 +15,10 @@ public sealed class SdkFacadeGenerator
         @"(?<![A-Za-z0-9_])(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*){2,})",
         RegexOptions.Compiled);
 
+    private static readonly Regex ScheduleOneUsingAliasRegex = new(
+        @"^\s*using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*){1,})\s*;",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
     public SdkFacadePlan Plan(ProjectAnalysis project)
     {
         string projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
@@ -44,7 +48,9 @@ public sealed class SdkFacadeGenerator
             builder.AppendLine();
         }
 
-        foreach (SdkTypeAlias alias in plan.TypeAliases.OrderBy(value => value.Alias, StringComparer.OrdinalIgnoreCase))
+        foreach (SdkTypeAlias alias in plan.TypeAliases
+                     .Where(alias => alias.GenerateGlobalUsing)
+                     .OrderBy(value => value.Alias, StringComparer.OrdinalIgnoreCase))
         {
             builder.AppendLine("#if MONO");
             builder.AppendLine($"global using {alias.Alias} = {alias.MonoType};");
@@ -54,18 +60,15 @@ public sealed class SdkFacadeGenerator
             builder.AppendLine();
         }
 
-        builder.AppendLine("namespace S1Interop.Generated;");
-        builder.AppendLine();
-        builder.AppendLine("internal static class S1InteropRuntime");
-        builder.AppendLine("{");
-        builder.AppendLine("#if IL2CPP");
-        builder.AppendLine("    public const bool IsIl2Cpp = true;");
-        builder.AppendLine("    public const string RuntimeName = \"IL2CPP\";");
-        builder.AppendLine("#else");
-        builder.AppendLine("    public const bool IsIl2Cpp = false;");
-        builder.AppendLine("    public const string RuntimeName = \"Mono\";");
-        builder.AppendLine("#endif");
-        builder.AppendLine("}");
+        foreach (SdkTypeAlias alias in plan.TypeAliases.OrderBy(value => value.Alias, StringComparer.OrdinalIgnoreCase))
+        {
+            builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{Escape(alias.MonoType)}\", Alias = \"{Escape(alias.Alias)}\", Il2CppTypeName = \"{Escape(alias.Il2CppType)}\")]");
+        }
+
+        if (plan.TypeAliases.Count > 0)
+        {
+            builder.AppendLine();
+        }
 
         return builder.ToString();
     }
@@ -109,6 +112,7 @@ public sealed class SdkFacadeGenerator
         }
 
         var monoTypesByAlias = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
+        var explicitSourceAliasKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (string file in WorkspaceTraversal.EnumerateFiles(projectDirectory, "*.cs"))
         {
             if (IsGeneratedOrBuildOutput(projectDirectory, file))
@@ -117,6 +121,26 @@ public sealed class SdkFacadeGenerator
             }
 
             string source = File.ReadAllText(file);
+            foreach (Match match in ScheduleOneUsingAliasRegex.Matches(source))
+            {
+                string alias = match.Groups["alias"].Value;
+                string monoType = ToMonoTypeName(match.Groups["type"].Value);
+                if (string.IsNullOrWhiteSpace(alias) ||
+                    string.Equals(alias, monoType.Split('.').LastOrDefault(), StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!monoTypesByAlias.TryGetValue(alias, out SortedSet<string>? monoTypes))
+                {
+                    monoTypes = new SortedSet<string>(StringComparer.Ordinal);
+                    monoTypesByAlias[alias] = monoTypes;
+                }
+
+                monoTypes.Add(monoType);
+                explicitSourceAliasKeys.Add(GetAliasKey(alias, monoType));
+            }
+
             foreach (Match match in FullyQualifiedScheduleOneTypeRegex.Matches(source))
             {
                 string type = match.Groups["type"].Value;
@@ -125,9 +149,7 @@ public sealed class SdkFacadeGenerator
                     continue;
                 }
 
-                string monoType = type.StartsWith("Il2Cpp", StringComparison.Ordinal)
-                    ? type["Il2Cpp".Length..]
-                    : type;
+                string monoType = ToMonoTypeName(type);
                 string[] parts = monoType.Split('.');
                 string alias = parts.Last();
                 if (string.IsNullOrWhiteSpace(alias))
@@ -155,11 +177,19 @@ public sealed class SdkFacadeGenerator
             .Select(pair =>
             {
                 string monoType = pair.Value.Single();
-                return new SdkTypeAlias(pair.Key, monoType, $"Il2Cpp{monoType}");
+                bool generateGlobalUsing = !explicitSourceAliasKeys.Contains(GetAliasKey(pair.Key, monoType));
+                return new SdkTypeAlias(pair.Key, monoType, $"Il2Cpp{monoType}", generateGlobalUsing);
             })
             .OrderBy(alias => alias.Alias, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private static string GetAliasKey(string alias, string monoType) => $"{alias}\n{monoType}";
+
+    private static string ToMonoTypeName(string type) =>
+        type.StartsWith("Il2Cpp", StringComparison.Ordinal)
+            ? type["Il2Cpp".Length..]
+            : type;
 
     private static bool IsUsingDirectiveMatch(string source, int matchIndex)
     {
@@ -173,4 +203,7 @@ public sealed class SdkFacadeGenerator
     {
         return WorkspaceTraversal.HasExcludedPathPart(projectDirectory, file);
     }
+
+    private static string Escape(string value) =>
+        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
 }

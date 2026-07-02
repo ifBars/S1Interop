@@ -44,6 +44,18 @@ public sealed class SourceInteropAnalyzer
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex ReflectionLookupWithVariableReceiverRegex = new(
+        @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\)|[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Get(?<kind>Field|Property)\s*\(",
+        RegexOptions.Compiled);
+
+    private static readonly Regex TypeAliasAssignmentRegex = new(
+        @"\b(?:Type|System\.Type)\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<receiver>[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*;",
+        RegexOptions.Compiled);
+
+    private static readonly Regex GuiWindowDelegateArgumentRegex = new(
+        @"\bGUI\.Window\s*\(\s*[^,]+\s*,\s*[^,]+\s*,\s*(?<listener>[A-Za-z_][A-Za-z0-9_\.]*)\s*,",
+        RegexOptions.Compiled);
+
     public SourceInteropAnalysis Analyze(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -185,6 +197,7 @@ public sealed class SourceInteropAnalyzer
             }
 
             AddManagedSurfaceDiagnostics(projectPath, sourceFile, lines, span, projectClassNames, injectedTypeNames, diagnostics);
+            AddGameConstructorSignatureDiagnostics(projectPath, sourceFile, lines, span, diagnostics);
         }
     }
 
@@ -246,6 +259,18 @@ public sealed class SourceInteropAnalyzer
                 "Prefer S1API EventHelper or DelegateSupport.ConvertDelegate for generated-wrapper event surfaces."));
         }
 
+        if (IsDirectDelegateArgumentInteropLine(trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "DirectDelegateArgumentInterop",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Direct delegate arguments passed to Unity or game callbacks can require IL2CPP delegate conversion.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer S1Interop.Generated.S1InteropDelegateBridge.Convert<TDelegate> so delegate conversion is centralized and runtime-selected."));
+        }
+
         if (IsHarmonyOverloadBindingLine(lines, index))
         {
             sourceRisks.Add(new SourceRisk(
@@ -282,12 +307,120 @@ public sealed class SourceInteropAnalyzer
                 $"{relativePath}:{index + 1}: {trimmed}",
                 "Prefer generated S1InteropMember declarations so the owner type, member name, static shape, and cached lookup stay centralized across runtimes."));
         }
+
+        if (IsIl2CppByteBufferInteropLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppByteBufferInterop",
+                "high",
+                sourceFile,
+                index + 1,
+                "Native or game APIs that fill managed byte[] buffers can behave differently under IL2CPP marshalling.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Use an IL2CPP branch with Il2CppStructArray<byte> for receive/fill buffers, copy bytes into a managed byte[] before parsing, and consider pinning send buffers for IL2CPP."));
+        }
+
+        if (IsManagedCollectionSignatureInteropLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "ManagedCollectionSignatureInterop",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Game-facing signatures that use managed collection types can miss IL2CPP wrapper collection parameters at runtime.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Add a MONO/IL2CPP signature branch so IL2CPP uses Il2CppSystem.Collections.Generic.List<T> for game-owned callback parameters."));
+        }
+
+        if (IsIl2CppObjectCastInteropLine(trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppObjectCastInterop",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Plain C# casts or pattern matches against IL2CPP-backed objects can fail to unwrap object proxies.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer S1Interop.Generated.S1InteropObjectCast.As<T>/Is<T> for backend-neutral casts, or add an IL2CPP branch that calls TryCast<T>() and handles cast failures explicitly."));
+        }
     }
 
     private static bool IsHarmonyTranspilerLine(string line) =>
         line.Contains("HarmonyTranspiler", StringComparison.Ordinal) ||
         line.Contains("IEnumerable<CodeInstruction>", StringComparison.Ordinal) ||
         line.Contains("CodeInstruction", StringComparison.Ordinal) && line.Contains("Transpiler", StringComparison.Ordinal);
+
+    private static bool IsIl2CppByteBufferInteropLine(IReadOnlyList<string> lines, int index, string line)
+    {
+        if (line.Contains("Il2CppStructArray", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (line.Contains("SteamNetworking.ReadP2PPacket", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return LooksLikeNativeByteBufferFillCall(line) &&
+               DiscoverByteArrayVariableNames(lines).Any(name => line.Contains(name, StringComparison.Ordinal));
+    }
+
+    private static bool LooksLikeNativeByteBufferFillCall(string line) =>
+        line.Contains('(') &&
+        (line.Contains(".Read", StringComparison.Ordinal) ||
+         line.Contains(".Receive", StringComparison.Ordinal) ||
+         line.Contains(".Recv", StringComparison.Ordinal) ||
+         line.Contains(".Get", StringComparison.Ordinal) ||
+         line.Contains(".Fill", StringComparison.Ordinal)) &&
+        !line.Contains("File.", StringComparison.Ordinal) &&
+        !line.Contains("Encoding.", StringComparison.Ordinal) &&
+        !line.Contains("MemoryStream", StringComparison.Ordinal);
+
+    private static IReadOnlySet<string> DiscoverByteArrayVariableNames(IReadOnlyList<string> lines)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        Regex declarationRegex = new(@"\b(?:byte\[\]|System\.Byte\[\])\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\b");
+        foreach (string line in lines)
+        {
+            Match match = declarationRegex.Match(line);
+            if (match.Success)
+            {
+                names.Add(match.Groups["name"].Value);
+            }
+        }
+
+        return names;
+    }
+
+    private static bool IsManagedCollectionSignatureInteropLine(IReadOnlyList<string> lines, int index, string line) =>
+        line.Contains("List<", StringComparison.Ordinal) &&
+        line.Contains(')') &&
+        !line.Contains('=') &&
+        !line.Contains("Il2CppSystem.Collections.Generic.List", StringComparison.Ordinal) &&
+        IsGameFacingSignatureContext(lines, index, line);
+
+    private static bool IsGameFacingSignatureContext(IReadOnlyList<string> lines, int index, string line)
+    {
+        string context = string.Join(
+            ' ',
+            lines.Skip(Math.Max(0, index - 2)).Take(Math.Min(5, lines.Count - Math.Max(0, index - 2))).Select(value => value.Trim()));
+        return context.Contains("Postfix", StringComparison.Ordinal) ||
+               context.Contains("Prefix", StringComparison.Ordinal) ||
+               context.Contains("__instance", StringComparison.Ordinal) ||
+               context.Contains("BindInternal", StringComparison.Ordinal) ||
+               context.Contains("Config", StringComparison.Ordinal) ||
+               context.Contains("Panel", StringComparison.Ordinal);
+    }
+
+    private static bool IsIl2CppObjectCastInteropLine(string line) =>
+        line.Contains(" is ", StringComparison.Ordinal) &&
+        !line.Contains("Il2CppObjectBase", StringComparison.Ordinal) &&
+        !line.Contains("TryCast<", StringComparison.Ordinal) &&
+        (line.Contains("UniversalRenderPipelineAsset", StringComparison.Ordinal) ||
+         line.Contains("UnityEngine.Object", StringComparison.Ordinal) ||
+         line.Contains("Component", StringComparison.Ordinal) ||
+         line.Contains("MonoBehaviour", StringComparison.Ordinal));
 
     private static bool IsDirectUnityEventListenerLine(string line, IReadOnlySet<string> runtimeSafeUnityListenerNames)
     {
@@ -318,6 +451,27 @@ public sealed class SourceInteropAnalyzer
         !line.Contains("DelegateSupport.ConvertDelegate", StringComparison.Ordinal) &&
         !line.Contains("EventHelper.", StringComparison.Ordinal);
 
+    private static bool IsDirectDelegateArgumentInteropLine(string line)
+    {
+        if (!line.Contains("GUI.Window", StringComparison.Ordinal) ||
+            line.Contains("DelegateSupport.ConvertDelegate", StringComparison.Ordinal) ||
+            line.Contains("S1InteropDelegateBridge.Convert", StringComparison.Ordinal) ||
+            line.Contains("new GUI.WindowFunction", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Match match = GuiWindowDelegateArgumentRegex.Match(line);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string listener = match.Groups["listener"].Value;
+        return listener.Length > 0 &&
+               !listener.Contains('.', StringComparison.Ordinal);
+    }
+
     private static bool IsHarmonyOverloadBindingLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
@@ -338,18 +492,13 @@ public sealed class SourceInteropAnalyzer
     private static bool IsFieldPropertyReflectionFallbackLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
-        Match fieldLookup = ReflectionLookupReceiverRegex.Matches(line)
-            .FirstOrDefault(match => match.Groups["kind"].Value == "Field")!;
-        if (fieldLookup is null || !fieldLookup.Success)
+        if (!line.Contains(".GetField(", StringComparison.Ordinal))
         {
             return false;
         }
 
-        string receiver = NormalizeReflectionReceiver(fieldLookup.Groups["receiver"].Value);
-        string forwardWindow = GetSourceWindow(lines, index, maxLineCount: 16);
-        string backwardWindow = GetSourceWindow(lines, Math.Max(0, index - 15), Math.Min(16, index + 1));
-        return HasReflectionLookup(forwardWindow, receiver, "Property") ||
-               HasReflectionLookup(backwardWindow, receiver, "Property");
+        string window = GetSourceWindow(lines, Math.Max(0, index - 15), maxLineCount: 31);
+        return HasFieldPropertyFallbackPair(window);
     }
 
     private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
@@ -368,14 +517,14 @@ public sealed class SourceInteropAnalyzer
 
     private static bool HasFieldPropertyFallbackPair(string sourceWindow)
     {
-        foreach (Match match in ReflectionLookupReceiverRegex.Matches(sourceWindow))
+        foreach (ReflectionLookup lookup in GetReflectionLookups(sourceWindow))
         {
-            if (match.Groups["kind"].Value != "Field")
+            if (lookup.Kind != "Field")
             {
                 continue;
             }
 
-            if (HasReflectionLookup(sourceWindow, NormalizeReflectionReceiver(match.Groups["receiver"].Value), "Property"))
+            if (HasReflectionLookup(sourceWindow, lookup.Receiver, "Property"))
             {
                 return true;
             }
@@ -385,10 +534,42 @@ public sealed class SourceInteropAnalyzer
     }
 
     private static bool HasReflectionLookup(string sourceWindow, string receiver, string kind) =>
-        ReflectionLookupReceiverRegex.Matches(sourceWindow)
-            .Any(match =>
-                match.Groups["kind"].Value == kind &&
-                NormalizeReflectionReceiver(match.Groups["receiver"].Value) == receiver);
+        GetReflectionLookups(sourceWindow)
+            .Any(lookup =>
+                lookup.Kind == kind &&
+                lookup.Receiver == receiver);
+
+    private static IReadOnlyList<ReflectionLookup> GetReflectionLookups(string sourceWindow)
+    {
+        Dictionary<string, string> aliases = GetTypeAliases(sourceWindow);
+        var lookups = new List<ReflectionLookup>();
+        foreach (Match match in ReflectionLookupWithVariableReceiverRegex.Matches(sourceWindow))
+        {
+            string receiver = NormalizeReflectionReceiver(match.Groups["receiver"].Value);
+            if (aliases.TryGetValue(receiver, out string? normalizedReceiver))
+            {
+                lookups.Add(new ReflectionLookup(normalizedReceiver, match.Groups["kind"].Value));
+            }
+            else if (receiver.Contains("typeof(", StringComparison.Ordinal) ||
+                     receiver.Contains(".GetType()", StringComparison.Ordinal))
+            {
+                lookups.Add(new ReflectionLookup(receiver, match.Groups["kind"].Value));
+            }
+        }
+
+        return lookups;
+    }
+
+    private static Dictionary<string, string> GetTypeAliases(string sourceWindow)
+    {
+        var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match match in TypeAliasAssignmentRegex.Matches(sourceWindow))
+        {
+            aliases[match.Groups["alias"].Value] = NormalizeReflectionReceiver(match.Groups["receiver"].Value);
+        }
+
+        return aliases;
+    }
 
     private static string NormalizeReflectionReceiver(string receiver) =>
         Regex.Replace(receiver, @"\s+", string.Empty);
@@ -437,6 +618,17 @@ public sealed class SourceInteropAnalyzer
         directive.Contains("IL2CPPBEPINEX", StringComparison.OrdinalIgnoreCase) ||
         directive.Contains("MONO_BUILD", StringComparison.OrdinalIgnoreCase) ||
         directive.Contains("MOD_IL2CPP", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInsideRuntimeConditional(IReadOnlyList<string> lines, int lineIndex)
+    {
+        var runtimeGuardStack = new Stack<bool>();
+        for (int index = 0; index <= lineIndex && index < lines.Count; index++)
+        {
+            UpdateRuntimeGuardStack(lines[index], runtimeGuardStack);
+        }
+
+        return runtimeGuardStack.Contains(true);
+    }
 
     private static HashSet<string> DiscoverRuntimeSafeUnityListenerNames(IEnumerable<string> lines)
     {
@@ -589,6 +781,59 @@ public sealed class SourceInteropAnalyzer
                 $"{sourceFile}:{index + 1}: {span.Name}.{memberName}({memberMatch.Groups["params"].Value}) uses {string.Join(", ", managedTypes)}"));
         }
     }
+
+    private static void AddGameConstructorSignatureDiagnostics(
+        string projectPath,
+        string sourceFile,
+        string[] lines,
+        ClassSpan span,
+        List<InteropDiagnostic> diagnostics)
+    {
+        if (!IsLikelyGameBackedType(span.BaseType))
+        {
+            return;
+        }
+
+        for (int index = span.StartLine; index <= span.EndLine; index++)
+        {
+            string line = lines[index];
+            if (!line.Contains($" {span.Name}(", StringComparison.Ordinal) ||
+                !line.Contains("Guid", StringComparison.Ordinal) ||
+                !line.Contains("List<", StringComparison.Ordinal) ||
+                IsInsideRuntimeConditional(lines, index))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new InteropDiagnostic(
+                "game_constructor_requires_il2cpp_signature",
+                DiagnosticSeverity.Error,
+                "Constructors that mirror game class constructors can need IL2CPP wrapper parameter equivalents under IL2CPP builds.",
+                projectPath,
+                null,
+                $"{sourceFile}:{index + 1}: {span.Name} constructor uses managed Guid/List<T> parameters without an IL2CPP signature branch."));
+            return;
+        }
+    }
+
+    private static bool IsLikelyGameBackedType(string baseType)
+    {
+        string[] baseTypes = baseType.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return baseTypes.Any(candidate =>
+            IsLikelyIl2CppInjectedBase(candidate) ||
+            IsKnownGameDataBase(candidate) ||
+            IsScheduleOneTypeName(candidate));
+    }
+
+    private static bool IsKnownGameDataBase(string candidate)
+    {
+        string simpleName = candidate.Split('.').Last();
+        return simpleName is "VehicleData" or "GameData";
+    }
+
+    private static bool IsScheduleOneTypeName(string candidate) =>
+        candidate.Contains("ScheduleOne.", StringComparison.Ordinal) ||
+        candidate.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal);
 
     private static string[] FindProjectManagedTypes(
         string signature,
@@ -750,4 +995,6 @@ public sealed class SourceInteropAnalyzer
     }
 
     private sealed record ClassSpan(string Name, string BaseType, int StartLine, int EndLine);
+
+    private sealed record ReflectionLookup(string Receiver, string Kind);
 }

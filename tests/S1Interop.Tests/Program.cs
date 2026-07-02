@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -57,7 +59,11 @@ internal sealed class S1InteropFixtureTests
         count++;
         MemberAccessFallbackRewriterRewritesNullableValueGetter();
         count++;
+        MemberAccessFallbackRewriterRewritesDynamicNamedHelpers();
+        count++;
         SourceInteropAnalyzerReportsFieldPropertyReflectionFallbackRisk();
+        count++;
+        MigrationRewritesDynamicInstanceReflectionFallbackWithoutTargets();
         count++;
         SourceInteropAnalyzerReportsDirectMemberReflectionLookupRisk();
         count++;
@@ -71,6 +77,14 @@ internal sealed class S1InteropFixtureTests
         count++;
         MigrationApplyAndRollbackRewritesSimpleDelegateAssignments();
         count++;
+        MigrationApplyAndRollbackRewritesDelegateArguments();
+        count++;
+        MigrationApplyAndRollbackRewritesIl2CppObjectCasts();
+        count++;
+        InitCommandApplyAndRollbackCreatesBackendNeutralStarter();
+        count++;
+        NewCommandCreatesBackendNeutralProjectScaffold();
+        count++;
         MigrationApplyAndRollbackGeneratesSourceRiskReport();
         count++;
         VerifyMigrationCanIncludeSourceMigrationsInSandbox();
@@ -82,6 +96,8 @@ internal sealed class S1InteropFixtureTests
         MigrationPreservesLocalPropsUnderOsConditionedGameDir();
         count++;
         MigrationApplyAndRollbackScaffoldsLocalReferenceProperties();
+        count++;
+        MigrationRepairsExistingLocalBuildPropsImport();
         count++;
         RuntimeDefineMigrationUsesDiagnosticDefineEvidenceForLegacyPlatformGroups();
         count++;
@@ -157,9 +173,9 @@ internal sealed class S1InteropFixtureTests
         count++;
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
-        PlayerCameraCompatBridgeRewritesCloseInterfaceCalls();
-        count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
+        count++;
+        BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes();
         count++;
         S1InteropGeneratorProducesCompileTimeEventBridges();
         count++;
@@ -210,7 +226,13 @@ internal sealed class S1InteropFixtureTests
         count++;
         S1FuelModInjectedTypesAreAnalyzed();
         count++;
+        BackendNeutralRegistryCompilesRealS1FuelModFacadeTargets();
+        count++;
+        SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
+        count++;
         MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
+        count++;
+        MigrationApplyConditionalizesS1FuelModGameConstructor();
         count++;
         VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource();
         count++;
@@ -369,13 +391,32 @@ internal sealed class S1InteropFixtureTests
                     {
                         button.onClick.AddListener(OnClicked);
                         SomeEvent = (Action)Delegate.Combine(SomeEvent, new Action(OnClicked));
+                        GUI.Window(0, windowRect, DrawWindow, "");
+                        SteamNetworking.ReadP2PPacket(data, packetSize, out bytesRead, out remoteId, channel);
+                        if (pipelineAsset is UniversalRenderPipelineAsset typedAsset)
+                        {
+                            _ = typedAsset;
+                        }
+                    }
+
+                    public static void BindInternalPostfix(object __instance,
+                        List<EntityConfiguration> configs)
+                    {
                     }
 
                     [HarmonyTranspiler]
                     public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) => instructions;
 
                     private static event Action? SomeEvent;
+                    private static byte[] data = [];
+                    private static uint packetSize;
+                    private static uint bytesRead;
+                    private static object remoteId = new();
+                    private static int channel;
+                    private static object windowRect = new();
+                    private static object pipelineAsset = new();
                     private static void OnClicked() { }
+                    private static void DrawWindow(int id) { }
                 }
                 """);
 
@@ -391,6 +432,18 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 source.SourceRisks.Any(risk => risk.Kind == "DirectDelegateCombine"),
                 "Source analyzer should report direct delegate combine risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "DirectDelegateArgumentInterop"),
+                "Source analyzer should report direct delegate argument interop risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "Il2CppByteBufferInterop"),
+                "Source analyzer should report IL2CPP byte buffer marshalling risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "ManagedCollectionSignatureInterop"),
+                "Source analyzer should report managed collection signature interop risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "Il2CppObjectCastInterop"),
+                "Source analyzer should report IL2CPP object cast risk.");
 
             MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
             Assert(
@@ -405,9 +458,34 @@ internal sealed class S1InteropFixtureTests
                 "Migration plan should rewrite safely rewritable UnityEvent listener risks.");
             Assert(
                 plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "rewrite_delegate_arguments" &&
+                    operation.Automatic),
+                "Migration plan should rewrite safely rewritable direct delegate argument risks.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
                     operation.RuleId == "source_risk_harmony_transpiler" &&
                     !operation.Automatic),
                 "Migration plan should surface Harmony transpiler risks as non-automatic guidance.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "source_risk_il2_cpp_byte_buffer_interop" &&
+                    !operation.Automatic),
+                "Migration plan should surface IL2CPP byte buffer risks as non-automatic guidance.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "source_risk_managed_collection_signature_interop" &&
+                    !operation.Automatic),
+                "Migration plan should surface managed collection signature risks as non-automatic guidance.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "rewrite_il2cpp_object_casts" &&
+                    operation.Automatic),
+                "Migration plan should rewrite simple IL2CPP object cast risks through the generated object cast helper.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "install_s1interop_generator_package" &&
+                    operation.Automatic),
+                "Migration plan should install the S1Interop generator package when rewriting object casts through generated helpers.");
         }
         finally
         {
@@ -623,6 +701,10 @@ internal sealed class S1InteropFixtureTests
                 migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
                 "Simple typed fallback getter should be rewritten through S1InteropMemberRegistry.");
+            Assert(
+                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(notice, \"container\");", StringComparison.Ordinal) &&
+                !migratedSource.Contains("notice.GetType().GetField(\"container\"", StringComparison.Ordinal),
+                "Simple dynamic object fallback getter should be rewritten through the backend-neutral instance member registry.");
 
             string report = File.ReadAllText(reportPath);
             Assert(
@@ -635,6 +717,131 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationRewritesDynamicInstanceReflectionFallbackWithoutTargets()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "DynamicReflectionMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "DynamicReflection.cs");
+            string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using System.Reflection;
+
+                namespace DynamicReflectionMod;
+
+                public static class DynamicReflection
+                {
+                    public static object? ReadMember(object? target, string memberName)
+                    {
+                        if (target == null)
+                        {
+                            return null;
+                        }
+
+                        Type type = target.GetType();
+                        PropertyInfo? property = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (property != null && property.CanRead && property.GetIndexParameters().Length == 0)
+                        {
+                            return property.GetValue(target, null);
+                        }
+
+                        FieldInfo? field = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            return field.GetValue(target);
+                        }
+
+                        return null;
+                    }
+
+                    public static bool TrySetMember(object? target, string memberName, object? value)
+                    {
+                        if (target == null)
+                        {
+                            return false;
+                        }
+
+                        Type type = target.GetType();
+                        PropertyInfo? property = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (property != null && property.CanWrite && property.GetIndexParameters().Length == 0)
+                        {
+                            property.SetValue(target, value, null);
+                            return true;
+                        }
+
+                        FieldInfo? field = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            field.SetValue(target, value);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                }
+                """);
+
+            ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
+            SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
+            Assert(
+                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 2,
+                $"Source analyzer should report the dynamic field/property getter and setter fallbacks. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
+
+            MigrationPlan plan = new MigrationPlanner().Plan(new WorkspaceAnalysis(tempProject, [project]));
+            ProjectMigrationPlan projectPlan = plan.Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package" && operation.Automatic),
+                "Dynamic instance fallback rewrites should install the S1Interop generator package for the generated member registry.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_member_access_fallbacks" && operation.Automatic),
+                "Dynamic instance fallback rewrites should be automatic when the same literal member is checked as field and property.");
+            Assert(
+                !projectPlan.Operations.Any(operation => operation.RuleId == "generate_member_access_targets"),
+                "Dynamic instance fallback rewrites should not generate owner-specific member target declarations.");
+            Assert(
+                !projectPlan.Operations.Any(operation => operation.RuleId == "source_risk_field_property_reflection_fallback" && !operation.Automatic),
+                "Automatically rewritten dynamic instance fallback should not remain as manual source-risk guidance.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_member_access_fallbacks"),
+                "Migration apply should rewrite dynamic instance reflection fallback helpers.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Migration apply should install the generator package for dynamic instance fallback helpers.");
+            Assert(!File.Exists(targetPath), "Dynamic instance fallback migration should not create member-access target declarations.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(target, memberName);", StringComparison.Ordinal) &&
+                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.TrySetInstanceValue(target, memberName, value);", StringComparison.Ordinal) &&
+                !migratedSource.Contains("type.GetField(memberName", StringComparison.Ordinal) &&
+                !migratedSource.Contains("type.GetProperty(memberName", StringComparison.Ordinal),
+                $"Dynamic instance fallback should be rewritten through backend-neutral instance helpers. Source:{Environment.NewLine}{migratedSource}");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the generator package reference change.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten dynamic reflection source file.");
         }
         finally
         {
@@ -813,6 +1020,73 @@ internal sealed class S1InteropFixtureTests
         Assert(
             rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetrenderScaleValue<float>(asset);", StringComparison.Ordinal),
             $"Nullable value fallback getter should rewrite through the generated member registry value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
+    }
+
+    private void MemberAccessFallbackRewriterRewritesDynamicNamedHelpers()
+    {
+        string source =
+            """
+            using System.Reflection;
+
+            namespace ReflectionFallbackMod;
+
+            public static class ReflectionFallback
+            {
+                private static object? ReadMember(object? target, string memberName)
+                {
+                    if (target == null)
+                    {
+                        return null;
+                    }
+
+                    Type type = target.GetType();
+                    PropertyInfo? property = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (property != null && property.CanRead)
+                    {
+                        return property.GetValue(target);
+                    }
+
+                    FieldInfo? field = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    return field?.GetValue(target);
+                }
+
+                private static bool TrySetMember(object? target, string memberName, object? value)
+                {
+                    if (target == null)
+                    {
+                        return false;
+                    }
+
+                    Type type = target.GetType();
+                    PropertyInfo? property = type.GetProperty(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (property != null && property.CanWrite)
+                    {
+                        property.SetValue(target, value);
+                        return true;
+                    }
+
+                    FieldInfo? field = type.GetField(memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (field != null)
+                    {
+                        field.SetValue(target, value);
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
+            """;
+
+        string rewritten = new MemberAccessFallbackRewriter().RewriteSource(
+            source,
+            Path.Combine(Path.GetTempPath(), "ReflectionFallback.cs"),
+            Array.Empty<MemberAccessTarget>());
+        Assert(
+            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(target, memberName);", StringComparison.Ordinal) &&
+            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.TrySetInstanceValue(target, memberName, value);", StringComparison.Ordinal) &&
+            !rewritten.Contains("type.GetProperty(memberName", StringComparison.Ordinal) &&
+            !rewritten.Contains("type.GetField(memberName", StringComparison.Ordinal),
+            $"Dynamic named member helpers should rewrite through backend-neutral instance helpers. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void DirectMemberReflectionLookupRewriterRewritesSplitAndCachedAssignments()
@@ -994,7 +1268,21 @@ internal sealed class S1InteropFixtureTests
                 #elif IL2CPP
                         button.onClick.AddListener(new System.Action(OnClicked));
                         Il2CppSystem.Delegate combined = Il2CppSystem.Delegate.Combine(SomeEvent, SomeEvent);
+                        SteamNetworking.ReadP2PPacket(il2CppBuffer, packetSize, out bytesRead, out remoteId, channel);
+                        if (pipelineAsset is Il2CppObjectBase il2CppObject)
+                        {
+                            UniversalRenderPipelineAsset? asset = il2CppObject.TryCast<UniversalRenderPipelineAsset>();
+                        }
                 #endif
+                    }
+
+                    public static void BindInternalPostfix(object __instance,
+                #if MONO
+                        System.Collections.Generic.List<EntityConfiguration> configs)
+                #else
+                        Il2CppSystem.Collections.Generic.List<EntityConfiguration> configs)
+                #endif
+                    {
                     }
 
                     public static void BindSafe(Button button, UnityAction callback)
@@ -1029,6 +1317,15 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 risks.All(risk => !risk.Evidence.Contains("Utils.ToUnityAction", StringComparison.Ordinal)),
                 "Explicit ToUnityAction helper calls should not be reported as unhandled migration risk.");
+            Assert(
+                risks.All(risk => risk.Kind != "Il2CppByteBufferInterop"),
+                "Runtime-guarded IL2CPP packet buffers should not be reported.");
+            Assert(
+                risks.All(risk => risk.Kind != "ManagedCollectionSignatureInterop"),
+                "Runtime-guarded managed collection signatures should not be reported.");
+            Assert(
+                risks.All(risk => risk.Kind != "Il2CppObjectCastInterop"),
+                "Runtime-guarded IL2CPP object TryCast branches should not be reported.");
             Assert(
                 risks.Any(risk => risk.Kind == "HarmonyTranspiler"),
                 "Unguarded Harmony transpiler should still be reported.");
@@ -1356,6 +1653,305 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback did not remove the generated source-risk report.");
             Assert(!File.Exists(bridgePath), "Generated delegate bridge should be removed by rollback.");
             Assert(!File.Exists(reportPath), "Generated source-risk report should be removed by rollback.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesDelegateArguments()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "DelegateArgumentMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "WindowController.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace DelegateArgumentMod;
+
+                public sealed class WindowController
+                {
+                    private object windowRect = new();
+                    private object style = new();
+
+                    public void Draw()
+                    {
+                        windowRect = GUI.Window(0, windowRect, DrawWindow, "", style);
+                        windowRect = GUI.Window(1, windowRect, S1Interop.Generated.S1InteropDelegateBridge.Convert<GUI.WindowFunction>(DrawWindow), "");
+                        windowRect = GUI.Window(2, windowRect, DelegateSupport.ConvertDelegate<GUI.WindowFunction>(DrawWindow), "");
+                    }
+
+                    private void DrawWindow(int id)
+                    {
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_delegate_arguments" && operation.Automatic),
+                "Migration plan should rewrite simple direct delegate arguments.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package" && operation.Automatic),
+                "Migration plan should install the S1Interop generator package for delegate conversion helper generation.");
+            Assert(
+                projectPlan.Operations.All(operation => operation.RuleId != "source_risk_direct_delegate_argument_interop"),
+                "Simple delegate argument risks should not remain manual when the generated helper rewrite can handle them.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlanner().Plan(before));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_delegate_arguments"),
+                "Migration apply should rewrite simple direct delegate arguments.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Migration apply should install the generator package for rewritten delegate arguments.");
+
+            string migratedProject = File.ReadAllText(tempProject);
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedProject.Contains("S1Interop.Generators", StringComparison.Ordinal),
+                "Delegate argument migration should add the S1Interop generator package reference.");
+            Assert(
+                migratedSource.Contains("windowRect = GUI.Window(0, windowRect, S1Interop.Generated.S1InteropDelegateBridge.Convert<GUI.WindowFunction>(DrawWindow), \"\", style);", StringComparison.Ordinal),
+                "Delegate argument migration should rewrite the plain GUI.Window method-group argument through S1InteropDelegateBridge.");
+            Assert(
+                CountOccurrences(migratedSource, "S1Interop.Generated.S1InteropDelegateBridge.Convert<GUI.WindowFunction>") == 2,
+                "Delegate argument migration should rewrite only the direct method-group argument and keep existing helper usage intact.");
+            Assert(
+                migratedSource.Contains("DelegateSupport.ConvertDelegate<GUI.WindowFunction>(DrawWindow)", StringComparison.Ordinal),
+                "Existing IL2CPP-specific DelegateSupport conversion should stay intact.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Projects.Single().SourceInterop!.SourceRisks.All(risk => risk.Kind != "DirectDelegateArgumentInterop"),
+                "Delegate argument migration should clear rewritable delegate argument risks from the migrated source.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the generator package reference change.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the rewritten delegate argument source file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationApplyAndRollbackRewritesIl2CppObjectCasts()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "ObjectCastMod.csproj");
+            string tempSource = Path.Combine(tempRoot, "RenderOptimizer.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                namespace ObjectCastMod;
+
+                public static class RenderOptimizer
+                {
+                    public static bool TrySetScale(object? pipelineAsset)
+                    {
+                        if (pipelineAsset is UniversalRenderPipelineAsset typedAsset)
+                        {
+                            typedAsset.renderScale = 0.75f;
+                            return true;
+                        }
+
+                        if (S1Interop.Generated.S1InteropObjectCast.Is<UniversalRenderPipelineAsset>(pipelineAsset, out UniversalRenderPipelineAsset? existingAsset))
+                        {
+                            existingAsset.renderScale = 1.0f;
+                        }
+
+                        return false;
+                    }
+                }
+
+                public sealed class UniversalRenderPipelineAsset
+                {
+                    public float renderScale;
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_il2cpp_object_casts" && operation.Automatic),
+                "Migration plan should rewrite simple IL2CPP-prone object pattern casts.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package" && operation.Automatic),
+                "Migration plan should install the S1Interop generator package for object cast helper generation.");
+            Assert(
+                projectPlan.Operations.All(operation => operation.RuleId != "source_risk_il2_cpp_object_cast_interop"),
+                "Simple object cast risks should not remain manual when the generated helper rewrite can handle them.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlanner().Plan(before));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_il2cpp_object_casts"),
+                "Migration apply should rewrite simple object pattern casts.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Migration apply should install the generator package for rewritten object casts.");
+
+            string migratedProject = File.ReadAllText(tempProject);
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedProject.Contains("S1Interop.Generators", StringComparison.Ordinal),
+                "Object cast migration should add the S1Interop generator package reference.");
+            Assert(
+                migratedSource.Contains("if (S1Interop.Generated.S1InteropObjectCast.Is<UniversalRenderPipelineAsset>(pipelineAsset, out UniversalRenderPipelineAsset? typedAsset))", StringComparison.Ordinal),
+                "Object cast migration should rewrite the plain C# pattern match through S1InteropObjectCast.");
+            Assert(
+                CountOccurrences(migratedSource, "S1Interop.Generated.S1InteropObjectCast.Is<UniversalRenderPipelineAsset>") == 2,
+                "Object cast migration should rewrite the risky cast once without rewriting existing generated-helper usage.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Projects.Single().SourceInterop!.SourceRisks.All(risk => risk.Kind != "Il2CppObjectCastInterop"),
+                "Object cast migration should clear rewritable object cast risks from the migrated source.");
+
+            MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
+            Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback did not restore the generator package reference change.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback did not restore the rewritten object cast source file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void InitCommandApplyAndRollbackCreatesBackendNeutralStarter()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "FreshBackendNeutralMod.csproj");
+            string starterPath = Path.Combine(tempRoot, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            ProcessResult dryRun = RunDotNet("run", "--project", cliProject, "--", "init", tempProject);
+            Assert(dryRun.ExitCode == 0, $"s1interop init dry-run should succeed. Output: {dryRun.Output}");
+            Assert(
+                dryRun.Output.Contains("install_s1interop_generator_package", StringComparison.Ordinal) &&
+                dryRun.Output.Contains("generate_backend_neutral_starter", StringComparison.Ordinal),
+                $"s1interop init dry-run should plan generator install and starter generation. Output: {dryRun.Output}");
+            Assert(!File.Exists(starterPath), "s1interop init dry-run should not write the starter file.");
+
+            ProcessResult apply = RunDotNet("run", "--project", cliProject, "--", "init", tempProject, "--apply");
+            Assert(apply.ExitCode == 0, $"s1interop init --apply should succeed. Output: {apply.Output}");
+            Assert(File.Exists(starterPath), "s1interop init --apply should create the backend-neutral starter file.");
+
+            string projectSource = File.ReadAllText(tempProject);
+            string starterSource = File.ReadAllText(starterPath);
+            Assert(
+                projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
+                projectSource.Contains("PrivateAssets", StringComparison.Ordinal),
+                "s1interop init should install the S1Interop generator package privately.");
+            Assert(
+                starterSource.Contains("S1InteropGenerateUnityEventBridge", StringComparison.Ordinal) &&
+                starterSource.Contains("S1InteropGenerateDelegateEventBridge", StringComparison.Ordinal) &&
+                starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
+                starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
+                "Backend-neutral starter should seed generator bridge attributes and editable type/member examples.");
+
+            string manifestPath = ExtractManifestPath(apply.Output);
+            ProcessResult rollback = RunDotNet("run", "--project", cliProject, "--", "migrate", "rollback", manifestPath);
+            Assert(rollback.ExitCode == 0, $"s1interop migrate rollback should restore init changes. Output: {rollback.Output}");
+            Assert(!File.Exists(starterPath), "Rollback should remove the backend-neutral starter file created by init.");
+            Assert(
+                !File.ReadAllText(tempProject).Contains("S1Interop.Generators", StringComparison.Ordinal),
+                "Rollback should restore the project file before the generator package reference was installed.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void NewCommandCreatesBackendNeutralProjectScaffold()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string targetDirectory = Path.Combine(tempRoot, "Fresh Neutral Mod");
+            string projectName = "FreshNeutralMod";
+            string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
+            string corePath = Path.Combine(targetDirectory, "ModCore.cs");
+            string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
+
+            ProcessResult dryRun = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory);
+            Assert(dryRun.ExitCode == 0, $"s1interop new dry-run should succeed. Output: {dryRun.Output}");
+            Assert(
+                dryRun.Output.Contains("S1Interop new project dry-run", StringComparison.Ordinal) &&
+                dryRun.Output.Contains(projectPath, StringComparison.Ordinal) &&
+                dryRun.Output.Contains(starterPath, StringComparison.Ordinal),
+                $"s1interop new dry-run should print planned scaffold files. Output: {dryRun.Output}");
+            Assert(!Directory.Exists(targetDirectory), "s1interop new dry-run should not create the target directory.");
+
+            ProcessResult apply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");
+            Assert(apply.ExitCode == 0, $"s1interop new --apply should succeed. Output: {apply.Output}");
+            Assert(File.Exists(projectPath), "s1interop new should create the project file.");
+            Assert(File.Exists(corePath), "s1interop new should create the core source file.");
+            Assert(File.Exists(starterPath), "s1interop new should create the backend-neutral starter file.");
+
+            string projectSource = File.ReadAllText(projectPath);
+            string coreSource = File.ReadAllText(corePath);
+            string starterSource = File.ReadAllText(starterPath);
+            Assert(
+                projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
+                projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
+                projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
+                projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal),
+                "Generated project should target netstandard2.1, enable C# 10, and install S1Interop.Generators privately.");
+            Assert(
+                coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
+                coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal),
+                "Generated core source should use a sanitized project namespace/name.");
+            Assert(
+                starterSource.Contains("S1InteropGenerateUnityEventBridge", StringComparison.Ordinal) &&
+                starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
+                starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
+                "Generated starter should seed backend-neutral generator attributes and examples.");
+
+            ProcessResult secondApply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");
+            Assert(secondApply.ExitCode == 2, $"s1interop new should refuse to overwrite a non-empty target. Output: {secondApply.Output}");
         }
         finally
         {
@@ -1702,6 +2298,61 @@ internal sealed class S1InteropFixtureTests
             Assert(rollbackResult.RemovedFiles.Contains(examplePropsPath), "Rollback should remove generated local.build.props.example.");
             Assert(!File.Exists(localPropsPath), "Rollback did not remove local.build.props.");
             Assert(!File.Exists(examplePropsPath), "Rollback did not remove local.build.props.example.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void MigrationRepairsExistingLocalBuildPropsImport()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "MissingLocalPropsImport.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net6.0</TargetFramework>
+                    <Configurations>Il2cpp_Debug</Configurations>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Il2cpp_Debug'">
+                    <DefineConstants>IL2CPP</DefineConstants>
+                    <GamePath>$(Il2CppGamePath)</GamePath>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "local.build.props"),
+                """
+                <Project>
+                  <PropertyGroup>
+                    <Il2CppGamePath>C:\Games\Schedule I_public</Il2CppGamePath>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = new WorkspaceAnalyzer().Analyze(tempProject);
+            Assert(
+                before.Projects.Single().Diagnostics.Any(diagnostic => diagnostic.RuleId == "missing_local_build_props_import"),
+                "Existing local.build.props without a project import should be diagnosed.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlanner().Plan(before));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "missing_local_build_props_import"),
+                "Migration should repair a missing local.build.props import.");
+            Assert(
+                CountProjectImports(tempProject, "local.build.props") == 1,
+                "Project should import local.build.props exactly once after repair.");
+
+            WorkspaceAnalysis after = new WorkspaceAnalyzer().Analyze(tempProject);
+            Assert(
+                after.Projects.Single().Diagnostics.All(diagnostic => diagnostic.RuleId != "missing_local_build_props_import"),
+                "Repaired project should not retain the local.build.props import diagnostic.");
         }
         finally
         {
@@ -2494,6 +3145,183 @@ internal sealed class S1InteropFixtureTests
         {
             DeleteDirectoryIfExists(tempRoot);
         }
+    }
+
+    private void MigrationApplyConditionalizesS1FuelModGameConstructor()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "FuelVehicleDataInterop.csproj");
+            string tempSource = Path.Combine(tempRoot, "FuelVehicleData.cs");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                tempSource,
+                """
+                using System;
+                using System.Collections.Generic;
+                using UnityEngine;
+
+                namespace S1FuelMod.Systems;
+
+                public class FuelVehicleData : ScheduleOne.Persistence.Datas.VehicleData
+                {
+                    public FuelVehicleData(Guid guid, string code, Vector3 pos, Quaternion rot, EVehicleColor col, ItemSet vehicleContents, List<SpraySurfaceData> spraySurfaces, FuelData fuelData)
+                        : base(guid, code, pos, rot, col, vehicleContents, spraySurfaces)
+                    {
+                    }
+
+                    public static FuelVehicleData FromVehicleData(VehicleData vehicleData, FuelData fuelData)
+                    {
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new List<SpraySurfaceData>();
+                        return new FuelVehicleData(
+                            new Guid(vehicleData.GUID),
+                            vehicleData.VehicleCode,
+                            vehicleData.Position,
+                            vehicleData.Rotation,
+                            Enum.Parse<EVehicleColor>(vehicleData.Color),
+                            vehicleData.VehicleContents,
+                            spraySurfaces,
+                            fuelData);
+                    }
+                }
+
+                public class CustomGamePayload : ScheduleOne.Persistence.Datas.GameData
+                {
+                    public CustomGamePayload(Guid guid, List<SpraySurfaceData> spraySurfaces)
+                        : base(guid, spraySurfaces)
+                    {
+                    }
+                }
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            ProjectMigrationPlan projectPlan = new MigrationPlanner().Plan(before).Projects.Single();
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "game_constructor_requires_il2cpp_signature"),
+                "Mono-only game constructor fixture should plan an IL2CPP signature migration.");
+
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "game_constructor_requires_il2cpp_signature"),
+                "Migration should apply the game constructor signature repair.");
+
+            string migratedSource = File.ReadAllText(tempSource);
+            Assert(
+                migratedSource.Contains("public FuelVehicleData(Il2CppSystem.Guid guid", StringComparison.Ordinal) &&
+                migratedSource.Contains("Il2CppSystem.Collections.Generic.List<SpraySurfaceData> spraySurfaces", StringComparison.Ordinal),
+                "Migrated constructor should use IL2CPP Guid and List wrapper types under IL2CPP.");
+            Assert(
+                migratedSource.Contains("public CustomGamePayload(Il2CppSystem.Guid guid, Il2CppSystem.Collections.Generic.List<SpraySurfaceData> spraySurfaces)", StringComparison.Ordinal),
+                "Migrated non-VehicleData game constructor should also use IL2CPP Guid and List wrapper types under IL2CPP.");
+            Assert(
+                migratedSource.Contains("new Il2CppSystem.Collections.Generic.List<SpraySurfaceData>()", StringComparison.Ordinal),
+                "Migrated factory helper should use an IL2CPP list fallback under IL2CPP.");
+            Assert(
+                migratedSource.Contains("new Il2CppSystem.Guid(vehicleData.GUID)", StringComparison.Ordinal),
+                "Migrated factory helper should construct Il2CppSystem.Guid under IL2CPP.");
+            Assert(
+                CountOccurrences(migratedSource, "#if IL2CPP") >= 3,
+                "Migrated source should guard the constructor and helper conversions with IL2CPP branches.");
+
+            WorkspaceAnalysis after = analyzer.Analyze(tempProject);
+            Assert(
+                after.Diagnostics.All(diagnostic => diagnostic.RuleId != "game_constructor_requires_il2cpp_signature"),
+                "Migrated game constructor fixture should not retain the constructor signature diagnostic.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void BackendNeutralRegistryCompilesRealS1FuelModFacadeTargets()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
+        if (!Directory.Exists(sourceDirectory))
+        {
+            Console.WriteLine("Skipping S1FuelMod backend-neutral registry fixture because S1FuelMod is not available.");
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            CopyFixtureDirectory(sourceDirectory, tempRoot);
+            string tempProject = Path.Combine(tempRoot, "S1FuelMod.csproj");
+            WorkspaceAnalysis workspace = analyzer.Analyze(tempProject);
+            SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(workspace.Projects.Single());
+            Assert(facadePlan.TypeAliases.Count > 0, "Copied S1FuelMod should expose real ScheduleOne facade aliases for backend-neutral registry generation.");
+
+            string source = BuildBackendNeutralRegistrySource(facadePlan.TypeAliases.Take(12));
+            string generated = RunTypeRegistryGenerator(source);
+
+            Assert(
+                generated.Contains("public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();", StringComparison.Ordinal),
+                "Copied S1FuelMod facade targets should compile through backend-neutral runtime detection.");
+            Assert(
+                facadePlan.TypeAliases.Take(12).All(alias =>
+                    generated.Contains($"public const string {alias.Alias}MonoName = \"{alias.MonoType}\";", StringComparison.Ordinal) &&
+                    generated.Contains($"public const string {alias.Alias}Il2CppName = \"{alias.Il2CppType}\";", StringComparison.Ordinal)),
+                $"Backend-neutral registry should preserve both Mono and IL2CPP names for copied S1FuelMod aliases. Generated source:{Environment.NewLine}{generated}");
+            Assert(
+                facadePlan.TypeAliases.Take(12).All(alias =>
+                    generated.Contains($"public static object? Create{alias.Alias}(params object?[] args) => Create({alias.Alias}Name, args);", StringComparison.Ordinal) &&
+                    generated.Contains($"public static object? Get{alias.Alias}Static(string memberName) => S1InteropMemberRegistry.GetValue({alias.Alias}Name, memberName, null);", StringComparison.Ordinal)),
+                $"Backend-neutral registry should emit object-based facade helpers for copied S1FuelMod aliases. Generated source:{Environment.NewLine}{generated}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs()
+    {
+        string projectPath = Path.Combine(WorkspaceRoot, "BarsGraphics", "BarsGraphics.csproj");
+        if (!File.Exists(projectPath))
+        {
+            Console.WriteLine("Skipping BarsGraphics SDK facade alias fixture because BarsGraphics is not available.");
+            return;
+        }
+
+        ProjectAnalysis project = analyzer.Analyze(projectPath).Projects.Single();
+        var generator = new SdkFacadeGenerator();
+        SdkFacadePlan facadePlan = generator.Plan(project);
+        string source = generator.GenerateSource(facadePlan);
+
+        Assert(
+            facadePlan.TypeAliases.Any(alias =>
+                alias.Alias == "GameHud" &&
+                alias.MonoType == "ScheduleOne.UI.HUD" &&
+                alias.Il2CppType == "Il2CppScheduleOne.UI.HUD" &&
+                !alias.GenerateGlobalUsing),
+            "BarsGraphics should expose GameHud as a backend-neutral registry alias pair without duplicating its local alias.");
+        Assert(
+            facadePlan.TypeAliases.Any(alias =>
+                alias.Alias == "GamePlayerCamera" &&
+                alias.MonoType == "ScheduleOne.PlayerScripts.PlayerCamera" &&
+                alias.Il2CppType == "Il2CppScheduleOne.PlayerScripts.PlayerCamera" &&
+                !alias.GenerateGlobalUsing),
+            "BarsGraphics should expose GamePlayerCamera as a backend-neutral registry alias pair without duplicating its local alias.");
+        Assert(
+            !source.Contains("global using GameHud =", StringComparison.Ordinal) &&
+            !source.Contains("global using GamePlayerCamera =", StringComparison.Ordinal),
+            "BarsGraphics generated facade should not duplicate aliases already declared by source files.");
+        Assert(
+            source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.HUD\", Alias = \"GameHud\", Il2CppTypeName = \"Il2CppScheduleOne.UI.HUD\")]", StringComparison.Ordinal) &&
+            source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.PlayerCamera\", Alias = \"GamePlayerCamera\", Il2CppTypeName = \"Il2CppScheduleOne.PlayerScripts.PlayerCamera\")]", StringComparison.Ordinal),
+            "BarsGraphics aliases should feed generated backend-neutral registry attributes.");
     }
 
     private void VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource()
@@ -4507,6 +5335,9 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 migratedSource.Contains("public Overlay()", StringComparison.Ordinal),
                 "Migrated source should preserve the existing parameterless constructor.");
+            Assert(
+                !migratedSource.Contains("ClassInjector.DerivedConstructorPointer<Overlay>()", StringComparison.Ordinal),
+                "Migration should not add a duplicate managed-instantiation constructor when one already exists.");
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             Assert(
@@ -4593,6 +5424,14 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 migratedSource.Contains("public Equippable_GasolineCan(System.IntPtr ptr) : base(ptr) { }", StringComparison.Ordinal),
                 "Migrated source should contain a guarded System.IntPtr constructor.");
+            Assert(
+                migratedSource.Contains(
+                    "public Equippable_GasolineCan() : base(Il2CppInterop.Runtime.Injection.ClassInjector.DerivedConstructorPointer<Equippable_GasolineCan>())",
+                    StringComparison.Ordinal) &&
+                migratedSource.Contains(
+                    "Il2CppInterop.Runtime.Injection.ClassInjector.DerivedConstructorBody(this);",
+                    StringComparison.Ordinal),
+                "Migrated source should contain a guarded managed-instantiation constructor for IL2CPP.");
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             ProjectMigrationPlan secondPlan = new MigrationPlanner().Plan(after).Projects.Single();
@@ -4974,53 +5813,6 @@ internal sealed class S1InteropFixtureTests
             "Alias and static ScheduleOne usings should remain source-level guarded because global namespace imports cannot replace them safely.");
     }
 
-    private void PlayerCameraCompatBridgeRewritesCloseInterfaceCalls()
-    {
-        string source =
-            """
-            using GamePlayerCamera = ScheduleOne.PlayerScripts.PlayerCamera;
-
-            namespace SyntheticMod
-            {
-                public static class CameraFlow
-                {
-                    public static void Restore()
-                    {
-                        GamePlayerCamera.Instance.CloseInterface(0f, true);
-                        ScheduleOne.PlayerScripts.PlayerCamera.Instance.CloseInterface();
-                    }
-                }
-            }
-            """;
-
-        string rewritten = PlayerCameraCompatRewriter.RewriteSource(source);
-
-        Assert(
-            rewritten.Contains(
-                "S1Interop.Generated.S1PlayerCameraCompat.CloseInterface(GamePlayerCamera.Instance, 0f, true);",
-                StringComparison.Ordinal),
-            $"PlayerCamera CloseInterface call with arguments was not rewritten. Rewritten source:{Environment.NewLine}{rewritten}");
-        Assert(
-            rewritten.Contains(
-                "S1Interop.Generated.S1PlayerCameraCompat.CloseInterface(ScheduleOne.PlayerScripts.PlayerCamera.Instance);",
-                StringComparison.Ordinal),
-            $"PlayerCamera CloseInterface call without arguments was not rewritten. Rewritten source:{Environment.NewLine}{rewritten}");
-        Assert(!rewritten.Contains(".CloseInterface(0f, true);", StringComparison.Ordinal), "Direct CloseInterface call should be routed through the generated compatibility bridge.");
-
-        string bridgeSource = PlayerCameraCompatGenerator.GenerateSource();
-        Assert(
-            bridgeSource.Contains("namespace S1Interop.Generated", StringComparison.Ordinal) &&
-            !bridgeSource.Contains("namespace S1Interop.Generated;", StringComparison.Ordinal),
-            "Generated PlayerCamera bridge should avoid C# 10-only file-scoped namespace syntax.");
-        Assert(
-            bridgeSource.Contains("camera.CloseInterface(cameraLerpTime, reenableCameraInput);", StringComparison.Ordinal),
-            "Generated PlayerCamera bridge should preserve the Mono CloseInterface call.");
-        Assert(
-            bridgeSource.Contains("camera.SetCanLook(true);", StringComparison.Ordinal) &&
-            bridgeSource.Contains("camera.SetDoFActive(false, cameraLerpTime);", StringComparison.Ordinal),
-            "Generated PlayerCamera bridge should provide an IL2CPP fallback using wrapper-visible camera APIs.");
-    }
-
     private void S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache()
     {
         const string source =
@@ -5048,6 +5840,7 @@ internal sealed class S1InteropFixtureTests
 
         string monoGenerated = RunTypeRegistryGenerator(source, "MONO");
         string il2CppGenerated = RunTypeRegistryGenerator(source, "IL2CPP");
+        string runtimeGenerated = RunTypeRegistryGenerator(source);
 
         Assert(
             monoGenerated.Contains("public const S1InteropRuntimeBackend Backend = S1InteropRuntimeBackend.Mono;", StringComparison.Ordinal) &&
@@ -5070,6 +5863,19 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("private static readonly System.Collections.Generic.Dictionary<string, System.Type?> Cache", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
+        Assert(
+            il2CppGenerated.Contains("internal static class S1InteropObjectCast", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool Is<T>(object? value, out T? result) where T : class", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static T? As<T>(object? value) where T : class", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("method.MakeGenericMethod(targetType)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", StringComparison.Ordinal),
+            $"Generated type registry should include a backend-neutral object cast helper for IL2CPP TryCast<T> proxy unwrapping. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("internal static class S1InteropDelegateBridge", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static TDelegate Convert<TDelegate>(TDelegate listener) where TDelegate : class", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppInterop.Runtime.DelegateSupport", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("method.MakeGenericMethod(delegateType)", StringComparison.Ordinal),
+            $"Generated type registry should include a backend-neutral delegate bridge for reflected IL2CPP DelegateSupport conversion. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("ResolveFromLoadedAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("assembly.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal) &&
@@ -5121,6 +5927,255 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("ownerType.GetMethod(memberName, AllBindings, binder: null, types: parameterTypes, modifiers: null)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("parameterType.MakeByRefType()", StringComparison.Ordinal),
             "Generated member registry should cache property, field, method overload, and by-ref lookup paths.");
+        Assert(
+            il2CppGenerated.Contains("public static object? GetInstanceValue(object? instance, string memberName)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("System.Reflection.MemberInfo? member = ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TrySetInstanceValue(object? instance, string memberName, object? value, S1InteropMemberKind kind)", StringComparison.Ordinal),
+            $"Generated member registry should include cached instance-type helpers for generic reflection code. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public static bool TryConvertValue(object? value, System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("TryConvertIl2CppGuid(value, conversionType, out converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("TryConvertIl2CppList(value, conversionType, out converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Il2CppSystem.Collections.Generic.List`1", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("property.SetValue(instance, converted, null);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("field.SetValue(instance, converted);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("converted = System.Convert.ChangeType(value, conversionType, System.Globalization.CultureInfo.InvariantCulture)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("System.Enum.Parse(conversionType, text, ignoreCase: true)", StringComparison.Ordinal),
+            $"Generated member registry should centralize value conversion before field/property writes. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("if (!TryConvertArguments(method.GetParameters(), args, out object?[] converted))", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("object? result = method.Invoke(instance, converted);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("CopyByRefArguments(method.GetParameters(), converted, args);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is System.Type elementType", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("args[index] = converted[index];", StringComparison.Ordinal),
+            $"Generated member registry should convert method invocation arguments and copy by-ref values back after reflection Invoke. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, string[]? parameterTypeNames, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames, S1InteropMemberKind.Method) as System.Reflection.MethodInfo", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static System.Reflection.MemberInfo? ResolveMemberCached(System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("string ownerKey = ownerType.AssemblyQualifiedName ?? ownerType.FullName ?? ownerType.Name;", StringComparison.Ordinal),
+            $"Generated member registry should include cached dynamic instance method invocation helpers for backend-neutral reflection wrappers. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static object? CreatePlayerCamera(params object?[] args) => Create(PlayerCameraName, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? GetPlayerCameraStatic(string memberName) => S1InteropMemberRegistry.GetValue(PlayerCameraName, memberName, null);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static bool TrySetPlayerCameraStatic(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue(PlayerCameraName, memberName, null, value);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? InvokePlayerCameraStatic(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke(PlayerCameraName, methodName, parameterTypeNames: null, null, args);", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? Create(string runtimeTypeName, params object?[] args)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("constructor.Invoke(converted)", StringComparison.Ordinal),
+            $"Backend-neutral type registry should emit object-based type facade helpers that do not require compiling against backend-specific types. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static bool IsMono => Backend == S1InteropRuntimeBackend.Mono;", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static bool IsIl2Cpp => Backend == S1InteropRuntimeBackend.Il2Cpp;", StringComparison.Ordinal),
+            $"Backend-neutral generator output should detect and cache the runtime backend. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public const string PlayerCameraMonoName = \"ScheduleOne.PlayerScripts.PlayerCamera\";", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public const string PlayerCameraIl2CppName = \"Il2CppScheduleOne.PlayerScripts.PlayerCamera\";", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static string PlayerCameraName => GetRuntimeTypeName(PlayerCameraMonoName, PlayerCameraIl2CppName);", StringComparison.Ordinal),
+            $"Backend-neutral generator output should keep both backend type names and resolve the active one at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("if (S1InteropTypeRegistry.Resolve(\"Il2CppScheduleOne.PlayerScripts.PlayerCamera\") is not null)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("if (S1InteropTypeRegistry.Resolve(\"ScheduleOne.PlayerScripts.PlayerCamera\") is not null)", StringComparison.Ordinal),
+            $"Backend-neutral generator output should probe known IL2CPP and Mono types. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static string GetRuntimeTypeName(string monoTypeName, string il2CppTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("S1InteropRuntime.Backend == S1InteropRuntimeBackend.Il2Cpp ? il2CppTypeName : monoTypeName", StringComparison.Ordinal),
+            $"Backend-neutral generator output should expose runtime type-name selection for method parameter caches. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
+            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal),
+            $"Backend-neutral member registry should route alias parameter types through runtime-resolved names. Generated source:{Environment.NewLine}{runtimeGenerated}");
+    }
+
+    private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.UI.HUD", Alias = "Hud", Il2CppTypeName = "Il2CppScheduleOne.UI.HUD")]
+            [assembly: S1Interop.S1InteropMember("Hud", "Instance", Alias = "HudInstance", IsStatic = true)]
+            [assembly: S1Interop.S1InteropMember("Hud", "Scale", Alias = "HudScale", Kind = S1Interop.S1InteropMemberKind.Field)]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int", "string&" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetData", Alias = "HudSetData", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid", "System.Collections.Generic.List<string>" })]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.UI
+            {
+                public sealed class HUD
+                {
+                    public static HUD Instance { get; } = new HUD();
+                    public int Scale;
+                    public string? LastName { get; private set; }
+                    public string? LastData { get; private set; }
+
+                    public string SetLevel(int level, ref string name)
+                    {
+                        Scale = level;
+                        name = "il2cpp:" + name;
+                        LastName = name;
+                        return "done";
+                    }
+
+                    public string SetData(Il2CppSystem.Guid guid, Il2CppSystem.Collections.Generic.List<string> names)
+                    {
+                        LastData = guid.Value + ":" + names.Count + ":" + names[0];
+                        return LastData;
+                    }
+                }
+            }
+
+            namespace Il2CppSystem
+            {
+                public sealed class Guid
+                {
+                    public Guid(string value)
+                    {
+                        Value = value;
+                    }
+
+                    public string Value { get; }
+                }
+
+                namespace Collections.Generic
+                {
+                    public sealed class List<T>
+                    {
+                        private readonly System.Collections.Generic.List<T> inner = new System.Collections.Generic.List<T>();
+
+                        public int Count => inner.Count;
+
+                        public T this[int index] => inner[index];
+
+                        public void Add(T value)
+                        {
+                            inner.Add(value);
+                        }
+                    }
+                }
+            }
+
+            namespace Il2CppInterop.Runtime.InteropTypes
+            {
+                public class Il2CppObjectBase
+                {
+                    private readonly object? target;
+
+                    public Il2CppObjectBase(object? target)
+                    {
+                        this.target = target;
+                    }
+
+                    public T? TryCast<T>() where T : class
+                    {
+                        return target as T;
+                    }
+                }
+            }
+
+            namespace Il2CppInterop.Runtime
+            {
+                public static class DelegateSupport
+                {
+                    public static bool WasCalled;
+
+                    public static T? ConvertDelegate<T>(System.Delegate listener) where T : class
+                    {
+                        WasCalled = true;
+                        return listener as T;
+                    }
+                }
+            }
+            """;
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source);
+        Type runtimeType = assembly.GetType("S1Interop.Generated.S1InteropRuntime", throwOnError: true)!;
+        Type typeRegistryType = assembly.GetType("S1Interop.Generated.S1InteropTypeRegistry", throwOnError: true)!;
+        Type memberRegistryType = assembly.GetType("S1Interop.Generated.S1InteropMemberRegistry", throwOnError: true)!;
+        Type objectCastType = assembly.GetType("S1Interop.Generated.S1InteropObjectCast", throwOnError: true)!;
+        Type delegateBridgeType = assembly.GetType("S1Interop.Generated.S1InteropDelegateBridge", throwOnError: true)!;
+        Type memberKindType = assembly.GetTypes().Single(type => type.Name == "S1InteropMemberKind");
+
+        object? backend = runtimeType.GetProperty("Backend")?.GetValue(null);
+        object? isIl2Cpp = runtimeType.GetProperty("IsIl2Cpp")?.GetValue(null);
+        object? hudName = typeRegistryType.GetProperty("HudName")?.GetValue(null);
+        object? hudType = typeRegistryType.GetProperty("Hud")?.GetValue(null);
+        MethodInfo? getHudInstance = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetHudInstance" && !method.IsGenericMethod && method.GetParameters().Length == 0);
+        object? hudInstance = getHudInstance?.Invoke(null, null);
+
+        Assert(string.Equals(backend?.ToString(), "Il2Cpp", StringComparison.Ordinal), $"Backend-neutral runtime detection should select Il2Cpp when only Il2Cpp types are loadable. Backend={backend}");
+        Assert(isIl2Cpp is true, "Backend-neutral runtime IsIl2Cpp should be true for the fake Il2Cpp assembly.");
+        Assert(string.Equals(hudName as string, "Il2CppScheduleOne.UI.HUD", StringComparison.Ordinal), $"Backend-neutral HudName should resolve to Il2Cpp type name. HudName={hudName}");
+        Assert(hudType is Type resolvedHudType && resolvedHudType.FullName == "Il2CppScheduleOne.UI.HUD", "Backend-neutral type registry should resolve the fake Il2Cpp HUD type.");
+        Assert(hudInstance is not null && hudInstance.GetType().FullName == "Il2CppScheduleOne.UI.HUD", "Generated static member helper should return the fake Il2Cpp HUD instance.");
+        object hud = hudInstance!;
+
+        MethodInfo? trySetScale = memberRegistryType.GetMethod("TrySetHudScale", [typeof(object), typeof(object)]);
+        Assert(trySetScale is not null, "Generated member registry should expose TrySetHudScale.");
+        object? setResult = trySetScale!.Invoke(null, [hud, "42"]);
+        Assert(setResult is true, "Generated field setter should convert string values to the reflected integer field type.");
+
+        object? scale = hud.GetType().GetField("Scale")?.GetValue(hud);
+        Assert(scale is 42, $"Generated field setter should update the fake Il2Cpp field. Scale={scale}");
+
+        object fieldKind = Enum.Parse(memberKindType, "Field");
+        MethodInfo? getInstanceValue = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetInstanceValue" && method.GetParameters().Length == 3);
+        MethodInfo? trySetInstanceValue = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "TrySetInstanceValue" && method.GetParameters().Length == 4);
+        Assert(getInstanceValue is not null, "Generated member registry should expose typed GetInstanceValue.");
+        Assert(trySetInstanceValue is not null, "Generated member registry should expose typed TrySetInstanceValue.");
+        object? dynamicScale = getInstanceValue!.Invoke(null, [hud, "Scale", fieldKind]);
+        Assert(dynamicScale is 42, $"Generated dynamic instance getter should read from the fake Il2Cpp object. Scale={dynamicScale}");
+        object? dynamicSetResult = trySetInstanceValue!.Invoke(null, [hud, "Scale", "99", fieldKind]);
+        Assert(dynamicSetResult is true, "Generated dynamic instance setter should convert values and write through cached instance member lookup.");
+        Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 99, "Generated dynamic instance setter should update the fake Il2Cpp field.");
+
+        MethodInfo? invokeSetLevel = memberRegistryType.GetMethod("InvokeHudSetLevel", [typeof(object), typeof(object[])]);
+        Assert(invokeSetLevel is not null, "Generated member registry should expose InvokeHudSetLevel.");
+        object?[] args = ["7", "fps"];
+        object? invokeResult = invokeSetLevel!.Invoke(null, [hud, args]);
+
+        Assert(string.Equals(invokeResult as string, "done", StringComparison.Ordinal), $"Generated method invoker should return reflected method result. Result={invokeResult}");
+        Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 7, "Generated method invoker should convert string numeric arguments before invocation.");
+        Assert(string.Equals(args[1] as string, "il2cpp:fps", StringComparison.Ordinal), $"Generated method invoker should copy by-ref argument values back to caller args. Arg={args[1]}");
+
+        MethodInfo? invokeInstance = memberRegistryType.GetMethod("InvokeInstance", [typeof(object), typeof(string), typeof(string[]), typeof(object[])]);
+        Assert(invokeInstance is not null, "Generated member registry should expose overload-specific InvokeInstance.");
+        object?[] dynamicArgs = ["11", "hud"];
+        object? dynamicInvokeResult = invokeInstance!.Invoke(null, [hud, "SetLevel", new[] { "int", "string&" }, dynamicArgs]);
+        Assert(string.Equals(dynamicInvokeResult as string, "done", StringComparison.Ordinal), $"Generated dynamic instance invoker should return reflected method result. Result={dynamicInvokeResult}");
+        Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 11, "Generated dynamic instance invoker should convert arguments before invocation.");
+        Assert(string.Equals(dynamicArgs[1] as string, "il2cpp:hud", StringComparison.Ordinal), $"Generated dynamic instance invoker should copy by-ref argument values back to caller args. Arg={dynamicArgs[1]}");
+
+        MethodInfo? invokeSetData = memberRegistryType.GetMethod("InvokeHudSetData", [typeof(object), typeof(object[])]);
+        Assert(invokeSetData is not null, "Generated member registry should expose InvokeHudSetData.");
+        Guid guid = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        object? setDataResult = invokeSetData!.Invoke(null, [hud, new object?[] { guid, new[] { "alpha", "beta" } }]);
+        Assert(
+            string.Equals(setDataResult as string, "11111111-2222-3333-4444-555555555555:2:alpha", StringComparison.Ordinal),
+            $"Generated method invoker should convert System.Guid and managed arrays to fake IL2CPP Guid/List parameter types. Result={setDataResult}");
+
+        Type objectBaseType = assembly.GetType("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", throwOnError: true)!;
+        object proxy = Activator.CreateInstance(objectBaseType, [hud])!;
+        MethodInfo? objectCastAs = objectCastType.GetMethod("As")?.MakeGenericMethod(hud.GetType());
+        Assert(objectCastAs is not null, "Generated object cast helper should expose As<T>.");
+        object? castResult = objectCastAs!.Invoke(null, [proxy]);
+        Assert(ReferenceEquals(castResult, hud), "Generated object cast helper should unwrap fake IL2CPP proxies through reflected TryCast<T>.");
+
+        Type delegateSupportType = assembly.GetType("Il2CppInterop.Runtime.DelegateSupport", throwOnError: true)!;
+        MethodInfo? convertDelegate = delegateBridgeType.GetMethod("Convert")?.MakeGenericMethod(typeof(Action));
+        Assert(convertDelegate is not null, "Generated delegate bridge should expose Convert<TDelegate>.");
+        Action action = static () => { };
+        object? convertedDelegate = convertDelegate!.Invoke(null, [action]);
+        object? delegateSupportCalled = delegateSupportType.GetField("WasCalled")?.GetValue(null);
+        Assert(ReferenceEquals(convertedDelegate, action), "Generated delegate bridge should return the converted delegate instance.");
+        Assert(delegateSupportCalled is true, "Generated delegate bridge should route IL2CPP delegate conversion through reflected DelegateSupport.ConvertDelegate<T>.");
     }
 
     private void S1InteropGeneratorProducesCompileTimeEventBridges()
@@ -5214,10 +6269,15 @@ internal sealed class S1InteropFixtureTests
             File.WriteAllText(
                 Path.Combine(tempRoot, "Core.cs"),
                 """
+                using GameHud = Il2CppScheduleOne.UI.HUD;
+                using GameWeed = ScheduleOne.Product.WeedDefinition;
+
                 namespace AliasFacadeMod
                 {
                     public static class Core
                     {
+                        private static GameHud? hud;
+                        private static GameWeed? aliasedWeed;
                         private static ScheduleOne.Product.WeedDefinition? weed;
                         private static ScheduleOne.Persistence.Datas.QuestEntryData? questEntry;
                         private static ScheduleOne.Other.QuestEntryData? collidingQuestEntry;
@@ -5234,8 +6294,23 @@ internal sealed class S1InteropFixtureTests
                 plan.TypeAliases.Any(alias =>
                     alias.Alias == "WeedDefinition" &&
                     alias.MonoType == "ScheduleOne.Product.WeedDefinition" &&
-                    alias.Il2CppType == "Il2CppScheduleOne.Product.WeedDefinition"),
+                    alias.Il2CppType == "Il2CppScheduleOne.Product.WeedDefinition" &&
+                    alias.GenerateGlobalUsing),
                 "Facade plan should alias unique fully-qualified ScheduleOne type references.");
+            Assert(
+                plan.TypeAliases.Any(alias =>
+                    alias.Alias == "GameHud" &&
+                    alias.MonoType == "ScheduleOne.UI.HUD" &&
+                    alias.Il2CppType == "Il2CppScheduleOne.UI.HUD" &&
+                    !alias.GenerateGlobalUsing),
+                "Facade plan should normalize explicit Il2Cpp ScheduleOne alias directives into backend-neutral registry aliases without duplicating local aliases.");
+            Assert(
+                plan.TypeAliases.Any(alias =>
+                    alias.Alias == "GameWeed" &&
+                    alias.MonoType == "ScheduleOne.Product.WeedDefinition" &&
+                    alias.Il2CppType == "Il2CppScheduleOne.Product.WeedDefinition" &&
+                    !alias.GenerateGlobalUsing),
+                "Facade plan should preserve explicit Mono ScheduleOne alias directives as backend-neutral registry aliases without duplicating local aliases.");
             Assert(
                 plan.TypeAliases.All(alias => alias.Alias != "QuestEntryData"),
                 "Facade plan should skip aliases when multiple fully-qualified types share the same simple name.");
@@ -5243,6 +6318,17 @@ internal sealed class S1InteropFixtureTests
                 facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
                 facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),
                 "Generated facade should include conditional aliases for unique fully-qualified type references.");
+            Assert(
+                !facadeSource.Contains("global using GameHud =", StringComparison.Ordinal) &&
+                !facadeSource.Contains("global using GameWeed =", StringComparison.Ordinal),
+                "Generated facade should not duplicate aliases already declared by source files.");
+            Assert(
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.HUD\", Alias = \"GameHud\", Il2CppTypeName = \"Il2CppScheduleOne.UI.HUD\")]", StringComparison.Ordinal) &&
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Product.WeedDefinition\", Alias = \"GameWeed\", Il2CppTypeName = \"Il2CppScheduleOne.Product.WeedDefinition\")]", StringComparison.Ordinal),
+                "Generated facade should emit registry attributes so explicit aliases can feed backend-neutral Roslyn caches.");
+            Assert(
+                !facadeSource.Contains("S1InteropRuntime", StringComparison.Ordinal),
+                "File-based SDK facade should not emit runtime helpers; the Roslyn generator owns backend-neutral runtime detection and caches.");
         }
         finally
         {
@@ -5293,6 +6379,9 @@ internal sealed class S1InteropFixtureTests
                 projectPlan.Operations.Any(operation => operation.RuleId == "generate_sdk_facade"),
                 "Fully-qualified ScheduleOne types should trigger SDK facade generation.");
             Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"),
+                "Generated SDK facade registry attributes should install the S1Interop Roslyn generator package.");
+            Assert(
                 projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_fully_qualified_scheduleone_types"),
                 "Fully-qualified ScheduleOne types should plan a source rewrite when the alias is unique.");
 
@@ -5321,6 +6410,9 @@ internal sealed class S1InteropFixtureTests
                 facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
                 facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),
                 "Generated facade should provide Mono and IL2CPP aliases for the rewritten type.");
+            Assert(
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Product.WeedDefinition\", Alias = \"WeedDefinition\", Il2CppTypeName = \"Il2CppScheduleOne.Product.WeedDefinition\")]", StringComparison.Ordinal),
+                "Generated facade should register rewritten aliases for backend-neutral reflection cache generation.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
@@ -5896,11 +6988,35 @@ internal sealed class S1InteropFixtureTests
 
     private static IReadOnlyDictionary<string, string> RunS1InteropGenerator(string source, params string[] symbols)
     {
+        Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols);
+        return outputCompilation.SyntaxTrees
+            .Where(tree => (tree.FilePath ?? string.Empty).Contains("S1Interop.Generators", StringComparison.Ordinal))
+            .ToDictionary(
+                tree => Path.GetFileName(tree.FilePath),
+                tree => tree.GetText().ToString(),
+                StringComparer.Ordinal);
+    }
+
+    private static System.Reflection.Assembly CompileAndLoadS1InteropGeneratedAssembly(string source, params string[] symbols)
+    {
+        Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols);
+        using var assemblyStream = new MemoryStream();
+        Microsoft.CodeAnalysis.Emit.EmitResult emitResult = outputCompilation.Emit(assemblyStream);
+        Assert(
+            emitResult.Success,
+            $"S1Interop generated compilation emit failed: {string.Join(Environment.NewLine, emitResult.Diagnostics)}");
+
+        assemblyStream.Position = 0;
+        return System.Reflection.Assembly.Load(assemblyStream.ToArray());
+    }
+
+    private static Compilation RunS1InteropGeneratorCompilation(string source, params string[] symbols)
+    {
         CSharpParseOptions parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Latest)
             .WithPreprocessorSymbols(symbols);
         CSharpCompilation compilation = CSharpCompilation.Create(
-            "SyntheticMod",
+            "SyntheticMod." + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source, parseOptions)],
             GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -5917,12 +7033,7 @@ internal sealed class S1InteropFixtureTests
             outputCompilation.GetDiagnostics().All(diagnostic => diagnostic.Severity != RoslynDiagnosticSeverity.Error),
             $"S1Interop generated compilation reported errors: {string.Join(Environment.NewLine, outputCompilation.GetDiagnostics())}");
 
-        return outputCompilation.SyntaxTrees
-            .Where(tree => (tree.FilePath ?? string.Empty).Contains("S1Interop.Generators", StringComparison.Ordinal))
-            .ToDictionary(
-                tree => Path.GetFileName(tree.FilePath),
-                tree => tree.GetText().ToString(),
-                StringComparer.Ordinal);
+        return outputCompilation;
     }
 
     private static IReadOnlyList<MetadataReference> GetTrustedPlatformReferences()
@@ -5934,6 +7045,27 @@ internal sealed class S1InteropFixtureTests
             .Select(path => MetadataReference.CreateFromFile(path))
             .ToArray();
     }
+
+    private static string BuildBackendNeutralRegistrySource(IEnumerable<SdkTypeAlias> aliases)
+    {
+        var builder = new StringBuilder();
+        foreach (SdkTypeAlias alias in aliases)
+        {
+            builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{EscapeCSharpString(alias.MonoType)}\", Alias = \"{EscapeCSharpString(alias.Alias)}\", Il2CppTypeName = \"{EscapeCSharpString(alias.Il2CppType)}\")]");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("namespace SyntheticRealMod");
+        builder.AppendLine("{");
+        builder.AppendLine("    internal static class BackendNeutralRegistryProbe");
+        builder.AppendLine("    {");
+        builder.AppendLine("    }");
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
+    private static string EscapeCSharpString(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static int CountProjectImports(string projectPath, string importPath)
     {
@@ -5968,6 +7100,20 @@ internal sealed class S1InteropFixtureTests
             "; ",
             buildResults.Select(result =>
                 $"{result.Configuration}/{result.Runtime}: exit={result.ExitCode}, success={result.Success}, timedOut={result.TimedOut}, readiness={result.ReadinessStatus}, attribution={result.Attribution}, kind={result.FailureKind}, summary={result.Summary}, issues={string.Join("|", result.Issues.Select(issue => $"{issue.Kind}:{issue.Include}:{issue.Path}"))}, command={result.Command}, output={result.Output}"));
+    }
+
+    private static string ExtractManifestPath(string output)
+    {
+        foreach (string line in output.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries))
+        {
+            const string prefix = "Manifest:";
+            if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return line[prefix.Length..].Trim();
+            }
+        }
+
+        throw new InvalidOperationException($"Could not find manifest path in output: {output}");
     }
 
     private static string ComputeSha256(string path)

@@ -81,6 +81,15 @@ public sealed class MigrationPlanner
                     true,
                     "Create ignored local.build.props scaffolding for unresolved modding reference path properties."),
 
+                "missing_local_build_props_import" => new MigrationOperation(
+                    diagnostic.RuleId,
+                    project.ProjectPath,
+                    null,
+                    "low",
+                    true,
+                    "Import generated local.build.props so local Mono/IL2CPP game path properties are visible to builds.",
+                    diagnostic.Evidence),
+
                 "missing_il2cppinterop_reference" => new MigrationOperation(
                     diagnostic.RuleId,
                     project.ProjectPath,
@@ -117,6 +126,15 @@ public sealed class MigrationPlanner
                     diagnostic.Evidence),
 
                 "injected_member_requires_hidefromil2cpp" => CreateHideFromIl2CppOperation(diagnostic),
+
+                "game_constructor_requires_il2cpp_signature" => new MigrationOperation(
+                    diagnostic.RuleId,
+                    diagnostic.Evidence is null ? project.ProjectPath : GetDiagnosticFilePath(diagnostic.Evidence, project.ProjectPath),
+                    null,
+                    "low",
+                    true,
+                    "Conditionalize game-constructor signatures so IL2CPP builds use wrapper Guid/List types.",
+                    diagnostic.Evidence),
 
                 _ => null
             };
@@ -197,34 +215,21 @@ public sealed class MigrationPlanner
                 "Install a project-local MSBuild target that runs S1Interop lint before compilation and can be restored through the migration manifest."));
         }
 
-        string[] playerCameraCompatFiles = PlayerCameraCompatRewriter
-            .FindFilesWithCloseInterfaceCalls(project.ProjectPath)
-            .ToArray();
-        if (playerCameraCompatFiles.Length > 0)
-        {
-            operations.Add(new MigrationOperation(
-                "generate_player_camera_compat_bridge",
-                PlayerCameraCompatGenerator.GetSourcePath(project.ProjectPath),
-                null,
-                "low",
-                true,
-                "Generate a PlayerCamera compatibility bridge for Mono-only CloseInterface calls missing from IL2CPP wrappers."));
-
-            foreach (string sourceFile in playerCameraCompatFiles)
-            {
-                operations.Add(new MigrationOperation(
-                    "rewrite_player_camera_close_interface",
-                    sourceFile,
-                    null,
-                    "low",
-                    true,
-                    "Rewrite PlayerCamera.CloseInterface calls through the generated S1Interop compatibility bridge."));
-            }
-        }
-
         SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(project);
         if (facadePlan.HasContent)
         {
+            if (facadePlan.TypeAliases.Count > 0 &&
+                !operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+            {
+                operations.Add(new MigrationOperation(
+                    "install_s1interop_generator_package",
+                    project.ProjectPath,
+                    null,
+                    "low",
+                    true,
+                    "Install the S1Interop Roslyn generator package required by generated SDK facade type registry attributes."));
+            }
+
             operations.Add(new MigrationOperation(
                 "generate_sdk_facade",
                 facadePlan.OutputPath,
@@ -253,6 +258,9 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticDelegateRisks = project.SourceInterop.SourceRisks
                 .Where(DelegateAssignmentRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticDelegateArgumentRisks = project.SourceInterop.SourceRisks
+                .Where(DelegateArgumentRewriter.CanRewrite)
+                .ToArray();
             SourceRisk[] automaticHarmonyOverloadRisks = project.SourceInterop.SourceRisks
                 .Where(HarmonyOverloadBindingRewriter.CanRewrite)
                 .ToArray();
@@ -262,17 +270,24 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticDirectMemberLookupRisks = project.SourceInterop.SourceRisks
                 .Where(DirectMemberReflectionLookupRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticObjectCastRisks = project.SourceInterop.SourceRisks
+                .Where(Il2CppObjectCastRewriter.CanRewrite)
+                .ToArray();
+            int generatedMemberAccessTargetCount = new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count;
             bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
                 .Any(risk =>
                     risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase) ||
                     risk.Kind.Equals("DirectMemberReflectionLookup", StringComparison.OrdinalIgnoreCase)) &&
-                new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count > 0;
+                generatedMemberAccessTargetCount > 0;
+            bool hasAutomaticMemberAccessRewrites = automaticMemberAccessRisks.Length > 0 || automaticDirectMemberLookupRisks.Length > 0;
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
                 .Except(automaticDelegateRisks)
+                .Except(automaticDelegateArgumentRisks)
                 .Except(automaticHarmonyOverloadRisks)
                 .Except(automaticMemberAccessRisks)
                 .Except(automaticDirectMemberLookupRisks)
+                .Except(automaticObjectCastRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -325,6 +340,34 @@ public sealed class MigrationPlanner
                 }
             }
 
+            if (automaticDelegateArgumentRisks.Length > 0)
+            {
+                if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+                {
+                    operations.Add(new MigrationOperation(
+                        "install_s1interop_generator_package",
+                        project.ProjectPath,
+                        null,
+                        "low",
+                        true,
+                        "Install the S1Interop Roslyn generator package required by generated backend-neutral delegate conversion helpers."));
+                }
+
+                foreach (string sourceFile in automaticDelegateArgumentRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_delegate_arguments",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple direct Unity/game delegate arguments through the generated S1InteropDelegateBridge conversion helper."));
+                }
+            }
+
             if (automaticHarmonyOverloadRisks.Length > 0)
             {
                 if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
@@ -361,7 +404,7 @@ public sealed class MigrationPlanner
                 }
             }
 
-            if (hasGeneratedMemberAccessTargets)
+            if (hasGeneratedMemberAccessTargets || hasAutomaticMemberAccessRewrites)
             {
                 if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
                 {
@@ -371,16 +414,19 @@ public sealed class MigrationPlanner
                         null,
                         "low",
                         true,
-                        "Install the S1Interop Roslyn generator package required by generated member access target attributes."));
+                        "Install the S1Interop Roslyn generator package required by generated member access helpers."));
                 }
 
-                operations.Add(new MigrationOperation(
-                    "generate_member_access_targets",
-                    MemberAccessTargetGenerator.GetSourcePath(project.ProjectPath),
-                    null,
-                    "low",
-                    true,
-                    "Generate S1InteropMember declarations for typed field/property reflection targets."));
+                if (hasGeneratedMemberAccessTargets)
+                {
+                    operations.Add(new MigrationOperation(
+                        "generate_member_access_targets",
+                        MemberAccessTargetGenerator.GetSourcePath(project.ProjectPath),
+                        null,
+                        "low",
+                        true,
+                        "Generate S1InteropMember declarations for typed field/property reflection targets."));
+                }
 
                 foreach (string sourceFile in automaticMemberAccessRisks
                              .Select(risk => risk.FilePath)
@@ -408,6 +454,34 @@ public sealed class MigrationPlanner
                         "low",
                         true,
                         "Rewrite simple direct typeof(...).GetField/GetProperty lookups through generated S1InteropMemberRegistry FieldInfo/PropertyInfo accessors."));
+                }
+            }
+
+            if (automaticObjectCastRisks.Length > 0)
+            {
+                if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+                {
+                    operations.Add(new MigrationOperation(
+                        "install_s1interop_generator_package",
+                        project.ProjectPath,
+                        null,
+                        "low",
+                        true,
+                        "Install the S1Interop Roslyn generator package required by generated backend-neutral object cast helpers."));
+                }
+
+                foreach (string sourceFile in automaticObjectCastRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_il2cpp_object_casts",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite simple IL2CPP-prone C# pattern casts through the generated S1InteropObjectCast helper."));
                 }
             }
 

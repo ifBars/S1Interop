@@ -288,9 +288,42 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("    internal static class S1InteropRuntime");
         builder.AppendLine("    {");
-        builder.AppendLine($"        public const S1InteropRuntimeBackend Backend = S1InteropRuntimeBackend.{runtime};");
-        builder.AppendLine($"        public const bool IsMono = {ToCSharpBoolean(runtime == RuntimeBackend.Mono)};");
-        builder.AppendLine($"        public const bool IsIl2Cpp = {ToCSharpBoolean(runtime == RuntimeBackend.Il2Cpp)};");
+        if (runtime == RuntimeBackend.Unknown)
+        {
+            builder.AppendLine("        private static S1InteropRuntimeBackend? cachedBackend;");
+            builder.AppendLine("        public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();");
+            builder.AppendLine("        public static bool IsMono => Backend == S1InteropRuntimeBackend.Mono;");
+            builder.AppendLine("        public static bool IsIl2Cpp => Backend == S1InteropRuntimeBackend.Il2Cpp;");
+            builder.AppendLine();
+            builder.AppendLine("        private static S1InteropRuntimeBackend DetectBackend()");
+            builder.AppendLine("        {");
+            foreach (S1InteropTypeEntry entry in entries.OrderBy(entry => entry.Alias, StringComparer.Ordinal))
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(entry.Il2CppTypeName)}\") is not null)");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Il2Cpp;");
+                builder.AppendLine("            }");
+            }
+
+            foreach (S1InteropTypeEntry entry in entries.OrderBy(entry => entry.Alias, StringComparer.Ordinal))
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(entry.MonoTypeName)}\") is not null)");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Mono;");
+                builder.AppendLine("            }");
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("            return S1InteropRuntimeBackend.Unknown;");
+            builder.AppendLine("        }");
+        }
+        else
+        {
+            builder.AppendLine($"        public const S1InteropRuntimeBackend Backend = S1InteropRuntimeBackend.{runtime};");
+            builder.AppendLine($"        public const bool IsMono = {ToCSharpBoolean(runtime == RuntimeBackend.Mono)};");
+            builder.AppendLine($"        public const bool IsIl2Cpp = {ToCSharpBoolean(runtime == RuntimeBackend.Il2Cpp)};");
+        }
+
         builder.AppendLine("    }");
         builder.AppendLine();
         builder.AppendLine("    internal static class S1InteropTypeRegistry");
@@ -300,12 +333,31 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
         foreach (S1InteropTypeEntry entry in entries.OrderBy(entry => entry.Alias, StringComparer.Ordinal))
         {
-            string runtimeName = runtime == RuntimeBackend.Il2Cpp ? entry.Il2CppTypeName : entry.MonoTypeName;
-            builder.AppendLine($"        public const string {entry.Alias}Name = \"{Escape(runtimeName)}\";");
+            if (runtime == RuntimeBackend.Unknown)
+            {
+                builder.AppendLine($"        public const string {entry.Alias}MonoName = \"{Escape(entry.MonoTypeName)}\";");
+                builder.AppendLine($"        public const string {entry.Alias}Il2CppName = \"{Escape(entry.Il2CppTypeName)}\";");
+                builder.AppendLine($"        public static string {entry.Alias}Name => GetRuntimeTypeName({entry.Alias}MonoName, {entry.Alias}Il2CppName);");
+            }
+            else
+            {
+                string runtimeName = runtime == RuntimeBackend.Il2Cpp ? entry.Il2CppTypeName : entry.MonoTypeName;
+                builder.AppendLine($"        public const string {entry.Alias}Name = \"{Escape(runtimeName)}\";");
+            }
+
             builder.AppendLine($"        public static System.Type? {entry.Alias} => Resolve({entry.Alias}Name);");
+            builder.AppendLine($"        public static object? Create{entry.Alias}(params object?[] args) => Create({entry.Alias}Name, args);");
+            builder.AppendLine($"        public static object? Get{entry.Alias}Static(string memberName) => S1InteropMemberRegistry.GetValue({entry.Alias}Name, memberName, null);");
+            builder.AppendLine($"        public static bool TrySet{entry.Alias}Static(string memberName, object? value) => S1InteropMemberRegistry.TrySetValue({entry.Alias}Name, memberName, null, value);");
+            builder.AppendLine($"        public static object? Invoke{entry.Alias}Static(string methodName, params object?[] args) => S1InteropMemberRegistry.Invoke({entry.Alias}Name, methodName, parameterTypeNames: null, null, args);");
             builder.AppendLine();
         }
 
+        builder.AppendLine("        public static string GetRuntimeTypeName(string monoTypeName, string il2CppTypeName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            return S1InteropRuntime.Backend == S1InteropRuntimeBackend.Il2Cpp ? il2CppTypeName : monoTypeName;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
         builder.AppendLine("        public static System.Type? Resolve(string runtimeTypeName)");
         builder.AppendLine("        {");
         builder.AppendLine("            if (!Cache.TryGetValue(runtimeTypeName, out System.Type? type))");
@@ -319,6 +371,46 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            return type;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static object? Create(string runtimeTypeName, params object?[] args)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Type? type = Resolve(runtimeTypeName);");
+        builder.AppendLine("            if (type is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            foreach (System.Reflection.ConstructorInfo constructor in type.GetConstructors(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Reflection.ParameterInfo[] parameters = constructor.GetParameters();");
+        builder.AppendLine("                if (parameters.Length != args.Length)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    continue;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                object?[] converted = new object?[args.Length];");
+        builder.AppendLine("                bool compatible = true;");
+        builder.AppendLine("                for (int index = 0; index < args.Length; index++)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (!S1InteropMemberRegistry.TryConvertValue(args[index], parameters[index].ParameterType, out object? convertedValue))");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        compatible = false;");
+        builder.AppendLine("                        break;");
+        builder.AppendLine("                    }");
+        builder.AppendLine();
+        builder.AppendLine("                    converted[index] = convertedValue;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                if (!compatible)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    continue;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                return constructor.Invoke(converted);");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return null;");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static System.Type? ResolveFromLoadedAssemblies(string runtimeTypeName)");
@@ -372,9 +464,194 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            }");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
+        GenerateObjectCastRegistry(builder);
+        GenerateDelegateBridge(builder);
         GenerateMemberRegistry(builder, runtime, entries, members);
         builder.AppendLine("}");
         return builder.ToString();
+    }
+
+    private static void GenerateObjectCastRegistry(StringBuilder builder)
+    {
+        builder.AppendLine();
+        builder.AppendLine("    internal static class S1InteropObjectCast");
+        builder.AppendLine("    {");
+        builder.AppendLine("        private static readonly System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?> TryCastCache = new System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?>(System.StringComparer.Ordinal);");
+        builder.AppendLine();
+        builder.AppendLine("        public static bool Is<T>(object? value, out T? result) where T : class");
+        builder.AppendLine("        {");
+        builder.AppendLine("            result = As<T>(value);");
+        builder.AppendLine("            return result is not null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static T? As<T>(object? value) where T : class");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (value is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (value is T typed)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return typed;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type valueType = value.GetType();");
+        builder.AppendLine("            if (!IsIl2CppObjectBase(valueType))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.MethodInfo? tryCast = ResolveTryCastMethod(valueType, typeof(T));");
+        builder.AppendLine("            if (tryCast is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return tryCast.Invoke(value, null) as T;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MethodInfo? ResolveTryCastMethod(System.Type valueType, System.Type targetType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            string cacheKey = (valueType.AssemblyQualifiedName ?? valueType.FullName ?? valueType.Name) + \"|\" + (targetType.AssemblyQualifiedName ?? targetType.FullName ?? targetType.Name);");
+        builder.AppendLine("            if (!TryCastCache.TryGetValue(cacheKey, out System.Reflection.MethodInfo? method))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                method = FindTryCastMethod(valueType, targetType);");
+        builder.AppendLine("                TryCastCache[cacheKey] = method;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return method;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MethodInfo? FindTryCastMethod(System.Type valueType, System.Type targetType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            for (System.Type? current = valueType; current is not null; current = current.BaseType)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                foreach (System.Reflection.MethodInfo method in current.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (!method.Name.Equals(\"TryCast\", System.StringComparison.Ordinal) ||");
+        builder.AppendLine("                        !method.IsGenericMethodDefinition ||");
+        builder.AppendLine("                        method.GetGenericArguments().Length != 1 ||");
+        builder.AppendLine("                        method.GetParameters().Length != 0)");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        continue;");
+        builder.AppendLine("                    }");
+        builder.AppendLine();
+        builder.AppendLine("                    return method.MakeGenericMethod(targetType);");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool IsIl2CppObjectBase(System.Type valueType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            for (System.Type? current = valueType; current is not null; current = current.BaseType)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (string.Equals(current.FullName, \"Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase\", System.StringComparison.Ordinal))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return false;");
+        builder.AppendLine("        }");
+        builder.AppendLine("    }");
+    }
+
+    private static void GenerateDelegateBridge(StringBuilder builder)
+    {
+        builder.AppendLine();
+        builder.AppendLine("    internal static class S1InteropDelegateBridge");
+        builder.AppendLine("    {");
+        builder.AppendLine("        private static readonly System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?> ConvertDelegateCache = new System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?>(System.StringComparer.Ordinal);");
+        builder.AppendLine();
+        builder.AppendLine("        public static TDelegate Convert<TDelegate>(TDelegate listener) where TDelegate : class");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (listener is null || !S1InteropRuntime.IsIl2Cpp || listener is not System.Delegate delegateValue)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return listener;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.MethodInfo? convertDelegate = ResolveConvertDelegate(typeof(TDelegate));");
+        builder.AppendLine("            if (convertDelegate is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return listener;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return convertDelegate.Invoke(null, new object[] { delegateValue }) as TDelegate ?? listener;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return listener;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MethodInfo? ResolveConvertDelegate(System.Type delegateType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            string cacheKey = delegateType.AssemblyQualifiedName ?? delegateType.FullName ?? delegateType.Name;");
+        builder.AppendLine("            if (!ConvertDelegateCache.TryGetValue(cacheKey, out System.Reflection.MethodInfo? method))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                method = FindConvertDelegateMethod(delegateType);");
+        builder.AppendLine("                ConvertDelegateCache[cacheKey] = method;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return method;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MethodInfo? FindConvertDelegateMethod(System.Type delegateType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Type? delegateSupport = ResolveType(\"Il2CppInterop.Runtime.DelegateSupport\");");
+        builder.AppendLine("            if (delegateSupport is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            foreach (System.Reflection.MethodInfo method in delegateSupport.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (!method.Name.Equals(\"ConvertDelegate\", System.StringComparison.Ordinal) ||");
+        builder.AppendLine("                    !method.IsGenericMethodDefinition ||");
+        builder.AppendLine("                    method.GetGenericArguments().Length != 1 ||");
+        builder.AppendLine("                    method.GetParameters().Length != 1)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    continue;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                return method.MakeGenericMethod(delegateType);");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Type? ResolveType(string typeName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            System.Type? type = System.Type.GetType(typeName, throwOnError: false);");
+        builder.AppendLine("            if (type is not null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return type;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies())");
+        builder.AppendLine("            {");
+        builder.AppendLine("                type = assembly.GetType(typeName, throwOnError: false);");
+        builder.AppendLine("                if (type is not null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return type;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine("    }");
     }
 
     private static void GenerateMemberRegistry(
@@ -442,6 +719,32 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            return GetValue(ownerTypeName, memberName, instance, S1InteropMemberKind.FieldOrProperty);");
         builder.AppendLine("        }");
         builder.AppendLine();
+        builder.AppendLine("        public static object? GetInstanceValue(object? instance, string memberName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            return GetInstanceValue(instance, memberName, S1InteropMemberKind.FieldOrProperty);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static object? GetInstanceValue(object? instance, string memberName, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (instance is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind);");
+        builder.AppendLine("            if (member is System.Reflection.PropertyInfo property)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return property.GetValue(instance, null);");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (member is System.Reflection.FieldInfo field)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return field.GetValue(instance);");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
         builder.AppendLine("        public static object? GetValue(string ownerTypeName, string memberName, object? instance, S1InteropMemberKind kind)");
         builder.AppendLine("        {");
         builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, kind);");
@@ -463,29 +766,256 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            return TrySetValue(ownerTypeName, memberName, instance, value, S1InteropMemberKind.FieldOrProperty);");
         builder.AppendLine("        }");
         builder.AppendLine();
+        builder.AppendLine("        public static bool TrySetInstanceValue(object? instance, string memberName, object? value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            return TrySetInstanceValue(instance, memberName, value, S1InteropMemberKind.FieldOrProperty);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static bool TrySetInstanceValue(object? instance, string memberName, object? value, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (instance is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return TrySetValue(ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind), instance, value);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
         builder.AppendLine("        public static bool TrySetValue(string ownerTypeName, string memberName, object? instance, object? value, S1InteropMemberKind kind)");
         builder.AppendLine("        {");
         builder.AppendLine("            System.Reflection.MemberInfo? member = ResolveMember(ownerTypeName, memberName, parameterTypeNames: null, kind);");
+        builder.AppendLine("            return TrySetValue(member, instance, value);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TrySetValue(System.Reflection.MemberInfo? member, object? instance, object? value)");
+        builder.AppendLine("        {");
         builder.AppendLine("            if (member is System.Reflection.PropertyInfo property && property.CanWrite)");
         builder.AppendLine("            {");
-        builder.AppendLine("                property.SetValue(instance, value, null);");
+        builder.AppendLine("                if (!TryConvertValue(value, property.PropertyType, out object? converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                property.SetValue(instance, converted, null);");
         builder.AppendLine("                return true;");
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            if (member is System.Reflection.FieldInfo field)");
         builder.AppendLine("            {");
-        builder.AppendLine("                field.SetValue(instance, value);");
+        builder.AppendLine("                if (!TryConvertValue(value, field.FieldType, out object? converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                field.SetValue(instance, converted);");
         builder.AppendLine("                return true;");
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            return false;");
         builder.AppendLine("        }");
         builder.AppendLine();
+        builder.AppendLine("        public static bool TryConvertValue(object? value, System.Type targetType, out object? converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (value is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = targetType.IsValueType && System.Nullable.GetUnderlyingType(targetType) is null ? System.Activator.CreateInstance(targetType) : null;");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type conversionType = System.Nullable.GetUnderlyingType(targetType) ?? targetType;");
+        builder.AppendLine("            if (conversionType.IsInstanceOfType(value))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = value;");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (TryConvertIl2CppGuid(value, conversionType, out converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                if (TryConvertIl2CppList(value, conversionType, out converted))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                if (conversionType.IsEnum)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    converted = value is string text ? System.Enum.Parse(conversionType, text, ignoreCase: true) : System.Enum.ToObject(conversionType, value);");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                converted = System.Convert.ChangeType(value, conversionType, System.Globalization.CultureInfo.InvariantCulture);");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = null;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryConvertIl2CppGuid(object value, System.Type targetType, out object? converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            converted = null;");
+        builder.AppendLine("            if (!string.Equals(targetType.FullName, \"Il2CppSystem.Guid\", System.StringComparison.Ordinal) || value is not System.Guid guid)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Reflection.ConstructorInfo? stringConstructor = targetType.GetConstructor(new[] { typeof(string) });");
+        builder.AppendLine("                if (stringConstructor is not null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    converted = stringConstructor.Invoke(new object[] { guid.ToString() });");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                System.Reflection.ConstructorInfo? byteArrayConstructor = targetType.GetConstructor(new[] { typeof(byte[]) });");
+        builder.AppendLine("                if (byteArrayConstructor is not null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    converted = byteArrayConstructor.Invoke(new object[] { guid.ToByteArray() });");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = null;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return false;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryConvertIl2CppList(object value, System.Type targetType, out object? converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            converted = null;");
+        builder.AppendLine("            if (targetType.FullName is null || !targetType.FullName.StartsWith(\"Il2CppSystem.Collections.Generic.List`1\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (value is string || value is not System.Collections.IEnumerable enumerable)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type[] genericArguments = targetType.GetGenericArguments();");
+        builder.AppendLine("            if (genericArguments.Length != 1)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Reflection.MethodInfo? addMethod = targetType.GetMethod(\"Add\", new[] { genericArguments[0] });");
+        builder.AppendLine("            if (addMethod is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                object? list = System.Activator.CreateInstance(targetType);");
+        builder.AppendLine("                if (list is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                foreach (object? item in enumerable)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    if (!TryConvertValue(item, genericArguments[0], out object? convertedItem))");
+        builder.AppendLine("                    {");
+        builder.AppendLine("                        return false;");
+        builder.AppendLine("                    }");
+        builder.AppendLine();
+        builder.AppendLine("                    addMethod.Invoke(list, new object?[] { convertedItem });");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                converted = list;");
+        builder.AppendLine("                return true;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                converted = null;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
         builder.AppendLine("        public static object? Invoke(string ownerTypeName, string memberName, string[]? parameterTypeNames, object? instance, params object?[] args)");
         builder.AppendLine("        {");
-        builder.AppendLine("            return ResolveMethod(ownerTypeName, memberName, parameterTypeNames) is System.Reflection.MethodInfo method");
-        builder.AppendLine("                ? method.Invoke(instance, args)");
-        builder.AppendLine("                : null;");
+        builder.AppendLine("            return Invoke(ResolveMethod(ownerTypeName, memberName, parameterTypeNames), instance, args);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static object? InvokeInstance(object? instance, string memberName, params object?[] args)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            return InvokeInstance(instance, memberName, null, args);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        public static object? InvokeInstance(object? instance, string memberName, string[]? parameterTypeNames, params object?[] args)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (instance is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return Invoke(ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames, S1InteropMemberKind.Method) as System.Reflection.MethodInfo, instance, args);");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static object? Invoke(System.Reflection.MethodInfo? method, object? instance, params object?[] args)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (method is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            if (!TryConvertArguments(method.GetParameters(), args, out object?[] converted))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            object? result = method.Invoke(instance, converted);");
+        builder.AppendLine("            CopyByRefArguments(method.GetParameters(), converted, args);");
+        builder.AppendLine("            return result;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryConvertArguments(System.Reflection.ParameterInfo[] parameters, object?[] args, out object?[] converted)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            converted = System.Array.Empty<object?>();");
+        builder.AppendLine("            if (parameters.Length != args.Length)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            converted = new object?[args.Length];");
+        builder.AppendLine("            for (int index = 0; index < args.Length; index++)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Type parameterType = parameters[index].ParameterType;");
+        builder.AppendLine("                System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is System.Type elementType");
+        builder.AppendLine("                    ? elementType");
+        builder.AppendLine("                    : parameterType;");
+        builder.AppendLine("                if (!TryConvertValue(args[index], conversionType, out object? convertedValue))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return false;");
+        builder.AppendLine("                }");
+        builder.AppendLine();
+        builder.AppendLine("                converted[index] = convertedValue;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return true;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static void CopyByRefArguments(System.Reflection.ParameterInfo[] parameters, object?[] converted, object?[] args)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            int count = System.Math.Min(System.Math.Min(parameters.Length, converted.Length), args.Length);");
+        builder.AppendLine("            for (int index = 0; index < count; index++)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (parameters[index].ParameterType.IsByRef)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    args[index] = converted[index];");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        public static System.Reflection.MethodInfo? ResolveMethod(string ownerTypeName, string memberName, string[]? parameterTypeNames)");
@@ -502,6 +1032,19 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                member = ownerType is null");
         builder.AppendLine("                    ? null");
         builder.AppendLine("                    : ResolveMember(ownerType, memberName, parameterTypeNames, kind);");
+        builder.AppendLine("                Cache[cacheKey] = member;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return member;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Reflection.MemberInfo? ResolveMemberCached(System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            string ownerKey = ownerType.AssemblyQualifiedName ?? ownerType.FullName ?? ownerType.Name;");
+        builder.AppendLine("            string cacheKey = ownerKey + \"::\" + memberName + \"::\" + ((int)kind).ToString() + \"::\" + (parameterTypeNames is null ? string.Empty : string.Join(\"|\", parameterTypeNames));");
+        builder.AppendLine("            if (!Cache.TryGetValue(cacheKey, out System.Reflection.MemberInfo? member))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                member = ResolveMember(ownerType, memberName, parameterTypeNames, kind);");
         builder.AppendLine("                Cache[cacheKey] = member;");
         builder.AppendLine("            }");
         builder.AppendLine();
@@ -560,8 +1103,14 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine();
         builder.AppendLine("        private static System.Type? ResolveKnownType(string typeName)");
         builder.AppendLine("        {");
+        builder.AppendLine("            if (TryResolveGenericListType(typeName, out System.Type? genericListType))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return genericListType;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
         builder.AppendLine("            switch (typeName)");
         builder.AppendLine("            {");
+        builder.AppendLine("                case \"System.Guid\": return typeof(System.Guid);");
         builder.AppendLine("                case \"bool\": return typeof(bool);");
         builder.AppendLine("                case \"byte\": return typeof(byte);");
         builder.AppendLine("                case \"char\": return typeof(char);");
@@ -577,6 +1126,39 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                case \"void\": return typeof(void);");
         builder.AppendLine("                default: return S1InteropTypeRegistry.Resolve(typeName);");
         builder.AppendLine("            }");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static bool TryResolveGenericListType(string typeName, out System.Type? resolvedType)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            resolvedType = null;");
+        builder.AppendLine("            const string monoPrefix = \"System.Collections.Generic.List<\";");
+        builder.AppendLine("            const string il2CppPrefix = \"Il2CppSystem.Collections.Generic.List<\";");
+        builder.AppendLine("            string genericDefinitionName;");
+        builder.AppendLine("            string elementTypeName;");
+        builder.AppendLine("            if (typeName.StartsWith(monoPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"System.Collections.Generic.List`1\";");
+        builder.AppendLine("                elementTypeName = typeName.Substring(monoPrefix.Length, typeName.Length - monoPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else if (typeName.StartsWith(il2CppPrefix, System.StringComparison.Ordinal) && typeName.EndsWith(\">\", System.StringComparison.Ordinal))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                genericDefinitionName = \"Il2CppSystem.Collections.Generic.List`1\";");
+        builder.AppendLine("                elementTypeName = typeName.Substring(il2CppPrefix.Length, typeName.Length - il2CppPrefix.Length - 1);");
+        builder.AppendLine("            }");
+        builder.AppendLine("            else");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            System.Type? genericDefinition = S1InteropTypeRegistry.Resolve(genericDefinitionName);");
+        builder.AppendLine("            System.Type? elementType = ResolveKnownType(elementTypeName);");
+        builder.AppendLine("            if (genericDefinition is null || elementType is null)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            resolvedType = genericDefinition.MakeGenericType(elementType);");
+        builder.AppendLine("            return true;");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
     }
@@ -610,6 +1192,19 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             return byRef
                 ? $"S1InteropTypeRegistry.{matchingEntry.Value.Alias}Name + \"&\""
                 : $"S1InteropTypeRegistry.{matchingEntry.Value.Alias}Name";
+        }
+
+        if (runtime == RuntimeBackend.Unknown)
+        {
+            string monoTypeName = normalized;
+            string il2CppTypeName = ToIl2CppTypeName(normalized);
+            if (string.Equals(monoTypeName, il2CppTypeName, StringComparison.Ordinal))
+            {
+                return $"\"{Escape(monoTypeName + (byRef ? "&" : string.Empty))}\"";
+            }
+
+            string expression = $"S1InteropTypeRegistry.GetRuntimeTypeName(\"{Escape(monoTypeName)}\", \"{Escape(il2CppTypeName)}\")";
+            return byRef ? expression + " + \"&\"" : expression;
         }
 
         string runtimeTypeName = runtime == RuntimeBackend.Il2Cpp
@@ -845,10 +1440,29 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         }
         """;
 
-    private static string ToIl2CppTypeName(string monoTypeName) =>
-        monoTypeName.StartsWith("ScheduleOne.", StringComparison.Ordinal)
-            ? "Il2Cpp" + monoTypeName
-            : monoTypeName;
+    private static string ToIl2CppTypeName(string monoTypeName)
+    {
+        if (string.Equals(monoTypeName, "System.Guid", StringComparison.Ordinal) ||
+            string.Equals(monoTypeName, "Guid", StringComparison.Ordinal))
+        {
+            return "Il2CppSystem.Guid";
+        }
+
+        const string listPrefix = "System.Collections.Generic.List<";
+        if (monoTypeName.StartsWith(listPrefix, StringComparison.Ordinal) &&
+            monoTypeName.EndsWith(">", StringComparison.Ordinal))
+        {
+            string elementTypeName = monoTypeName.Substring(listPrefix.Length, monoTypeName.Length - listPrefix.Length - 1);
+            return $"Il2CppSystem.Collections.Generic.List<{ToIl2CppTypeName(elementTypeName)}>";
+        }
+
+        if (monoTypeName.StartsWith("ScheduleOne.", StringComparison.Ordinal))
+        {
+            return "Il2Cpp" + monoTypeName;
+        }
+
+        return monoTypeName;
+    }
 
     private static string GetSimpleName(string typeName)
     {

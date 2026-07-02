@@ -36,6 +36,7 @@ internal static class AnalysisBackedCommand
 
     private static bool IsMigrationPlanningCommand(ParsedCommand command) =>
         command.Name.Equals("migrate", StringComparison.OrdinalIgnoreCase) ||
+        command.Name.Equals("init", StringComparison.OrdinalIgnoreCase) ||
         command.Name.Equals("sdkgen", StringComparison.OrdinalIgnoreCase) ||
         command.Name.Equals("build-hook", StringComparison.OrdinalIgnoreCase);
 

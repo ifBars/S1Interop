@@ -109,7 +109,8 @@ public sealed record SdkFacadePlan(
 public sealed record SdkTypeAlias(
     string Alias,
     string MonoType,
-    string Il2CppType);
+    string Il2CppType,
+    bool GenerateGlobalUsing = true);
 
 public sealed record SourceInteropAnalysis(
     string ProjectPath,

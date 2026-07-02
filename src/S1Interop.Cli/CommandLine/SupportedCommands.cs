@@ -3,8 +3,10 @@ internal static class SupportedCommands
     private static readonly string[] Names =
     [
         "analyze",
+        "init",
         "lint",
         "migrate",
+        "new",
         "verify-migration",
         "build-hook",
         "sdkgen"

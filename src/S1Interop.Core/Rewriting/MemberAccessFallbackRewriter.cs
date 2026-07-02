@@ -1,7 +1,13 @@
+using System.Text.RegularExpressions;
+
 namespace S1Interop.Core;
 
 public sealed class MemberAccessFallbackRewriter
 {
+    private static readonly Regex DynamicInstanceLookupPattern = new(
+        @"(?<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*GetType\s*\(\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
+        RegexOptions.Compiled);
+
     private static readonly HashSet<string> ValueReturnTypes = new(StringComparer.Ordinal)
     {
         "bool",
@@ -21,6 +27,12 @@ public sealed class MemberAccessFallbackRewriter
     {
         "object",
         "void"
+    };
+
+    private static readonly HashSet<string> DynamicFallbackReturnTypes = new(StringComparer.Ordinal)
+    {
+        "object",
+        "object?"
     };
 
     private static readonly HashSet<string> MethodModifiers = new(StringComparer.Ordinal)
@@ -51,13 +63,14 @@ public sealed class MemberAccessFallbackRewriter
         MemberAccessTarget? target = new MemberAccessTargetCatalog()
             .DiscoverFileTargets(risk.FilePath)
             .FirstOrDefault(target => target.Line == risk.Line);
-        if (target is null)
+        string source = File.ReadAllText(risk.FilePath);
+        if (target is not null && new MemberAccessFallbackRewriter().RewriteSource(source, risk.FilePath, [target]) != source)
         {
-            return false;
+            return true;
         }
 
-        string source = File.ReadAllText(risk.FilePath);
-        return new MemberAccessFallbackRewriter().RewriteSource(source, risk.FilePath, [target]) != source;
+        return CanRewriteDynamicInstanceFallback(source, risk.Line) ||
+               CanRewriteDynamicHelperMethod(source, risk.Line);
     }
 
     public string RewriteSource(string source, string sourcePath, IReadOnlyList<MemberAccessTarget> projectTargets)
@@ -81,11 +94,6 @@ public sealed class MemberAccessFallbackRewriter
             sourceTargets = projectTargets.OrderByDescending(target => target.Line).ToArray();
         }
 
-        if (sourceTargets.Length == 0)
-        {
-            return source;
-        }
-
         var rewrittenLines = lines.ToList();
         bool changed = false;
         foreach (MemberAccessTarget target in sourceTargets)
@@ -97,6 +105,9 @@ public sealed class MemberAccessFallbackRewriter
 
             changed = true;
         }
+
+        changed |= TryRewriteDynamicHelperMethods(rewrittenLines);
+        changed |= TryRewriteDynamicInstanceFallbacks(rewrittenLines);
 
         if (!changed)
         {
@@ -140,6 +151,290 @@ public sealed class MemberAccessFallbackRewriter
         lines.Insert(openBraceLine + 1, replacement);
         return true;
     }
+
+    private static bool TryRewriteDynamicInstanceFallbacks(List<string> lines)
+    {
+        bool changed = false;
+        for (int index = lines.Count - 1; index >= 0; index--)
+        {
+            if (!ContainsDynamicInstanceLookup(lines[index]) ||
+                !TryFindContainingMethod(lines, index, out int methodLine, out MethodSignature signature) ||
+                !DynamicFallbackReturnTypes.Contains(signature.ReturnType) ||
+                !TryFindMethodBody(lines, methodLine, out int openBraceLine, out int closeBraceLine) ||
+                !TryFindDynamicInstanceFallback(lines, openBraceLine + 1, closeBraceLine - 1, out string parameterName, out string memberName))
+            {
+                continue;
+            }
+
+            string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue({parameterName}, \"{memberName}\");";
+            lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
+            lines.Insert(openBraceLine + 1, replacement);
+            changed = true;
+            index = methodLine;
+        }
+
+        return changed;
+    }
+
+    private static bool TryRewriteDynamicHelperMethods(List<string> lines)
+    {
+        bool changed = false;
+        for (int index = lines.Count - 1; index >= 0; index--)
+        {
+            if (!TryParseDynamicHelperSignature(lines[index], out DynamicHelperSignature signature) ||
+                !TryFindMethodBody(lines, index, out int openBraceLine, out int closeBraceLine) ||
+                !CanRewriteDynamicHelperBody(lines, openBraceLine + 1, closeBraceLine - 1, signature))
+            {
+                continue;
+            }
+
+            string replacement = signature.Kind == DynamicHelperKind.Setter
+                ? $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.TrySetInstanceValue({signature.TargetParameterName}, {signature.MemberParameterName}, {signature.ValueParameterName});"
+                : $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue({signature.TargetParameterName}, {signature.MemberParameterName});";
+            lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
+            lines.Insert(openBraceLine + 1, replacement);
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static bool TryParseDynamicHelperSignature(string line, out DynamicHelperSignature signature)
+    {
+        signature = default;
+        string trimmed = line.Trim();
+        if (trimmed.Length == 0 ||
+            trimmed.Contains("=>", StringComparison.Ordinal) ||
+            !trimmed.Contains('(', StringComparison.Ordinal) ||
+            !trimmed.Contains(')', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        int openParen = trimmed.IndexOf('(');
+        int closeParen = trimmed.IndexOf(')', openParen + 1);
+        if (openParen <= 0 || closeParen <= openParen)
+        {
+            return false;
+        }
+
+        string beforeParen = trimmed[..openParen].Trim();
+        string[] beforeTokens = beforeParen.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        if (beforeTokens.Length < 2 || beforeTokens.Any(token => token.Contains('.', StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        string returnType = beforeTokens[^2];
+        DynamicHelperKind kind;
+        if (DynamicFallbackReturnTypes.Contains(returnType))
+        {
+            kind = DynamicHelperKind.Getter;
+        }
+        else if (returnType.Equals("bool", StringComparison.Ordinal))
+        {
+            kind = DynamicHelperKind.Setter;
+        }
+        else
+        {
+            return false;
+        }
+
+        string[] parameters = trimmed[(openParen + 1)..closeParen]
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (kind == DynamicHelperKind.Getter && parameters.Length != 2 ||
+            kind == DynamicHelperKind.Setter && parameters.Length != 3)
+        {
+            return false;
+        }
+
+        if (!TryParseParameter(parameters[0], out string targetType, out string targetName) ||
+            !IsObjectLikeType(targetType) ||
+            !TryParseParameter(parameters[1], out string memberType, out string memberName) ||
+            !memberType.Equals("string", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string valueName = string.Empty;
+        if (kind == DynamicHelperKind.Setter &&
+            !TryParseParameter(parameters[2], out _, out valueName))
+        {
+            return false;
+        }
+
+        string indent = line[..(line.Length - line.TrimStart().Length)];
+        signature = new DynamicHelperSignature(indent, kind, targetName, memberName, valueName);
+        return true;
+    }
+
+    private static bool TryParseParameter(string parameter, out string type, out string name)
+    {
+        type = string.Empty;
+        name = string.Empty;
+        string[] tokens = parameter.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length < 2)
+        {
+            return false;
+        }
+
+        type = tokens[^2];
+        name = tokens[^1].TrimStart('@');
+        return IsIdentifier(name);
+    }
+
+    private static bool IsObjectLikeType(string type) =>
+        type.Equals("object", StringComparison.Ordinal) ||
+        type.Equals("object?", StringComparison.Ordinal) ||
+        type.Equals("System.Object", StringComparison.Ordinal) ||
+        type.Equals("System.Object?", StringComparison.Ordinal);
+
+    private static bool CanRewriteDynamicHelperBody(
+        IReadOnlyList<string> lines,
+        int startLine,
+        int endLine,
+        DynamicHelperSignature signature)
+    {
+        if (startLine > endLine || startLine < 0 || endLine >= lines.Count)
+        {
+            return false;
+        }
+
+        string body = string.Join('\n', lines.Skip(startLine).Take(endLine - startLine + 1));
+        if (!ContainsDynamicNamedLookup(body, "Property", signature.TargetParameterName, signature.MemberParameterName) ||
+            !ContainsDynamicNamedLookup(body, "Field", signature.TargetParameterName, signature.MemberParameterName))
+        {
+            return false;
+        }
+
+        return signature.Kind == DynamicHelperKind.Getter
+            ? body.Contains(".GetValue(", StringComparison.Ordinal)
+            : body.Contains(".SetValue(", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsDynamicNamedLookup(string body, string kind, string targetName, string memberName)
+    {
+        string directLookup = $"{targetName}.GetType().Get{kind}({memberName}";
+        if (body.Contains(directLookup, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        Match typeAssignment = Regex.Match(
+            body,
+            $@"\b(?:Type|System\.Type)\s+(?<typeName>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*{Regex.Escape(targetName)}\.GetType\s*\(\s*\)\s*;",
+            RegexOptions.Multiline);
+        return typeAssignment.Success &&
+               body.Contains($"{typeAssignment.Groups["typeName"].Value}.Get{kind}({memberName}", StringComparison.Ordinal);
+    }
+
+    private static bool CanRewriteDynamicInstanceFallback(string source, int line)
+    {
+        if (line <= 0)
+        {
+            return false;
+        }
+
+        string[] lines = source.Split(["\r\n", "\n"], StringSplitOptions.None);
+        int lineIndex = line - 1;
+        return lineIndex >= 0 &&
+               lineIndex < lines.Length &&
+               TryFindContainingMethod(lines, lineIndex, out int methodLine, out MethodSignature signature) &&
+               DynamicFallbackReturnTypes.Contains(signature.ReturnType) &&
+               TryFindMethodBody(lines, methodLine, out int openBraceLine, out int closeBraceLine) &&
+               TryFindDynamicInstanceFallback(lines, openBraceLine + 1, closeBraceLine - 1, out _, out _);
+    }
+
+    private static bool CanRewriteDynamicHelperMethod(string source, int line)
+    {
+        if (line <= 0)
+        {
+            return false;
+        }
+
+        string[] lines = source.Split(["\r\n", "\n"], StringSplitOptions.None);
+        int lineIndex = line - 1;
+        return lineIndex >= 0 &&
+               lineIndex < lines.Length &&
+               TryFindContainingDynamicHelperMethod(lines, lineIndex, out int methodLine, out DynamicHelperSignature signature) &&
+               TryFindMethodBody(lines, methodLine, out int openBraceLine, out int closeBraceLine) &&
+               CanRewriteDynamicHelperBody(lines, openBraceLine + 1, closeBraceLine - 1, signature);
+    }
+
+    private static bool TryFindContainingDynamicHelperMethod(
+        IReadOnlyList<string> lines,
+        int memberLine,
+        out int methodLine,
+        out DynamicHelperSignature signature)
+    {
+        for (int index = memberLine; index >= 0; index--)
+        {
+            if (TryParseDynamicHelperSignature(lines[index], out signature))
+            {
+                methodLine = index;
+                return true;
+            }
+        }
+
+        methodLine = -1;
+        signature = default;
+        return false;
+    }
+
+    private static bool TryFindDynamicInstanceFallback(
+        IReadOnlyList<string> lines,
+        int startLine,
+        int endLine,
+        out string parameterName,
+        out string memberName)
+    {
+        parameterName = string.Empty;
+        memberName = string.Empty;
+        if (startLine > endLine || startLine < 0 || endLine >= lines.Count)
+        {
+            return false;
+        }
+
+        var lookups = new List<(string Receiver, string Member, MemberAccessKind Kind)>();
+        for (int index = startLine; index <= endLine; index++)
+        {
+            foreach ((string receiver, string member, MemberAccessKind kind) in GetDynamicInstanceLookups(lines[index]))
+            {
+                lookups.Add((receiver, member, kind));
+            }
+        }
+
+        foreach (var group in lookups.GroupBy(lookup => (lookup.Receiver, lookup.Member)))
+        {
+            bool hasField = group.Any(lookup => lookup.Kind == MemberAccessKind.Field);
+            bool hasProperty = group.Any(lookup => lookup.Kind == MemberAccessKind.Property);
+            if (!hasField || !hasProperty)
+            {
+                continue;
+            }
+
+            parameterName = group.Key.Receiver;
+            memberName = group.Key.Member;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<(string Receiver, string Member, MemberAccessKind Kind)> GetDynamicInstanceLookups(string line)
+    {
+        foreach (Match match in DynamicInstanceLookupPattern.Matches(line))
+        {
+            yield return (
+                match.Groups["receiver"].Value,
+                match.Groups["member"].Value,
+                match.Groups["kind"].Value.Equals("Field", StringComparison.Ordinal) ? MemberAccessKind.Field : MemberAccessKind.Property);
+        }
+    }
+
+    private static bool ContainsDynamicInstanceLookup(string line) =>
+        line.Contains(".GetType()", StringComparison.Ordinal) &&
+        (line.Contains(".GetField(", StringComparison.Ordinal) || line.Contains(".GetProperty(", StringComparison.Ordinal));
 
     private static int FindTypedMemberAccessLine(IReadOnlyList<string> lines, MemberAccessTarget target)
     {
@@ -326,4 +621,17 @@ public sealed class MemberAccessFallbackRewriter
     }
 
     private readonly record struct MethodSignature(string Indent, string ReturnType, string ParameterName);
+
+    private enum DynamicHelperKind
+    {
+        Getter,
+        Setter
+    }
+
+    private readonly record struct DynamicHelperSignature(
+        string Indent,
+        DynamicHelperKind Kind,
+        string TargetParameterName,
+        string MemberParameterName,
+        string ValueParameterName);
 }
