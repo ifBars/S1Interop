@@ -5961,7 +5961,8 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is System.Type elementType", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("args[index] = ConvertBackValue(args[index], converted[index]);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackGuid(object converted, out System.Guid guid)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static bool TryConvertBackArray(System.Array original, object converted, out System.Array? managedArray)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("private static bool TryConvertBackArray(System.Array original, object converted, out System.Array? managedArray)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackList(System.Collections.IList original, object converted, out System.Collections.IList? managedList)", StringComparison.Ordinal),
             $"Generated member registry should convert method invocation arguments and copy by-ref values back after reflection Invoke. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, params object?[] args)", StringComparison.Ordinal) &&
@@ -6029,6 +6030,7 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "Scale", Alias = "HudScale", Kind = S1Interop.S1InteropMemberKind.Field)]
             [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int", "string&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "RewriteGuid", Alias = "HudRewriteGuid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid&" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "RewriteNames", Alias = "HudRewriteNames", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.List<string>&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetData", Alias = "HudSetData", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Guid", "System.Collections.Generic.List<string>" })]
             [assembly: S1Interop.S1InteropMember("Hud", "RewriteBytes", Alias = "HudRewriteBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetBytes", Alias = "HudSetBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
@@ -6051,6 +6053,7 @@ internal sealed class S1InteropFixtureTests
                     public int Scale;
                     public string? LastName { get; private set; }
                     public string? LastGuid { get; private set; }
+                    public string? LastRewriteNames { get; private set; }
                     public string? LastData { get; private set; }
                     public string? LastRewriteBytes { get; private set; }
                     public string? LastBytes { get; private set; }
@@ -6077,6 +6080,15 @@ internal sealed class S1InteropFixtureTests
                         guid = new Il2CppSystem.Guid("22222222-3333-4444-5555-666666666666");
                         LastGuid = guid.Value;
                         return LastGuid;
+                    }
+
+                    public string RewriteNames(ref Il2CppSystem.Collections.Generic.List<string> names)
+                    {
+                        names = new Il2CppSystem.Collections.Generic.List<string>();
+                        names.Add("delta");
+                        names.Add("echo");
+                        LastRewriteNames = names.Count + ":" + names[0] + ":" + names[1];
+                        return LastRewriteNames;
                     }
 
                     public string RewriteBytes(ref Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte> bytes)
@@ -6330,6 +6342,13 @@ internal sealed class S1InteropFixtureTests
         object? rewriteGuidResult = invokeRewriteGuid!.Invoke(null, [hud, guidArgs]);
         Assert(string.Equals(rewriteGuidResult as string, "22222222-3333-4444-5555-666666666666", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref Guid result. Result={rewriteGuidResult}");
         Assert(guidArgs[0] is Guid copiedGuid && copiedGuid == Guid.Parse("22222222-3333-4444-5555-666666666666"), $"Generated method invoker should copy IL2CPP Guid ref values back as System.Guid. Arg={guidArgs[0]}");
+
+        MethodInfo? invokeRewriteNames = memberRegistryType.GetMethod("InvokeHudRewriteNames", [typeof(object), typeof(object[])]);
+        Assert(invokeRewriteNames is not null, "Generated member registry should expose InvokeHudRewriteNames.");
+        object?[] nameRefArgs = [new List<string> { "alpha", "beta" }];
+        object? rewriteNamesResult = invokeRewriteNames!.Invoke(null, [hud, nameRefArgs]);
+        Assert(string.Equals(rewriteNamesResult as string, "2:delta:echo", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref list result. Result={rewriteNamesResult}");
+        Assert(nameRefArgs[0] is List<string> copiedNames && copiedNames.SequenceEqual(new[] { "delta", "echo" }), $"Generated method invoker should copy IL2CPP list ref values back as managed lists. Arg={nameRefArgs[0]}");
 
         MethodInfo? invokeRewriteBytes = memberRegistryType.GetMethod("InvokeHudRewriteBytes", [typeof(object), typeof(object[])]);
         Assert(invokeRewriteBytes is not null, "Generated member registry should expose InvokeHudRewriteBytes.");
