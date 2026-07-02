@@ -273,12 +273,11 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticObjectCastRisks = project.SourceInterop.SourceRisks
                 .Where(Il2CppObjectCastRewriter.CanRewrite)
                 .ToArray();
-            int generatedMemberAccessTargetCount = new MemberAccessTargetCatalog().Discover(project.ProjectPath).Count;
-            bool hasGeneratedMemberAccessTargets = project.SourceInterop.SourceRisks
-                .Any(risk =>
-                    risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase) ||
-                    risk.Kind.Equals("DirectMemberReflectionLookup", StringComparison.OrdinalIgnoreCase)) &&
-                generatedMemberAccessTargetCount > 0;
+            MemberAccessTarget[] generatedMemberAccessTargets = new MemberAccessTargetCatalog()
+                .Discover(project.ProjectPath)
+                .ToArray();
+            int generatedMemberAccessTargetCount = generatedMemberAccessTargets.Length;
+            bool hasGeneratedMemberAccessTargets = generatedMemberAccessTargetCount > 0;
             bool hasAutomaticMemberAccessRewrites = automaticMemberAccessRisks.Length > 0 || automaticDirectMemberLookupRisks.Length > 0;
             SourceRisk[] manualRisks = project.SourceInterop.SourceRisks
                 .Except(automaticUnityEventRisks)
@@ -430,6 +429,7 @@ public sealed class MigrationPlanner
 
                 foreach (string sourceFile in automaticMemberAccessRisks
                              .Select(risk => risk.FilePath)
+                             .Concat(generatedMemberAccessTargets.Select(target => target.SourceFilePath))
                              .Distinct(StringComparer.OrdinalIgnoreCase)
                              .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
                 {

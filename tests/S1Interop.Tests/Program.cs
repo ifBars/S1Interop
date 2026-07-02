@@ -785,6 +785,15 @@ internal sealed class S1InteropFixtureTests
                     target.Kind == MemberAccessKind.FieldOrProperty &&
                     !target.IsStatic),
                 "Member-access discovery should infer typed ReflectionUtils.TrySetFieldOrProperty targets from ScheduleOne method parameters.");
+
+            string source = File.ReadAllText(tempSource);
+            string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
+            Assert(
+                rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(_landVehicle);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper getter calls with declared generated member-cache getters.");
+            Assert(
+                rewritten.Contains("S1Interop.Generated.S1InteropMemberRegistry.TrySetcurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper setter calls with declared generated member-cache setters.");
         }
         finally
         {
@@ -3279,7 +3288,9 @@ internal sealed class S1InteropFixtureTests
             CopyFixtureDirectory(sourceDirectory, tempRoot);
             string tempProject = Path.Combine(tempRoot, "S1FuelMod.csproj");
             string tempFuelVehicleData = Path.Combine(tempRoot, "Systems", "FuelVehicleData.cs");
+            string tempVehicleFuelSystem = Path.Combine(tempRoot, "Systems", "VehicleFuelSystem.cs");
             string originalSource = File.ReadAllText(tempFuelVehicleData);
+            string originalVehicleFuelSystem = File.ReadAllText(tempVehicleFuelSystem);
 
             WorkspaceAnalysis before = analyzer.Analyze(tempProject);
             MigrationPlan plan = new MigrationPlanner().Plan(before);
@@ -3318,6 +3329,11 @@ internal sealed class S1InteropFixtureTests
             Assert(
                 CountOccurrences(migratedSource, "HideFromIl2Cpp") == CountOccurrences(originalSource, "HideFromIl2Cpp") + 1,
                 "Migration should add exactly one HideFromIl2Cpp attribute to FuelVehicleData.");
+            string migratedVehicleFuelSystem = File.ReadAllText(tempVehicleFuelSystem);
+            Assert(
+                migratedVehicleFuelSystem.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
+                !migratedVehicleFuelSystem.Contains("ReflectionUtils.TryGetFieldOrProperty(_landVehicle, \"vehicleName\")", StringComparison.Ordinal),
+                "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated member-cache helpers.");
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             Assert(after.Diagnostics.Count == 0, "Copied S1FuelMod fixture should have no diagnostics after migration apply.");
@@ -3336,9 +3352,13 @@ internal sealed class S1InteropFixtureTests
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempFuelVehicleData), "Rollback did not restore FuelVehicleData.cs.");
+            Assert(rollbackResult.RestoredFiles.Contains(tempVehicleFuelSystem), "Rollback did not restore VehicleFuelSystem.cs.");
             Assert(
                 string.Equals(File.ReadAllText(tempFuelVehicleData), originalSource, StringComparison.Ordinal),
                 "Rollback should restore the original FuelVehicleData source.");
+            Assert(
+                string.Equals(File.ReadAllText(tempVehicleFuelSystem), originalVehicleFuelSystem, StringComparison.Ordinal),
+                "Rollback should restore the original VehicleFuelSystem source.");
         }
         finally
         {

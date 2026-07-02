@@ -8,6 +8,10 @@ public sealed class MemberAccessFallbackRewriter
         @"(?<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*GetType\s*\(\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
 
+    private static readonly Regex TypedHelperLookupPattern = new(
+        @"(?<call>[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*Try(?<operation>Get|Set)FieldOrProperty\s*\(\s*(?<target>[_A-Za-z][A-Za-z0-9_]*)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""(?:\s*,\s*(?<value>[^;\r\n()]+))?\s*\))",
+        RegexOptions.Compiled);
+
     private static readonly HashSet<string> ValueReturnTypes = new(StringComparer.Ordinal)
     {
         "bool",
@@ -98,7 +102,8 @@ public sealed class MemberAccessFallbackRewriter
         bool changed = false;
         foreach (MemberAccessTarget target in sourceTargets)
         {
-            if (!TryRewriteTarget(rewrittenLines, target))
+            if (!TryRewriteTarget(rewrittenLines, target) &&
+                !TryRewriteTypedHelperCall(rewrittenLines, target))
             {
                 continue;
             }
@@ -150,6 +155,62 @@ public sealed class MemberAccessFallbackRewriter
         lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
         lines.Insert(openBraceLine + 1, replacement);
         return true;
+    }
+
+    private static bool TryRewriteTypedHelperCall(List<string> lines, MemberAccessTarget target)
+    {
+        int lineIndex = target.Line - 1;
+        if (lineIndex < 0 || lineIndex >= lines.Count)
+        {
+            return false;
+        }
+
+        string line = lines[lineIndex];
+        Match match = TypedHelperLookupPattern.Match(line);
+        if (!match.Success ||
+            !match.Groups["member"].Value.Equals(target.MemberName, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string replacement = match.Groups["operation"].Value.Equals("Set", StringComparison.Ordinal)
+            ? BuildTypedHelperSetterReplacement(match, target)
+            : BuildTypedHelperGetterReplacement(match, target);
+        if (replacement.Length == 0)
+        {
+            return false;
+        }
+
+        lines[lineIndex] = line[..match.Groups["call"].Index] + replacement + line[(match.Groups["call"].Index + match.Groups["call"].Length)..];
+        return true;
+    }
+
+    private static string BuildTypedHelperGetterReplacement(Match match, MemberAccessTarget target)
+    {
+        if (target.IsStatic)
+        {
+            return $"S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}()";
+        }
+
+        string instance = match.Groups["target"].Value;
+        return $"S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}({instance})";
+    }
+
+    private static string BuildTypedHelperSetterReplacement(Match match, MemberAccessTarget target)
+    {
+        if (!match.Groups["value"].Success)
+        {
+            return string.Empty;
+        }
+
+        string value = match.Groups["value"].Value.Trim();
+        if (target.IsStatic)
+        {
+            return $"S1Interop.Generated.S1InteropMemberRegistry.TrySet{target.MemberAlias}({value})";
+        }
+
+        string instance = match.Groups["target"].Value;
+        return $"S1Interop.Generated.S1InteropMemberRegistry.TrySet{target.MemberAlias}({instance}, {value})";
     }
 
     private static bool TryRewriteDynamicInstanceFallbacks(List<string> lines)
