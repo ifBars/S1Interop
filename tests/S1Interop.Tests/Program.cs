@@ -5962,7 +5962,9 @@ internal sealed class S1InteropFixtureTests
             il2CppGenerated.Contains("args[index] = ConvertBackValue(args[index], converted[index]);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackGuid(object converted, out System.Guid guid)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackArray(System.Array original, object converted, out System.Array? managedArray)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static bool TryConvertBackList(System.Collections.IList original, object converted, out System.Collections.IList? managedList)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("private static bool TryConvertBackList(System.Collections.IList original, object converted, out System.Collections.IList? managedList)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackDictionary(object? original, object converted, out object? managedDictionary)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackHashSet(object? original, object converted, out object? managedHashSet)", StringComparison.Ordinal),
             $"Generated member registry should convert method invocation arguments and copy by-ref values back after reflection Invoke. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, params object?[] args)", StringComparison.Ordinal) &&
@@ -6035,6 +6037,8 @@ internal sealed class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "RewriteBytes", Alias = "HudRewriteBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetBytes", Alias = "HudSetBytes", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "byte[]" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetLabels", Alias = "HudSetLabels", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string[]" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "RewriteScores", Alias = "HudRewriteScores", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.Dictionary<string, int>&" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "RewriteTags", Alias = "HudRewriteTags", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.HashSet<string>&" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetScores", Alias = "HudSetScores", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.Dictionary<string, int>" })]
             [assembly: S1Interop.S1InteropMember("Hud", "SetTags", Alias = "HudSetTags", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "System.Collections.Generic.HashSet<string>" })]
 
@@ -6119,9 +6123,27 @@ internal sealed class S1InteropFixtureTests
                         return LastScores;
                     }
 
+                    public string RewriteScores(ref Il2CppSystem.Collections.Generic.Dictionary<string, int> scores)
+                    {
+                        scores = new Il2CppSystem.Collections.Generic.Dictionary<string, int>();
+                        scores.Add("east", 12);
+                        scores.Add("west", 15);
+                        LastScores = scores.Count + ":" + scores["east"] + ":" + scores["west"];
+                        return LastScores;
+                    }
+
                     public string SetTags(Il2CppSystem.Collections.Generic.HashSet<string> tags)
                     {
                         LastTags = tags.Count + ":" + tags.Contains("north") + ":" + tags.Contains("south");
+                        return LastTags;
+                    }
+
+                    public string RewriteTags(ref Il2CppSystem.Collections.Generic.HashSet<string> tags)
+                    {
+                        tags = new Il2CppSystem.Collections.Generic.HashSet<string>();
+                        tags.Add("east");
+                        tags.Add("west");
+                        LastTags = tags.Count + ":" + tags.Contains("east") + ":" + tags.Contains("west");
                         return LastTags;
                     }
                 }
@@ -6164,6 +6186,8 @@ internal sealed class S1InteropFixtureTests
                         public bool Add(T value) => inner.Add(value);
 
                         public bool Contains(T value) => inner.Contains(value);
+
+                        public System.Collections.Generic.HashSet<T>.Enumerator GetEnumerator() => inner.GetEnumerator();
                     }
 
                     public sealed class Dictionary<TKey, TValue> where TKey : notnull
@@ -6178,6 +6202,8 @@ internal sealed class S1InteropFixtureTests
                         {
                             inner.Add(key, value);
                         }
+
+                        public System.Collections.Generic.Dictionary<TKey, TValue>.Enumerator GetEnumerator() => inner.GetEnumerator();
                     }
                 }
             }
@@ -6349,6 +6375,20 @@ internal sealed class S1InteropFixtureTests
         object? rewriteNamesResult = invokeRewriteNames!.Invoke(null, [hud, nameRefArgs]);
         Assert(string.Equals(rewriteNamesResult as string, "2:delta:echo", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref list result. Result={rewriteNamesResult}");
         Assert(nameRefArgs[0] is List<string> copiedNames && copiedNames.SequenceEqual(new[] { "delta", "echo" }), $"Generated method invoker should copy IL2CPP list ref values back as managed lists. Arg={nameRefArgs[0]}");
+
+        MethodInfo? invokeRewriteScores = memberRegistryType.GetMethod("InvokeHudRewriteScores", [typeof(object), typeof(object[])]);
+        Assert(invokeRewriteScores is not null, "Generated member registry should expose InvokeHudRewriteScores.");
+        object?[] scoreRefArgs = [new Dictionary<string, int> { ["north"] = 4 }];
+        object? rewriteScoresResult = invokeRewriteScores!.Invoke(null, [hud, scoreRefArgs]);
+        Assert(string.Equals(rewriteScoresResult as string, "2:12:15", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref dictionary result. Result={rewriteScoresResult}");
+        Assert(scoreRefArgs[0] is Dictionary<string, int> copiedScores && copiedScores.Count == 2 && copiedScores["east"] == 12 && copiedScores["west"] == 15, $"Generated method invoker should copy IL2CPP dictionary ref values back as managed dictionaries. Arg={scoreRefArgs[0]}");
+
+        MethodInfo? invokeRewriteTags = memberRegistryType.GetMethod("InvokeHudRewriteTags", [typeof(object), typeof(object[])]);
+        Assert(invokeRewriteTags is not null, "Generated member registry should expose InvokeHudRewriteTags.");
+        object?[] tagRefArgs = [new HashSet<string> { "north" }];
+        object? rewriteTagsResult = invokeRewriteTags!.Invoke(null, [hud, tagRefArgs]);
+        Assert(string.Equals(rewriteTagsResult as string, "2:True:True", StringComparison.Ordinal), $"Generated method invoker should return the fake IL2CPP ref hash set result. Result={rewriteTagsResult}");
+        Assert(tagRefArgs[0] is HashSet<string> copiedTags && copiedTags.SetEquals(new[] { "east", "west" }), $"Generated method invoker should copy IL2CPP hash set ref values back as managed hash sets. Arg={tagRefArgs[0]}");
 
         MethodInfo? invokeRewriteBytes = memberRegistryType.GetMethod("InvokeHudRewriteBytes", [typeof(object), typeof(object[])]);
         Assert(invokeRewriteBytes is not null, "Generated member registry should expose InvokeHudRewriteBytes.");
