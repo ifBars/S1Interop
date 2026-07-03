@@ -365,6 +365,35 @@ internal sealed partial class S1InteropFixtureTests
             $"Missing S1InteropType declarations should report S1I001 when Mono game references are available. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
+    private void S1InteropTypeRegistryGeneratorReportsMissingIl2CppDeclaredTypesWhenGameReferencesExist()
+    {
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.DoesNotExist", Alias = "MissingCamera")]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [il2CppGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I001" &&
+                diagnostic.GetMessage().Contains("Il2CppScheduleOne.PlayerScripts.DoesNotExist", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("MissingCamera", StringComparison.Ordinal)),
+            $"Missing S1InteropType declarations should report S1I001 when IL2CPP game references are available. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
     private void S1InteropTypeRegistryGeneratorSkipsReferenceValidationWhenGameReferencesAreAbsent()
     {
         const string source =
