@@ -134,12 +134,13 @@ dotnet restore .\YourMod.csproj --source .\artifacts\packages --source https://a
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- new .\MyBackendNeutralMod --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- init . --apply
+dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- sdkgen . --full-sdk --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- lint .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dual-runtime --dry-run
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; when those declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
+Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
 
 When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type/member strings during compilation. Missing type names report `S1I001`; member declarations with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
 

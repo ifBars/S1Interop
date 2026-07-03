@@ -129,6 +129,21 @@ internal sealed partial class S1InteropFixtureTests
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
+    private static void WriteAssemblyFromSource(string outputPath, string assemblyName, string source)
+    {
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            assemblyName,
+            [CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest))],
+            GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        Microsoft.CodeAnalysis.Emit.EmitResult emitResult = compilation.Emit(outputPath);
+        Assert(
+            emitResult.Success,
+            $"Synthetic assembly {assemblyName} failed to compile to {outputPath}: {string.Join(Environment.NewLine, emitResult.Diagnostics)}");
+    }
+
     private static System.Reflection.Assembly CompileAndLoadS1InteropGeneratedAssembly(string source, params string[] symbols)
     {
         return CompileAndLoadS1InteropGeneratedAssembly(source, assemblyName: null, symbols);

@@ -73,6 +73,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         MigrationApplyAndRollbackRewritesIl2CppObjectCasts();
         count++;
+        NewCommandProjectCanSeedFullBackendNeutralSdkFromReferenceMetadata();
+        count++;
         MigrationApplyAndRollbackGeneratesSourceRiskReport();
         count++;
         VerifyMigrationCanIncludeSourceMigrationsInSandbox();
@@ -194,6 +196,8 @@ internal sealed partial class S1InteropFixtureTests
         InitCommandApplyAndRollbackCreatesBackendNeutralStarter();
         count++;
         NewCommandCreatesBackendNeutralProjectScaffold();
+        count++;
+        NewCommandProjectCanSeedFullBackendNeutralSdkFromReferenceMetadata();
         count++;
         MigrationApplyAndRollbackGeneratesSourceRiskReport();
         count++;

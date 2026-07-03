@@ -1737,8 +1737,11 @@ internal sealed partial class S1InteropFixtureTests
                 projectSource.Contains("<ManagedPath Condition=\"'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''\">$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"0Harmony\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and select Mono or IL2CPP references without forcing backend-specific generated code.");
+                projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"Assembly-CSharp\">", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"ScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'!='Il2Cpp'\">", StringComparison.Ordinal) &&
+                projectSource.Contains("<Reference Include=\"Il2CppScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'=='Il2Cpp'\">", StringComparison.Ordinal),
+                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and select Mono or IL2CPP game references without forcing backend-specific generated code.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
                 coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
@@ -1794,6 +1797,98 @@ internal sealed partial class S1InteropFixtureTests
 
             ProcessResult secondApply = RunCli("new", targetDirectory, "--apply");
             Assert(secondApply.ExitCode == 2, $"s1interop new should refuse to overwrite a non-empty target. Output: {secondApply.Output}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private void NewCommandProjectCanSeedFullBackendNeutralSdkFromReferenceMetadata()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string targetDirectory = Path.Combine(tempRoot, "Fresh Sdk Mod");
+            string projectName = "FreshSdkMod";
+            string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
+            string gameRoot = Path.Combine(tempRoot, "SyntheticScheduleI");
+            string managedPath = Path.Combine(gameRoot, "Schedule I_Data", "Managed");
+            string assemblyPath = Path.Combine(managedPath, "Assembly-CSharp.dll");
+            string generatedFacade = Path.Combine(targetDirectory, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
+
+            WriteAssemblyFromSource(
+                assemblyPath,
+                "Assembly-CSharp",
+                """
+                namespace ScheduleOne
+                {
+                    public sealed class GameManager
+                    {
+                    }
+                }
+
+                namespace ScheduleOne.PlayerScripts
+                {
+                    public sealed class Player
+                    {
+                    }
+                }
+
+                namespace ScheduleOne.UI.Phone
+                {
+                    public sealed class Phone
+                    {
+                    }
+                }
+
+                namespace ScheduleOne.DevUtilities
+                {
+                    public sealed class Phone
+                    {
+                    }
+                }
+                """);
+
+            ProcessResult create = RunCli("new", targetDirectory, "--apply");
+            Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold before SDK seeding. Output: {create.Output}");
+            File.WriteAllText(
+                Path.Combine(targetDirectory, "local.build.props"),
+                $$"""
+                <Project>
+                  <PropertyGroup>
+                    <MonoGamePath>{{gameRoot}}</MonoGamePath>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            ProcessResult dryRun = RunCli("sdkgen", projectPath, "--full-sdk");
+            Assert(
+                dryRun.ExitCode == 0 &&
+                dryRun.Output.Contains("generate_full_sdk_facade", StringComparison.Ordinal) &&
+                dryRun.Output.Contains("install_s1interop_generator_package", StringComparison.Ordinal),
+                $"sdkgen --full-sdk dry-run should plan full SDK generation for a blank backend-neutral project with game references. Output: {dryRun.Output}");
+            Assert(!File.Exists(generatedFacade), "sdkgen --full-sdk dry-run should not write the generated facade.");
+
+            ProcessResult apply = RunCli("sdkgen", projectPath, "--full-sdk", "--apply");
+            Assert(apply.ExitCode == 0, $"sdkgen --full-sdk --apply should seed the generated SDK. Output: {apply.Output}");
+            Assert(File.Exists(generatedFacade), "sdkgen --full-sdk should write the generated SDK facade file.");
+
+            string source = File.ReadAllText(generatedFacade);
+            Assert(
+                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\", Il2CppTypeName = \"Il2CppScheduleOne.PlayerScripts.Player\")]", StringComparison.Ordinal) &&
+                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.Phone.Phone\", Alias = \"UIPhonePhone\", Il2CppTypeName = \"Il2CppScheduleOne.UI.Phone.Phone\")]", StringComparison.Ordinal) &&
+                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.DevUtilities.Phone\", Alias = \"DevUtilitiesPhone\", Il2CppTypeName = \"Il2CppScheduleOne.DevUtilities.Phone\")]", StringComparison.Ordinal) &&
+                !source.Contains("global using Player =", StringComparison.Ordinal),
+                "Full SDK generation should emit backend-neutral S1InteropType declarations for reference metadata and avoid broad global aliases.");
+
+            ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(
+                source,
+                [MetadataReference.CreateFromFile(assemblyPath)]);
+            Assert(
+                diagnostics.All(diagnostic => diagnostic.Id != "S1I001"),
+                $"Generated full SDK declarations should validate against the referenced game assembly. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
         }
         finally
         {

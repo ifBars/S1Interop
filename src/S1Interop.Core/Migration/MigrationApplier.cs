@@ -126,7 +126,8 @@ public sealed class MigrationApplier
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
                 "injected_member_requires_hidefromil2cpp" => ApplyHideFromIl2CppAttribute(operation, backupRoot, fileChanges),
                 "game_constructor_requires_il2cpp_signature" => ApplyGameConstructorSignature(operation, backupRoot, fileChanges),
-                "generate_sdk_facade" => ApplySdkFacade(projectPlan, document, backupRoot, fileChanges),
+                "generate_sdk_facade" => ApplySdkFacade(projectPlan, operation, document, backupRoot, fileChanges),
+                "generate_full_sdk_facade" => ApplySdkFacade(projectPlan, operation, document, backupRoot, fileChanges),
                 "generate_unity_event_bridge" => ApplyUnityEventBridge(operation, backupRoot, fileChanges),
                 "generate_delegate_event_bridge" => ApplyDelegateEventBridge(operation, backupRoot, fileChanges),
                 "generate_harmony_method_targets" => ApplyHarmonyMethodTargets(projectPlan, document, operation, backupRoot, fileChanges),
@@ -319,6 +320,7 @@ public sealed class MigrationApplier
         operation.RuleId switch
         {
             "generate_sdk_facade" => 10,
+            "generate_full_sdk_facade" => 10,
             "generate_unity_event_bridge" => 10,
             "generate_harmony_method_targets" => 10,
             "generate_member_access_targets" => 10,
@@ -1198,13 +1200,16 @@ public sealed class MigrationApplier
 
     private static bool ApplySdkFacade(
         ProjectMigrationPlan projectPlan,
+        MigrationOperation operation,
         XDocument document,
         string backupRoot,
         List<MigrationFileChange> fileChanges)
     {
         var generator = new SdkFacadeGenerator();
         ProjectAnalysis project = AnalyzeProject(projectPlan.ProjectPath);
-        SdkFacadePlan plan = generator.Plan(project);
+        SdkFacadePlan plan = generator.Plan(
+            project,
+            new SdkFacadeGeneratorOptions(FullSdk: operation.RuleId.Equals("generate_full_sdk_facade", StringComparison.OrdinalIgnoreCase)));
         if (!plan.HasContent)
         {
             return false;

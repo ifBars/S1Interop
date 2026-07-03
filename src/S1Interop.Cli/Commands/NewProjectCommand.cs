@@ -128,11 +128,26 @@ internal static class NewProjectCommand
               <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
               <Private>false</Private>
             </Reference>
+            <Reference Include="Assembly-CSharp">
+              <HintPath>$(ManagedPath)\Assembly-CSharp.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="ScheduleOne.Core" Condition="'$(S1InteropReferenceRuntime)'!='Il2Cpp'">
+              <HintPath>$(ManagedPath)\ScheduleOne.Core.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
+            <Reference Include="Il2CppScheduleOne.Core" Condition="'$(S1InteropReferenceRuntime)'=='Il2Cpp'">
+              <HintPath>$(ManagedPath)\Il2CppScheduleOne.Core.dll</HintPath>
+              <Private>false</Private>
+            </Reference>
           </ItemGroup>
 
           <Target Name="ValidateS1InteropLocalPaths" BeforeTargets="ResolveReferences">
             <Error Text="Missing MelonLoader at $(MelonLoaderPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(MelonLoaderPath)'=='' or !Exists('$(MelonLoaderPath)\MelonLoader.dll')" />
             <Error Text="Missing Unity assemblies at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\UnityEngine.CoreModule.dll')" />
+            <Error Text="Missing Schedule One game assembly at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath/Il2CppGamePath, or pass the game path as an MSBuild property." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\Assembly-CSharp.dll')" />
+            <Error Text="Missing ScheduleOne.Core at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath/Il2CppGamePath, or pass the game path as an MSBuild property." Condition="'$(S1InteropReferenceRuntime)'!='Il2Cpp' and ('$(ManagedPath)'=='' or !Exists('$(ManagedPath)\ScheduleOne.Core.dll'))" />
+            <Error Text="Missing Il2CppScheduleOne.Core at $(ManagedPath). Copy local.build.props.example to local.build.props and set Il2CppGamePath, or pass the game path as an MSBuild property." Condition="'$(S1InteropReferenceRuntime)'=='Il2Cpp' and ('$(ManagedPath)'=='' or !Exists('$(ManagedPath)\Il2CppScheduleOne.Core.dll'))" />
           </Target>
 
         </Project>
@@ -193,6 +208,12 @@ internal static class NewProjectCommand
         ```
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
+
+        To seed a generated backend-neutral SDK from your local game references instead of writing type declarations by hand, run:
+
+        ```powershell
+        s1interop sdkgen . --full-sdk --apply
+        ```
 
         ```csharp
         [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]

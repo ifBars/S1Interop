@@ -7,6 +7,11 @@ using S1Interop.Core;
 
 namespace S1Interop.Core.Generators;
 
+public sealed record SdkFacadeGeneratorOptions(bool FullSdk = false)
+{
+    public static SdkFacadeGeneratorOptions Default { get; } = new();
+}
+
 public sealed class SdkFacadeGenerator
 {
     private static readonly Regex ScheduleOneUsingRegex = new(
@@ -31,10 +36,17 @@ public sealed class SdkFacadeGenerator
 
     public SdkFacadePlan Plan(ProjectAnalysis project)
     {
+        return Plan(project, SdkFacadeGeneratorOptions.Default);
+    }
+
+    public SdkFacadePlan Plan(ProjectAnalysis project, SdkFacadeGeneratorOptions options)
+    {
         string projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
         string outputPath = Path.Combine(projectDirectory, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
         IReadOnlyList<string> namespaces = DiscoverScheduleOneNamespaces(projectDirectory);
-        IReadOnlyList<SdkTypeAlias> aliases = DiscoverTypeAliases(projectDirectory, project);
+        IReadOnlyList<SdkTypeAlias> aliases = options.FullSdk
+            ? DiscoverFullSdkTypeAliases(project)
+            : DiscoverTypeAliases(projectDirectory, project);
         return new SdkFacadePlan(project.ProjectPath, outputPath, namespaces, aliases, namespaces.Count > 0 || aliases.Count > 0);
     }
 
@@ -125,7 +137,7 @@ public sealed class SdkFacadeGenerator
         var explicitSourceAliasKeys = new HashSet<string>(StringComparer.Ordinal);
         var suppressGlobalUsingKeys = new HashSet<string>(StringComparer.Ordinal);
         HashSet<string> localTypeNames = DiscoverLocalTypeNames(projectDirectory);
-        HashSet<string> knownScheduleOneTypes = DiscoverKnownScheduleOneTypes(project);
+        ReferenceTypeCatalog referenceTypes = DiscoverReferenceTypes(project);
         foreach (string file in WorkspaceTraversal.EnumerateFiles(projectDirectory, "*.cs"))
         {
             if (IsGeneratedOrBuildOutput(projectDirectory, file))
@@ -184,7 +196,7 @@ public sealed class SdkFacadeGenerator
                 monoTypes.Add(monoType);
             }
 
-            foreach (SdkTypeAlias alias in DiscoverNamespaceScopedAliases(source, localTypeNames, knownScheduleOneTypes))
+            foreach (SdkTypeAlias alias in DiscoverNamespaceScopedAliases(source, localTypeNames, referenceTypes.AllTypes))
             {
                 AddAliasCandidate(monoTypesByAlias, alias.Alias, alias.MonoType);
                 suppressGlobalUsingKeys.Add(GetAliasKey(alias.Alias, alias.MonoType));
@@ -193,6 +205,7 @@ public sealed class SdkFacadeGenerator
 
         return monoTypesByAlias
             .Where(pair => pair.Value.Count == 1)
+            .Where(pair => IsAvailableOnConfiguredReferenceSurfaces(pair.Value.Single(), referenceTypes))
             .Select(pair =>
             {
                 string monoType = pair.Value.Single();
@@ -203,6 +216,31 @@ public sealed class SdkFacadeGenerator
             })
             .OrderBy(alias => alias.Alias, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static IReadOnlyList<SdkTypeAlias> DiscoverFullSdkTypeAliases(ProjectAnalysis project)
+    {
+        ReferenceTypeCatalog referenceTypes = DiscoverReferenceTypes(project);
+        string[] knownTypes = referenceTypes.AllTypes
+            .Where(type => IsAvailableOnConfiguredReferenceSurfaces(type, referenceTypes))
+            .OrderBy(type => type, StringComparer.Ordinal)
+            .ToArray();
+        Dictionary<string, int> simpleNameCounts = knownTypes
+            .GroupBy(GetSimpleTypeName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var aliases = new List<SdkTypeAlias>(knownTypes.Length);
+        var usedAliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string monoType in knownTypes)
+        {
+            string simpleAlias = GetSimpleTypeName(monoType);
+            string alias = simpleNameCounts[simpleAlias] == 1
+                ? SanitizeIdentifier(simpleAlias)
+                : CreateQualifiedAlias(monoType);
+            alias = EnsureUniqueAlias(alias, usedAliases);
+            aliases.Add(new SdkTypeAlias(alias, monoType, $"Il2Cpp{monoType}", GenerateGlobalUsing: false));
+        }
+
+        return aliases;
     }
 
     private static string GetAliasKey(string alias, string monoType) => $"{alias}\n{monoType}";
@@ -283,20 +321,67 @@ public sealed class SdkFacadeGenerator
         return typeNames;
     }
 
-    private static HashSet<string> DiscoverKnownScheduleOneTypes(ProjectAnalysis project)
+    private static ReferenceTypeCatalog DiscoverReferenceTypes(ProjectAnalysis project)
     {
-        var typeNames = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string path in project.Configurations
-                     .SelectMany(configuration => configuration.References)
-                     .Select(reference => reference.HintPath)
-                     .Where(path => !string.IsNullOrWhiteSpace(path))
-                     .Select(path => path!)
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        var allTypes = new HashSet<string>(StringComparer.Ordinal);
+        var monoTypes = new HashSet<string>(StringComparer.Ordinal);
+        var il2CppTypes = new HashSet<string>(StringComparer.Ordinal);
+        bool hasMonoSurface = false;
+        bool hasIl2CppSurface = false;
+        foreach ((string Path, RuntimeKind Runtime) reference in project.Configurations
+                     .SelectMany(configuration => configuration.References.Select(reference => (
+                         Path: reference.HintPath,
+                         Runtime: ResolveReferenceRuntime(configuration.Runtime, reference))))
+                     .Where(reference => !string.IsNullOrWhiteSpace(reference.Path))
+                     .Select(reference => (Path: reference.Path!, reference.Runtime))
+                     .Distinct())
         {
-            AddKnownTypesFromAssembly(path, typeNames);
+            var types = new HashSet<string>(StringComparer.Ordinal);
+            AddKnownTypesFromAssembly(reference.Path, types);
+            foreach (string type in types)
+            {
+                allTypes.Add(type);
+                if (reference.Runtime == RuntimeKind.Mono)
+                {
+                    monoTypes.Add(type);
+                    hasMonoSurface = true;
+                }
+                else if (reference.Runtime == RuntimeKind.Il2Cpp)
+                {
+                    il2CppTypes.Add(type);
+                    hasIl2CppSurface = true;
+                }
+            }
         }
 
-        return typeNames;
+        return new ReferenceTypeCatalog(allTypes, monoTypes, il2CppTypes, hasMonoSurface, hasIl2CppSurface);
+    }
+
+    private static bool IsAvailableOnConfiguredReferenceSurfaces(string monoType, ReferenceTypeCatalog referenceTypes) =>
+        (!referenceTypes.HasMonoSurface || referenceTypes.MonoTypes.Contains(monoType)) &&
+        (!referenceTypes.HasIl2CppSurface || referenceTypes.Il2CppTypes.Contains(monoType));
+
+    private static RuntimeKind ResolveReferenceRuntime(RuntimeKind configurationRuntime, ReferenceInfo reference)
+    {
+        if (configurationRuntime is RuntimeKind.Mono or RuntimeKind.Il2Cpp)
+        {
+            return configurationRuntime;
+        }
+
+        string text = $"{reference.Include}|{reference.HintPath}";
+        if (text.Contains("Il2Cpp", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeKind.Il2Cpp;
+        }
+
+        if (text.Contains("Schedule I_Data", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Managed", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Assembly-CSharp", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeKind.Mono;
+        }
+
+        return RuntimeKind.Unknown;
     }
 
     private static void AddKnownTypesFromAssembly(string path, HashSet<string> typeNames)
@@ -375,6 +460,62 @@ public sealed class SdkFacadeGenerator
             ? type["Il2Cpp".Length..]
             : type;
 
+    private static string GetSimpleTypeName(string typeName) =>
+        typeName.Split('.').LastOrDefault() ?? typeName;
+
+    private static string CreateQualifiedAlias(string monoType)
+    {
+        string prefix = "ScheduleOne.";
+        string typeName = monoType.StartsWith(prefix, StringComparison.Ordinal)
+            ? monoType[prefix.Length..]
+            : monoType;
+        string alias = string.Concat(typeName
+            .Split('.', StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizeIdentifier));
+        return string.IsNullOrWhiteSpace(alias) ? "ScheduleOneType" : alias;
+    }
+
+    private static string EnsureUniqueAlias(string alias, HashSet<string> usedAliases)
+    {
+        if (usedAliases.Add(alias))
+        {
+            return alias;
+        }
+
+        for (int suffix = 2; ; suffix++)
+        {
+            string candidate = alias + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (usedAliases.Add(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string SanitizeIdentifier(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (char character in value)
+        {
+            if (char.IsLetterOrDigit(character) || character == '_')
+            {
+                builder.Append(character);
+            }
+        }
+
+        if (builder.Length == 0)
+        {
+            return "Type";
+        }
+
+        if (!char.IsLetter(builder[0]) && builder[0] != '_')
+        {
+            builder.Insert(0, '_');
+        }
+
+        return builder.ToString();
+    }
+
     private static bool IsUsingDirectiveMatch(string source, int matchIndex)
     {
         int lineStart = source.LastIndexOf('\n', Math.Max(0, matchIndex - 1));
@@ -390,4 +531,11 @@ public sealed class SdkFacadeGenerator
 
     private static string Escape(string value) =>
         value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+
+    private sealed record ReferenceTypeCatalog(
+        HashSet<string> AllTypes,
+        HashSet<string> MonoTypes,
+        HashSet<string> Il2CppTypes,
+        bool HasMonoSurface,
+        bool HasIl2CppSurface);
 }

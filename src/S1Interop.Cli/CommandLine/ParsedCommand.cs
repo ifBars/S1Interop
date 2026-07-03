@@ -9,6 +9,7 @@ internal sealed record ParsedCommand(
     bool Build,
     int BuildTimeoutSeconds,
     bool IncludeSourceMigrations,
+    bool FullSdk,
     string? Il2CppGamePath,
     string? MonoGamePath,
     string? Configuration)
@@ -17,7 +18,7 @@ internal sealed record ParsedCommand(
     {
         if (args.Length == 0)
         {
-            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, null, null, null);
+            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, null, null, null);
         }
 
         string command = args[0].StartsWith("-", StringComparison.Ordinal) ? "analyze" : args[0];
@@ -30,6 +31,7 @@ internal sealed record ParsedCommand(
         bool apply = args.Any(arg => arg.Equals("--apply", StringComparison.OrdinalIgnoreCase));
         bool dualRuntime = args.Any(arg => arg.Equals("--dual-runtime", StringComparison.OrdinalIgnoreCase));
         bool build = args.Any(arg => arg.Equals("--build", StringComparison.OrdinalIgnoreCase));
+        bool fullSdk = args.Any(arg => arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase));
         bool includeSourceMigrations = args.Any(arg =>
             arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
             arg.Equals("--source-migrations", StringComparison.OrdinalIgnoreCase));
@@ -100,6 +102,6 @@ internal sealed record ParsedCommand(
             }
         }
 
-        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, il2CppGamePath, monoGamePath, configuration);
+        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, il2CppGamePath, monoGamePath, configuration);
     }
 }

@@ -7,6 +7,8 @@ internal static class MigrationPlanningCommand
     {
         MigrationPlan plan = command.Name.Equals("init", StringComparison.OrdinalIgnoreCase)
             ? CreateInitPlan(analysis)
+            : command.Name.Equals("sdkgen", StringComparison.OrdinalIgnoreCase)
+                ? CreateSdkGenPlan(analysis, command.FullSdk)
             : new MigrationPlanner().Plan(
                 analysis,
                 new MigrationPlannerOptions(
@@ -15,7 +17,7 @@ internal static class MigrationPlanningCommand
 
         plan = command.Name.ToLowerInvariant() switch
         {
-            "sdkgen" => FilterPlanOperations(plan, "install_s1interop_generator_package", "generate_sdk_facade"),
+            "sdkgen" => FilterPlanOperations(plan, "install_s1interop_generator_package", "generate_sdk_facade", "generate_full_sdk_facade"),
             "build-hook" => FilterPlanOperations(plan, "install_build_validation_hook"),
             _ => plan
         };
@@ -88,6 +90,45 @@ internal static class MigrationPlanningCommand
                         "low",
                         true,
                         "Create an editable S1Interop backend-neutral declarations file with starter generator attributes."));
+                }
+
+                return new ProjectMigrationPlan(project.ProjectPath, operations);
+            })
+            .ToArray();
+
+        return new MigrationPlan(analysis.RootPath, projects);
+    }
+
+    private static MigrationPlan CreateSdkGenPlan(WorkspaceAnalysis analysis, bool fullSdk)
+    {
+        ProjectMigrationPlan[] projects = analysis.Projects
+            .Select(project =>
+            {
+                SdkFacadePlan facadePlan = new S1Interop.Core.Generators.SdkFacadeGenerator()
+                    .Plan(project, new S1Interop.Core.Generators.SdkFacadeGeneratorOptions(FullSdk: fullSdk));
+                var operations = new List<MigrationOperation>();
+                if (facadePlan.TypeAliases.Count > 0)
+                {
+                    operations.Add(new MigrationOperation(
+                        "install_s1interop_generator_package",
+                        project.ProjectPath,
+                        null,
+                        "low",
+                        true,
+                        "Install the S1Interop Roslyn generator package required by generated SDK facade type registry attributes."));
+                }
+
+                if (facadePlan.HasContent)
+                {
+                    operations.Add(new MigrationOperation(
+                        fullSdk ? "generate_full_sdk_facade" : "generate_sdk_facade",
+                        facadePlan.OutputPath,
+                        null,
+                        "low",
+                        true,
+                        fullSdk
+                            ? "Generate S1Interop backend-neutral SDK declarations for all discoverable ScheduleOne reference types."
+                            : "Generate S1Interop global using facade for detected ScheduleOne namespaces so source can move away from manual Mono/IL2CPP using blocks."));
                 }
 
                 return new ProjectMigrationPlan(project.ProjectPath, operations);
