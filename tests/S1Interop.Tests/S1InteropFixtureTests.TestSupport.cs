@@ -190,13 +190,14 @@ internal sealed partial class S1InteropFixtureTests
         {
             if (member.IsStatic)
             {
-                builder.AppendLine($"        public static object? Read{member.Alias}() => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}();");
+                builder.AppendLine($"        public static object? Read{member.Alias}() => {GetTypeFacadeName(member)}.Get{ToPascalIdentifier(member.MemberName)}();");
             }
             else
             {
                 string parameterName = member.OwnerAlias.Equals("LandVehicle", StringComparison.Ordinal) ? "vehicle" : "instance";
-                builder.AppendLine($"        public static object? Read{member.Alias}(object {parameterName}) => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}({parameterName});");
-                builder.AppendLine($"        public static object? Read{member.Alias}Dynamically(object {parameterName}) => S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue({parameterName}, \"{EscapeCSharpString(member.MemberName)}\");");
+                string facadeName = GetTypeFacadeName(member);
+                builder.AppendLine($"        public static object? Read{member.Alias}(object {parameterName}) => {facadeName}.Get{ToPascalIdentifier(member.MemberName)}({parameterName});");
+                builder.AppendLine($"        public static object? Read{member.Alias}Dynamically(object {parameterName}) => {facadeName}.Get({parameterName}, \"{EscapeCSharpString(member.MemberName)}\");");
             }
         }
 
@@ -207,10 +208,62 @@ internal sealed partial class S1InteropFixtureTests
 
     private sealed record S1InteropMemberDeclaration(
         string OwnerAlias,
+        string OwnerTypeName,
         string MemberName,
         string Alias,
         string Kind,
         bool IsStatic);
+
+    private static string GetTypeFacadeName(S1InteropMemberDeclaration member)
+    {
+        string[] parts = member.OwnerTypeName
+            .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizeIdentifier)
+            .ToArray();
+        if (parts.Length == 0)
+        {
+            return $"S1Interop.{SanitizeIdentifier(member.OwnerAlias)}";
+        }
+
+        string typeName = parts[^1];
+        IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
+        if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
+        {
+            namespaceParts = namespaceParts.Skip(1);
+        }
+        else
+        {
+            namespaceParts = new[] { "Types" }.Concat(namespaceParts);
+        }
+
+        string namespaceSuffix = string.Join(".", namespaceParts);
+        return string.IsNullOrWhiteSpace(namespaceSuffix)
+            ? $"S1Interop.{typeName}"
+            : $"S1Interop.{namespaceSuffix}.{typeName}";
+    }
+
+    private static string ToPascalIdentifier(string value)
+    {
+        string sanitized = SanitizeIdentifier(value);
+        if (sanitized.Length == 1)
+        {
+            return sanitized.ToUpperInvariant();
+        }
+
+        return char.ToUpperInvariant(sanitized[0]) + sanitized[1..];
+    }
+
+    private static string SanitizeIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "RuntimeType";
+        }
+
+        var chars = value.Select(character => char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray();
+        string sanitized = new(chars);
+        return char.IsDigit(sanitized[0]) ? "_" + sanitized : sanitized;
+    }
 
     private static string EscapeCSharpString(string value) =>
         value.Replace("\\", "\\\\").Replace("\"", "\\\"");
@@ -465,6 +518,33 @@ internal sealed partial class S1InteropFixtureTests
         }
 
         conditionsDocument.Save(conditionsPath);
+    }
+
+    private static void RewriteHoverboardGamePaths(string projectPath, string monoGamePath, string il2CppGamePath)
+    {
+        XDocument document = XDocument.Load(projectPath, LoadOptions.PreserveWhitespace);
+        foreach (XElement propertyGroup in document.Root!.Elements()
+                     .Where(element => element.Name.LocalName.Equals("PropertyGroup", StringComparison.OrdinalIgnoreCase)))
+        {
+            string condition = propertyGroup.Attribute("Condition")?.Value ?? string.Empty;
+            XElement? s1Dir = propertyGroup.Elements()
+                .FirstOrDefault(element => element.Name.LocalName.Equals("S1Dir", StringComparison.OrdinalIgnoreCase));
+            if (s1Dir is null)
+            {
+                continue;
+            }
+
+            if (condition.Contains("MONO", StringComparison.OrdinalIgnoreCase))
+            {
+                s1Dir.Value = monoGamePath;
+            }
+            else if (condition.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase))
+            {
+                s1Dir.Value = il2CppGamePath;
+            }
+        }
+
+        document.Save(projectPath);
     }
 
     private static XElement GetConfigurationPropertyGroup(string projectPath, string configuration)

@@ -417,9 +417,9 @@ internal sealed partial class S1InteropFixtureTests
 
             string migratedSource = File.ReadAllText(tempSource);
             Assert(
-                migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal) &&
+                migratedSource.Contains("return S1Interop.Types.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
-                "Simple typed fallback getter should be rewritten through S1InteropMemberRegistry.");
+                "Simple typed fallback getter should be rewritten through the generated type-scoped facade.");
             Assert(
                 migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(notice, \"container\");", StringComparison.Ordinal) &&
                 !migratedSource.Contains("notice.GetType().GetField(\"container\"", StringComparison.Ordinal),
@@ -498,11 +498,11 @@ internal sealed partial class S1InteropFixtureTests
             string source = File.ReadAllText(tempSource);
             string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
             Assert(
-                rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(_landVehicle);", StringComparison.Ordinal),
-                "Member-access fallback rewriter should replace typed helper getter calls with declared generated member-cache getters.");
+                rewritten.Contains("return S1Interop.Vehicles.LandVehicle.GetVehicleName(_landVehicle);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper getter calls with type-scoped facade getters.");
             Assert(
-                rewritten.Contains("S1Interop.Generated.S1InteropMemberRegistry.TrySetcurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
-                "Member-access fallback rewriter should replace typed helper setter calls with declared generated member-cache setters.");
+                rewritten.Contains("S1Interop.Vehicles.LandVehicle.TrySetCurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper setter calls with type-scoped facade setters.");
         }
         finally
         {
@@ -765,8 +765,8 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.Getcontainer<GameObject>(notice);", StringComparison.Ordinal),
-            $"Simple typed fallback getter should rewrite through the generated member registry. Rewritten source:{Environment.NewLine}{rewritten}");
+            rewritten.Contains("return S1Interop.Types.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal),
+            $"Simple typed fallback getter should rewrite through the generated type-scoped facade. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MemberAccessFallbackRewriterRewritesNullableValueGetter()
@@ -804,8 +804,8 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetrenderScaleValue<float>(asset);", StringComparison.Ordinal),
-            $"Nullable value fallback getter should rewrite through the generated member registry value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
+            rewritten.Contains("return S1Interop.Types.UnityEngine.Rendering.RenderPipelineAsset.GetRenderScaleValue<float>(asset);", StringComparison.Ordinal),
+            $"Nullable value fallback getter should rewrite through the generated type-scoped facade value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MemberAccessFallbackRewriterRewritesDynamicNamedHelpers()

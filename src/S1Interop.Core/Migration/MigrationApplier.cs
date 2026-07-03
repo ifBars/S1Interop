@@ -1203,7 +1203,7 @@ public sealed class MigrationApplier
         List<MigrationFileChange> fileChanges)
     {
         var generator = new SdkFacadeGenerator();
-        var project = new ProjectAnalysis(projectPlan.ProjectPath, Array.Empty<ConfigurationAnalysis>(), Array.Empty<InteropDiagnostic>());
+        ProjectAnalysis project = AnalyzeProject(projectPlan.ProjectPath);
         SdkFacadePlan plan = generator.Plan(project);
         if (!plan.HasContent)
         {
@@ -1572,6 +1572,15 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static ProjectAnalysis AnalyzeProject(string projectPath)
+    {
+        string fullProjectPath = Path.GetFullPath(projectPath);
+        WorkspaceAnalysis analysis = new WorkspaceAnalyzer().Analyze(projectPath);
+        return analysis.Projects.FirstOrDefault(project =>
+                   string.Equals(Path.GetFullPath(project.ProjectPath), fullProjectPath, StringComparison.OrdinalIgnoreCase)) ??
+               new ProjectAnalysis(projectPath, Array.Empty<ConfigurationAnalysis>(), Array.Empty<InteropDiagnostic>());
+    }
+
     private static bool ApplyBuildValidationHook(
         string projectPath,
         XDocument document,
@@ -1654,7 +1663,7 @@ public sealed class MigrationApplier
         }
 
         var generator = new SdkFacadeGenerator();
-        var project = new ProjectAnalysis(projectPath, Array.Empty<ConfigurationAnalysis>(), Array.Empty<InteropDiagnostic>());
+        ProjectAnalysis project = AnalyzeProject(projectPath);
         SdkFacadePlan plan = generator.Plan(project);
         if (plan.TypeAliases.Count == 0)
         {

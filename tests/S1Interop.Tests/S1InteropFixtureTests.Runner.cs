@@ -350,6 +350,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
         count++;
+        BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
+        count++;
         VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy();
         count++;
         VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy();

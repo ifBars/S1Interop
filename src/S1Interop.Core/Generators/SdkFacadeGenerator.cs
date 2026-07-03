@@ -1,3 +1,5 @@
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -19,12 +21,20 @@ public sealed class SdkFacadeGenerator
         @"^\s*using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*){1,})\s*;",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
+    private static readonly Regex LocalTypeDeclarationRegex = new(
+        @"\b(?:class|struct|interface|enum|record)\s+(?<name>[A-Z][A-Za-z0-9_]*)\b",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SimpleTypeUsageRegex = new(
+        @"(?<![A-Za-z0-9_\.])(?<type>[A-Z][A-Za-z0-9_]*)(?:\s*<[^;\r\n{}()]+>)?\s+[A-Za-z_@][A-Za-z0-9_]*|(?<![A-Za-z0-9_\.])(?<type>[A-Z][A-Za-z0-9_]*)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*|\b(?:new|typeof)\s*\(?\s*(?<type>[A-Z][A-Za-z0-9_]*)|<\s*(?<type>[A-Z][A-Za-z0-9_]*)\s*>",
+        RegexOptions.Compiled);
+
     public SdkFacadePlan Plan(ProjectAnalysis project)
     {
         string projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
         string outputPath = Path.Combine(projectDirectory, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
         IReadOnlyList<string> namespaces = DiscoverScheduleOneNamespaces(projectDirectory);
-        IReadOnlyList<SdkTypeAlias> aliases = DiscoverTypeAliases(projectDirectory);
+        IReadOnlyList<SdkTypeAlias> aliases = DiscoverTypeAliases(projectDirectory, project);
         return new SdkFacadePlan(project.ProjectPath, outputPath, namespaces, aliases, namespaces.Count > 0 || aliases.Count > 0);
     }
 
@@ -104,7 +114,7 @@ public sealed class SdkFacadeGenerator
         return namespaces.ToArray();
     }
 
-    private static IReadOnlyList<SdkTypeAlias> DiscoverTypeAliases(string projectDirectory)
+    private static IReadOnlyList<SdkTypeAlias> DiscoverTypeAliases(string projectDirectory, ProjectAnalysis project)
     {
         if (!Directory.Exists(projectDirectory))
         {
@@ -113,6 +123,9 @@ public sealed class SdkFacadeGenerator
 
         var monoTypesByAlias = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         var explicitSourceAliasKeys = new HashSet<string>(StringComparer.Ordinal);
+        var suppressGlobalUsingKeys = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string> localTypeNames = DiscoverLocalTypeNames(projectDirectory);
+        HashSet<string> knownScheduleOneTypes = DiscoverKnownScheduleOneTypes(project);
         foreach (string file in WorkspaceTraversal.EnumerateFiles(projectDirectory, "*.cs"))
         {
             if (IsGeneratedOrBuildOutput(projectDirectory, file))
@@ -170,6 +183,12 @@ public sealed class SdkFacadeGenerator
 
                 monoTypes.Add(monoType);
             }
+
+            foreach (SdkTypeAlias alias in DiscoverNamespaceScopedAliases(source, localTypeNames, knownScheduleOneTypes))
+            {
+                AddAliasCandidate(monoTypesByAlias, alias.Alias, alias.MonoType);
+                suppressGlobalUsingKeys.Add(GetAliasKey(alias.Alias, alias.MonoType));
+            }
         }
 
         return monoTypesByAlias
@@ -177,7 +196,9 @@ public sealed class SdkFacadeGenerator
             .Select(pair =>
             {
                 string monoType = pair.Value.Single();
-                bool generateGlobalUsing = !explicitSourceAliasKeys.Contains(GetAliasKey(pair.Key, monoType));
+                string aliasKey = GetAliasKey(pair.Key, monoType);
+                bool generateGlobalUsing = !explicitSourceAliasKeys.Contains(aliasKey) &&
+                                           !suppressGlobalUsingKeys.Contains(aliasKey);
                 return new SdkTypeAlias(pair.Key, monoType, $"Il2Cpp{monoType}", generateGlobalUsing);
             })
             .OrderBy(alias => alias.Alias, StringComparer.Ordinal)
@@ -185,6 +206,169 @@ public sealed class SdkFacadeGenerator
     }
 
     private static string GetAliasKey(string alias, string monoType) => $"{alias}\n{monoType}";
+
+    private static IEnumerable<SdkTypeAlias> DiscoverNamespaceScopedAliases(
+        string source,
+        HashSet<string> localTypeNames,
+        HashSet<string> knownScheduleOneTypes)
+    {
+        if (knownScheduleOneTypes.Count == 0)
+        {
+            yield break;
+        }
+
+        string[] namespaces = ScheduleOneUsingRegex.Matches(source)
+            .Select(match => NormalizeScheduleOneNamespace(match.Groups["namespace"].Value))
+            .Where(value => value.StartsWith("ScheduleOne", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (namespaces.Length == 0)
+        {
+            yield break;
+        }
+
+        foreach (string typeName in DiscoverSimpleTypeNames(source))
+        {
+            if (localTypeNames.Contains(typeName))
+            {
+                continue;
+            }
+
+            foreach (string ns in namespaces)
+            {
+                string monoType = $"{ns}.{typeName}";
+                if (knownScheduleOneTypes.Contains(monoType))
+                {
+                    yield return new SdkTypeAlias(typeName, monoType, $"Il2Cpp{monoType}", GenerateGlobalUsing: false);
+                }
+            }
+        }
+    }
+
+    private static HashSet<string> DiscoverSimpleTypeNames(string source)
+    {
+        var typeNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match match in SimpleTypeUsageRegex.Matches(source))
+        {
+            foreach (Capture capture in match.Groups["type"].Captures)
+            {
+                string typeName = capture.Value;
+                if (!string.IsNullOrWhiteSpace(typeName))
+                {
+                    typeNames.Add(typeName);
+                }
+            }
+        }
+
+        return typeNames;
+    }
+
+    private static HashSet<string> DiscoverLocalTypeNames(string projectDirectory)
+    {
+        var typeNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string file in WorkspaceTraversal.EnumerateFiles(projectDirectory, "*.cs"))
+        {
+            if (IsGeneratedOrBuildOutput(projectDirectory, file))
+            {
+                continue;
+            }
+
+            string source = File.ReadAllText(file);
+            foreach (Match match in LocalTypeDeclarationRegex.Matches(source))
+            {
+                typeNames.Add(match.Groups["name"].Value);
+            }
+        }
+
+        return typeNames;
+    }
+
+    private static HashSet<string> DiscoverKnownScheduleOneTypes(ProjectAnalysis project)
+    {
+        var typeNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string path in project.Configurations
+                     .SelectMany(configuration => configuration.References)
+                     .Select(reference => reference.HintPath)
+                     .Where(path => !string.IsNullOrWhiteSpace(path))
+                     .Select(path => path!)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            AddKnownTypesFromAssembly(path, typeNames);
+        }
+
+        return typeNames;
+    }
+
+    private static void AddKnownTypesFromAssembly(string path, HashSet<string> typeNames)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            using var reader = new PEReader(stream);
+            if (!reader.HasMetadata)
+            {
+                return;
+            }
+
+            MetadataReader metadata = reader.GetMetadataReader();
+            foreach (TypeDefinitionHandle handle in metadata.TypeDefinitions)
+            {
+                TypeDefinition definition = metadata.GetTypeDefinition(handle);
+                string ns = metadata.GetString(definition.Namespace);
+                string name = metadata.GetString(definition.Name);
+                string? typeName = NormalizeMetadataTypeName(ns, name);
+                if (typeName is not null)
+                {
+                    typeNames.Add(typeName);
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static string? NormalizeMetadataTypeName(string ns, string name)
+    {
+        if (string.IsNullOrWhiteSpace(ns) ||
+            string.IsNullOrWhiteSpace(name) ||
+            name.StartsWith("<", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (name.Contains('`', StringComparison.Ordinal))
+        {
+            name = name[..name.IndexOf('`')];
+        }
+
+        string fullName = ToMonoTypeName($"{ns}.{name}");
+        return fullName.StartsWith("ScheduleOne.", StringComparison.Ordinal) ? fullName : null;
+    }
+
+    private static string NormalizeScheduleOneNamespace(string ns) =>
+        ns.StartsWith("Il2Cpp", StringComparison.Ordinal)
+            ? ns["Il2Cpp".Length..]
+            : ns;
+
+    private static void AddAliasCandidate(
+        Dictionary<string, SortedSet<string>> monoTypesByAlias,
+        string alias,
+        string monoType)
+    {
+        if (!monoTypesByAlias.TryGetValue(alias, out SortedSet<string>? monoTypes))
+        {
+            monoTypes = new SortedSet<string>(StringComparer.Ordinal);
+            monoTypesByAlias[alias] = monoTypes;
+        }
+
+        monoTypes.Add(monoType);
+    }
 
     private static string ToMonoTypeName(string type) =>
         type.StartsWith("Il2Cpp", StringComparison.Ordinal)

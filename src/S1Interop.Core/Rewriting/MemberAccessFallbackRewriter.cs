@@ -148,10 +148,11 @@ public sealed class MemberAccessFallbackRewriter
             return false;
         }
 
+        string memberName = ToPascalIdentifier(target.MemberName);
         string accessor = ValueReturnTypes.Contains(castType)
-            ? $"Get{target.MemberAlias}Value<{castType}>"
-            : $"Get{target.MemberAlias}<{castType}>";
-        string replacement = $"{signature.Indent}    return S1Interop.Generated.S1InteropMemberRegistry.{accessor}({signature.ParameterName});";
+            ? $"Get{memberName}Value<{castType}>"
+            : $"Get{memberName}<{castType}>";
+        string replacement = $"{signature.Indent}    return {BuildTypeFacadeAccessor(target, accessor, target.IsStatic ? string.Empty : signature.ParameterName)};";
         lines.RemoveRange(openBraceLine + 1, closeBraceLine - openBraceLine - 1);
         lines.Insert(openBraceLine + 1, replacement);
         return true;
@@ -189,11 +190,11 @@ public sealed class MemberAccessFallbackRewriter
     {
         if (target.IsStatic)
         {
-            return $"S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}()";
+            return $"{GetTypeFacadeName(target)}.Get{ToPascalIdentifier(target.MemberName)}()";
         }
 
         string instance = match.Groups["target"].Value;
-        return $"S1Interop.Generated.S1InteropMemberRegistry.Get{target.MemberAlias}({instance})";
+        return $"{GetTypeFacadeName(target)}.Get{ToPascalIdentifier(target.MemberName)}({instance})";
     }
 
     private static string BuildTypedHelperSetterReplacement(Match match, MemberAccessTarget target)
@@ -206,11 +207,70 @@ public sealed class MemberAccessFallbackRewriter
         string value = match.Groups["value"].Value.Trim();
         if (target.IsStatic)
         {
-            return $"S1Interop.Generated.S1InteropMemberRegistry.TrySet{target.MemberAlias}({value})";
+            return $"{GetTypeFacadeName(target)}.TrySet{ToPascalIdentifier(target.MemberName)}({value})";
         }
 
         string instance = match.Groups["target"].Value;
-        return $"S1Interop.Generated.S1InteropMemberRegistry.TrySet{target.MemberAlias}({instance}, {value})";
+        return $"{GetTypeFacadeName(target)}.TrySet{ToPascalIdentifier(target.MemberName)}({instance}, {value})";
+    }
+
+    private static string BuildTypeFacadeAccessor(MemberAccessTarget target, string accessor, string instance)
+    {
+        string facadeName = GetTypeFacadeName(target);
+        return string.IsNullOrWhiteSpace(instance)
+            ? $"{facadeName}.{accessor}()"
+            : $"{facadeName}.{accessor}({instance})";
+    }
+
+    private static string GetTypeFacadeName(MemberAccessTarget target)
+    {
+        string[] parts = target.OwnerTypeName
+            .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizeIdentifier)
+            .ToArray();
+        if (parts.Length == 0)
+        {
+            return $"S1Interop.{SanitizeIdentifier(target.OwnerAlias)}";
+        }
+
+        string typeName = parts[^1];
+        IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
+        if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
+        {
+            namespaceParts = namespaceParts.Skip(1);
+        }
+        else
+        {
+            namespaceParts = new[] { "Types" }.Concat(namespaceParts);
+        }
+
+        string namespaceSuffix = string.Join(".", namespaceParts);
+        return string.IsNullOrWhiteSpace(namespaceSuffix)
+            ? $"S1Interop.{typeName}"
+            : $"S1Interop.{namespaceSuffix}.{typeName}";
+    }
+
+    private static string ToPascalIdentifier(string value)
+    {
+        string sanitized = SanitizeIdentifier(value);
+        if (sanitized.Length == 1)
+        {
+            return sanitized.ToUpperInvariant();
+        }
+
+        return char.ToUpperInvariant(sanitized[0]) + sanitized[1..];
+    }
+
+    private static string SanitizeIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "RuntimeType";
+        }
+
+        var chars = value.Select(character => char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray();
+        string sanitized = new(chars);
+        return char.IsDigit(sanitized[0]) ? "_" + sanitized : sanitized;
     }
 
     private static bool TryRewriteDynamicInstanceFallbacks(List<string> lines)

@@ -1118,9 +1118,9 @@ internal sealed partial class S1InteropFixtureTests
                 "Migration should add exactly one HideFromIl2Cpp attribute to FuelVehicleData.");
             string migratedVehicleFuelSystem = File.ReadAllText(tempVehicleFuelSystem);
             Assert(
-                migratedVehicleFuelSystem.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
+                migratedVehicleFuelSystem.Contains("S1Interop.Vehicles.LandVehicle.GetVehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
                 !migratedVehicleFuelSystem.Contains("ReflectionUtils.TryGetFieldOrProperty(_landVehicle, \"vehicleName\")", StringComparison.Ordinal),
-                "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated member-cache helpers.");
+                "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated type-scoped facade helpers.");
             string generatedMemberTargets = File.ReadAllText(Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.MemberAccessTargets.g.cs"));
             Assert(
                 generatedMemberTargets.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"vehicleName\")]", StringComparison.Ordinal),
@@ -1342,6 +1342,7 @@ internal sealed partial class S1InteropFixtureTests
             S1InteropMemberDeclaration[] memberDeclarations = memberTargets
                 .Select(target => new S1InteropMemberDeclaration(
                     target.OwnerAlias,
+                    target.OwnerTypeName,
                     target.MemberName,
                     "S1FuelVehicleName",
                     $"S1Interop.S1InteropMemberKind.{target.Kind}",
@@ -1386,9 +1387,9 @@ internal sealed partial class S1InteropFixtureTests
                 "Fresh backend-neutral scaffold should use real copied S1FuelMod aliases as assembly-level runtime-resolved declarations.");
             Assert(
                 starterSource.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"S1FuelVehicleName\")]", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetS1FuelVehicleName(vehicle)", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(vehicle, \"vehicleName\")", StringComparison.Ordinal),
-                "Fresh backend-neutral scaffold should compile declared and dynamic generated member-cache helpers from real copied S1FuelMod reflection usage.");
+                starterSource.Contains("S1Interop.Vehicles.LandVehicle.GetVehicleName(vehicle)", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.Vehicles.LandVehicle.Get(vehicle, \"vehicleName\")", StringComparison.Ordinal),
+                "Fresh backend-neutral scaffold should compile declared and dynamic generated type-scoped facade helpers from real copied S1FuelMod reflection usage.");
         }
         finally
         {
@@ -1763,6 +1764,104 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             File.Exists(localProps) == hadLocalProps,
             "Hoverboard verify-migration should not create or remove real local.build.props.");
+    }
+
+    private void BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "Hoverboard");
+        string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+        string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+        if (!Directory.Exists(sourceDirectory) || !File.Exists(monoMelonLoader) || !File.Exists(il2CppMelonLoader))
+        {
+            Console.WriteLine("Skipping Hoverboard backend-neutral scaffold fixture because Hoverboard or local game roots are not available.");
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceCopy = Path.Combine(tempRoot, "HoverboardSource");
+            Directory.CreateDirectory(sourceCopy);
+            CopyFixtureDirectory(sourceDirectory, sourceCopy);
+            string copiedProject = Path.Combine(sourceCopy, "Hoverboard.csproj");
+            RewriteHoverboardGamePaths(copiedProject, monoGamePath, il2CppGamePath);
+
+            ProjectAnalysis project = analyzer.Analyze(copiedProject).Projects.Single();
+            SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(project);
+            SdkTypeAlias[] aliases = facadePlan.TypeAliases
+                .Where(alias =>
+                    alias.Alias.Equals("Skateboard", StringComparison.Ordinal) ||
+                    alias.Alias.Equals("SkateboardSettings", StringComparison.Ordinal) ||
+                    alias.Alias.Equals("SkateboardOverrideData", StringComparison.Ordinal) ||
+                    alias.Alias.Equals("WeatherConditions", StringComparison.Ordinal))
+                .OrderBy(alias => alias.Alias, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert(
+                aliases.Any(alias => alias.Alias == "Skateboard" && alias.MonoType == "ScheduleOne.Skating.Skateboard" && !alias.GenerateGlobalUsing),
+                "Hoverboard namespace-imported Skateboard usage should become a backend-neutral type alias backed by local reference metadata.");
+            Assert(
+                aliases.Any(alias => alias.Alias == "WeatherConditions" && alias.MonoType == "ScheduleOne.Weather.WeatherConditions" && !alias.GenerateGlobalUsing),
+                "Hoverboard namespace-imported WeatherConditions usage should become a backend-neutral type alias backed by local reference metadata.");
+            Assert(aliases.Length >= 4, "Hoverboard should expose several namespace-scoped backend-neutral aliases for scaffold validation.");
+
+            string scaffoldDirectory = Path.Combine(tempRoot, "FreshHoverboardFacadeMod");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+            Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for Hoverboard alias validation. Output: {create.Output}");
+
+            string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshHoverboardFacadeMod.csproj");
+            string starterPath = Path.Combine(scaffoldDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            File.WriteAllText(starterPath, BuildBackendNeutralRegistrySource(aliases));
+            File.WriteAllText(
+                Path.Combine(scaffoldDirectory, "HoverboardProbe.cs"),
+                """
+                namespace FreshHoverboardFacadeMod;
+
+                internal static class HoverboardProbe
+                {
+                    public static string Probe(object? skateboard, object? weather)
+                    {
+                        S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.SkateboardTag> board =
+                            S1Interop.Skating.Skateboard.As(skateboard);
+                        S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.WeatherConditionsTag> conditions =
+                            S1Interop.Weather.WeatherConditions.As(weather);
+
+                        return $"{S1Interop.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
+                    }
+                }
+                """);
+
+            string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+            string packageCache = Path.Combine(tempRoot, "NuGetPackages");
+
+            ProcessResult monoBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                $"-p:MonoGamePath={monoGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(monoBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real Hoverboard aliases should build against Mono references. Output: {monoBuild.Output}");
+
+            ProcessResult il2CppBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                "-p:S1InteropReferenceRuntime=Il2Cpp",
+                $"-p:Il2CppGamePath={il2CppGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(il2CppBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real Hoverboard aliases should build against IL2CPP references without source changes. Output: {il2CppBuild.Output}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
     }
 
     private void VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy()
