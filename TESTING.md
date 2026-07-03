@@ -45,7 +45,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 ```
 
 - `--integration-hoverboard`: fast real-mod coverage for `sdkgen --apply`, generated facade declarations, namespace-scoped SDK inference from local reference metadata, and compiling the CLI-generated SDK source against Mono and IL2CPP references.
-- `--integration-backend-neutral`: broader real-mod backend-neutral coverage without the heaviest build-gate fixtures, including CLI-generated SDK compile checks for Hoverboard namespace imports and BarsGraphics source aliases.
+- `--integration-backend-neutral`: broader real-mod backend-neutral coverage without the heaviest build-gate fixtures, including CLI-generated SDK compile checks for Hoverboard namespace imports, BarsGraphics source aliases, and S1FuelMod migration-generated member-access declarations.
 - `--integration-build-gates`: slower real-mod build verification for Mono/IL2CPP migration gates.
 
 Run the full `--integration` lane when a change crosses multiple migration domains or before a broad release-facing validation pass. Do not use it as the default iteration loop.

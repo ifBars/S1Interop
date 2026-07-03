@@ -175,7 +175,7 @@ The test harness is a console executable with explicit modes:
 - `--portable`: CI-safe coverage without private local fixtures.
 - `--integration`: local real-mod and game-path coverage.
 - `--integration-hoverboard`: focused Hoverboard `sdkgen` coverage that compiles generated SDK source against Mono and IL2CPP references.
-- `--integration-backend-neutral`: focused real-mod backend-neutral facade coverage, including public CLI-generated SDK source compiled against Mono and IL2CPP references.
+- `--integration-backend-neutral`: focused real-mod backend-neutral facade coverage, including public CLI-generated SDK and migration-generated member-access source compiled against Mono and IL2CPP references.
 - `--integration-build-gates`: heavier real-mod build verification gates.
 - `--all`: portable plus integration when local workspace dependencies exist.
 

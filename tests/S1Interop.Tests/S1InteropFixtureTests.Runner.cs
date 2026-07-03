@@ -354,6 +354,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         BackendNeutralScaffoldBuildsRealS1FuelModFacadeTargetsAgainstBothReferenceSurfaces();
         count++;
+        MigrationApplyGeneratesS1FuelModMemberAccessFacadesThatBuildAgainstBothReferenceSurfaces();
+        count++;
         SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
         count++;
         BackendNeutralScaffoldBuildsRealBarsGraphicsFacadeTargetsAgainstBothReferenceSurfaces();
@@ -429,7 +431,7 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         BackendNeutralRegistryCompilesRealS1FuelModFacadeTargets();
         count++;
-        BackendNeutralScaffoldBuildsRealS1FuelModFacadeTargetsAgainstBothReferenceSurfaces();
+        MigrationApplyGeneratesS1FuelModMemberAccessFacadesThatBuildAgainstBothReferenceSurfaces();
         count++;
         SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
         count++;

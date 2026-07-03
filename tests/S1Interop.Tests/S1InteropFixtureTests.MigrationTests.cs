@@ -1397,6 +1397,75 @@ internal sealed partial class S1InteropFixtureTests
         }
     }
 
+    private void MigrationApplyGeneratesS1FuelModMemberAccessFacadesThatBuildAgainstBothReferenceSurfaces()
+    {
+        string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");
+        string sourceProject = Path.Combine(sourceDirectory, "S1FuelMod.csproj");
+        string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+        string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+        if (!File.Exists(sourceProject) || !File.Exists(monoMelonLoader) || !File.Exists(il2CppMelonLoader))
+        {
+            Console.WriteLine("Skipping S1FuelMod migration-generated member-access fixture because S1FuelMod or local game roots are not available.");
+            return;
+        }
+
+        string originalProjectHash = ComputeSha256(sourceProject);
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string sourceCopy = Path.Combine(tempRoot, "S1FuelModSource");
+            Directory.CreateDirectory(sourceCopy);
+            CopyFixtureDirectory(sourceDirectory, sourceCopy);
+            string copiedProject = Path.Combine(sourceCopy, "S1FuelMod.csproj");
+            string generatedMemberTargets = Path.Combine(sourceCopy, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
+
+            ProcessResult apply = RunCli("migrate", copiedProject, "--apply");
+            Assert(
+                apply.ExitCode == 0 &&
+                apply.Output.Contains("S1Interop migration applied", StringComparison.Ordinal) &&
+                File.Exists(generatedMemberTargets),
+                $"s1interop migrate --apply should generate S1FuelMod member access declarations through the public CLI command. Output: {apply.Output}");
+
+            string generatedSource = File.ReadAllText(generatedMemberTargets);
+            Assert(
+                generatedSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Vehicles.LandVehicle\", Alias = \"LandVehicle\")]", StringComparison.Ordinal) &&
+                generatedSource.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"vehicleName\")]", StringComparison.Ordinal),
+                $"S1FuelMod migration should generate backend-neutral LandVehicle.vehicleName declarations from real ReflectionUtils usage. Generated source:{Environment.NewLine}{generatedSource}");
+
+            BuildGeneratedSdkScaffoldAgainstBothReferenceSurfaces(
+                tempRoot,
+                "FreshS1FuelGeneratedMemberAccessMod",
+                generatedSource,
+                "S1FuelProbe.cs",
+                """
+                namespace FreshS1FuelGeneratedMemberAccessMod;
+
+                internal static class S1FuelProbe
+                {
+                    public static string Probe(object? vehicle)
+                    {
+                        S1Interop.Vehicles.LandVehicle.Handle landVehicle = S1Interop.Vehicles.LandVehicle.As(vehicle);
+
+                        return $"{S1Interop.Vehicles.LandVehicle.TypeName}|{landVehicle.HasValue}|{S1Interop.Vehicles.LandVehicle.GetVehicleName(landVehicle)}";
+                    }
+                }
+                """,
+                monoGamePath,
+                il2CppGamePath);
+
+            Assert(
+                string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
+                "S1FuelMod generated member-access fixture should not mutate the real project file.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs()
     {
         string projectPath = Path.Combine(WorkspaceRoot, "BarsGraphics", "BarsGraphics.csproj");
