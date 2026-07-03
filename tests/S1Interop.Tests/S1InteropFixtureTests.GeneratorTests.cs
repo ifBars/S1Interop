@@ -1393,7 +1393,13 @@ internal sealed partial class S1InteropFixtureTests
                     {
                         public const string TypeName = "ScheduleOne.Product.WeedDefinition";
                         public const string VerbatimTypeName = @"ScheduleOne.Product.WeedDefinition";
+                        public const string CommandSnippet = "new Il2CppScheduleOne.Console.SetWeather().Execute(null)";
+                        public const string ListSnippet = "new Il2CppSystem.Collections.Generic.List<string>()";
                         // ScheduleOne.Product.WeedDefinition should remain readable in comments.
+                        // new Il2CppScheduleOne.Console.SetWeather().Execute(null) should remain readable in comments.
+                        /*
+                         * var ignoredCommand = new Il2CppScheduleOne.Console.ClearTrash();
+                         */
                         public static Type WeedType => typeof(ScheduleOne.Product.WeedDefinition);
                         public static Type HudType => typeof(Il2CppScheduleOne.UI.HUD);
                         public static Type? WeedTypeByName => Type.GetType("ScheduleOne.Product.WeedDefinition", false);
@@ -1465,15 +1471,19 @@ internal sealed partial class S1InteropFixtureTests
                 !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(Il2CppScheduleOne.UI.HUD)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
-                !migratedSource.Contains("new Il2CppSystem.Collections.Generic.List<string>()", StringComparison.Ordinal) &&
-                !migratedSource.Contains("new Il2CppScheduleOne.Console.SetWeather()", StringComparison.Ordinal) &&
+                !migratedSource.Contains("var commandList = new Il2CppSystem.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
+                !migratedSource.Contains("var command = new Il2CppScheduleOne.Console.SetWeather();", StringComparison.Ordinal) &&
                 !migratedSource.Contains("ScheduleOne.Product.WeedDefinition? Find()", StringComparison.Ordinal),
                 "Migration should remove fully-qualified ScheduleOne type tokens from code when the alias is unique.");
             Assert(
                 migratedSource.Contains("public const string TypeName = \"ScheduleOne.Product.WeedDefinition\";", StringComparison.Ordinal) &&
                 migratedSource.Contains("public const string VerbatimTypeName = @\"ScheduleOne.Product.WeedDefinition\";", StringComparison.Ordinal) &&
-                migratedSource.Contains("// ScheduleOne.Product.WeedDefinition should remain readable in comments.", StringComparison.Ordinal),
-                "Migration should not rewrite fully-qualified ScheduleOne type names inside strings or comments.");
+                migratedSource.Contains("public const string CommandSnippet = \"new Il2CppScheduleOne.Console.SetWeather().Execute(null)\";", StringComparison.Ordinal) &&
+                migratedSource.Contains("public const string ListSnippet = \"new Il2CppSystem.Collections.Generic.List<string>()\";", StringComparison.Ordinal) &&
+                migratedSource.Contains("// ScheduleOne.Product.WeedDefinition should remain readable in comments.", StringComparison.Ordinal) &&
+                migratedSource.Contains("// new Il2CppScheduleOne.Console.SetWeather().Execute(null) should remain readable in comments.", StringComparison.Ordinal) &&
+                migratedSource.Contains("* var ignoredCommand = new Il2CppScheduleOne.Console.ClearTrash();", StringComparison.Ordinal),
+                "Migration should not rewrite fully-qualified ScheduleOne type names or invocation snippets inside strings or comments.");
             Assert(
                 facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
                 facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),

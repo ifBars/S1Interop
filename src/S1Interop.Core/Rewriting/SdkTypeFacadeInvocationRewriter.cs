@@ -1,9 +1,19 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace S1Interop.Core;
 
 public static class SdkTypeFacadeInvocationRewriter
 {
+    private enum RewriteState
+    {
+        Code,
+        BlockComment,
+        RegularString,
+        VerbatimString,
+        CharLiteral
+    }
+
     private static readonly Regex SimpleCreationRegex = new(
         @"(?<prefix>\bvar\s+(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*)new\s+(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*){2,})\s*\((?<args>[^;\r\n()]*)\)(?<suffix>\s*;)",
         RegexOptions.Compiled);
@@ -55,17 +65,159 @@ public static class SdkTypeFacadeInvocationRewriter
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
         string[] lines = source.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         var variableFacades = new Dictionary<string, string>(StringComparer.Ordinal);
+        RewriteState state = RewriteState.Code;
 
         for (int index = 0; index < lines.Length; index++)
         {
-            string line = RewriteIl2CppListCreation(lines[index]);
-            line = RewriteChainedInvocations(line, targetsByRuntimeType);
-            line = RewriteSimpleCreation(line, targetsByRuntimeType, variableFacades);
-            line = RewriteMappedVariableInvocation(line, variableFacades);
-            lines[index] = line;
+            lines[index] = RewriteLine(lines[index], targetsByRuntimeType, variableFacades, ref state);
         }
 
         return string.Join(newline, lines);
+    }
+
+    private static string RewriteLine(
+        string line,
+        IReadOnlyDictionary<string, TypeFacadeTarget> targetsByRuntimeType,
+        Dictionary<string, string> variableFacades,
+        ref RewriteState state)
+    {
+        var rewritten = new StringBuilder(line.Length);
+        var code = new StringBuilder();
+
+        for (int index = 0; index < line.Length; index++)
+        {
+            char ch = line[index];
+            char next = index + 1 < line.Length ? line[index + 1] : '\0';
+
+            switch (state)
+            {
+                case RewriteState.Code:
+                    if (ch == '/' && next == '/')
+                    {
+                        AppendRewrittenCode(rewritten, code, targetsByRuntimeType, variableFacades);
+                        rewritten.Append(line, index, line.Length - index);
+                        index = line.Length;
+                    }
+                    else if (ch == '/' && next == '*')
+                    {
+                        AppendRewrittenCode(rewritten, code, targetsByRuntimeType, variableFacades);
+                        rewritten.Append("/*");
+                        index++;
+                        state = RewriteState.BlockComment;
+                    }
+                    else if (ch == '"')
+                    {
+                        AppendRewrittenCode(rewritten, code, targetsByRuntimeType, variableFacades);
+                        rewritten.Append(ch);
+                        state = IsVerbatimStringStart(line, index)
+                            ? RewriteState.VerbatimString
+                            : RewriteState.RegularString;
+                    }
+                    else if (ch == '\'')
+                    {
+                        AppendRewrittenCode(rewritten, code, targetsByRuntimeType, variableFacades);
+                        rewritten.Append(ch);
+                        state = RewriteState.CharLiteral;
+                    }
+                    else
+                    {
+                        code.Append(ch);
+                    }
+
+                    break;
+
+                case RewriteState.BlockComment:
+                    rewritten.Append(ch);
+                    if (ch == '*' && next == '/')
+                    {
+                        rewritten.Append(next);
+                        index++;
+                        state = RewriteState.Code;
+                    }
+
+                    break;
+
+                case RewriteState.RegularString:
+                    rewritten.Append(ch);
+                    if (ch == '\\' && next != '\0')
+                    {
+                        rewritten.Append(next);
+                        index++;
+                    }
+                    else if (ch == '"')
+                    {
+                        state = RewriteState.Code;
+                    }
+
+                    break;
+
+                case RewriteState.VerbatimString:
+                    rewritten.Append(ch);
+                    if (ch == '"' && next == '"')
+                    {
+                        rewritten.Append(next);
+                        index++;
+                    }
+                    else if (ch == '"')
+                    {
+                        state = RewriteState.Code;
+                    }
+
+                    break;
+
+                case RewriteState.CharLiteral:
+                    rewritten.Append(ch);
+                    if (ch == '\\' && next != '\0')
+                    {
+                        rewritten.Append(next);
+                        index++;
+                    }
+                    else if (ch == '\'')
+                    {
+                        state = RewriteState.Code;
+                    }
+
+                    break;
+            }
+        }
+
+        AppendRewrittenCode(rewritten, code, targetsByRuntimeType, variableFacades);
+        return rewritten.ToString();
+    }
+
+    private static void AppendRewrittenCode(
+        StringBuilder rewritten,
+        StringBuilder code,
+        IReadOnlyDictionary<string, TypeFacadeTarget> targetsByRuntimeType,
+        Dictionary<string, string> variableFacades)
+    {
+        if (code.Length == 0)
+        {
+            return;
+        }
+
+        string segment = RewriteIl2CppListCreation(code.ToString());
+        segment = RewriteChainedInvocations(segment, targetsByRuntimeType);
+        segment = RewriteSimpleCreation(segment, targetsByRuntimeType, variableFacades);
+        segment = RewriteMappedVariableInvocation(segment, variableFacades);
+        rewritten.Append(segment);
+        code.Clear();
+    }
+
+    private static bool IsVerbatimStringStart(string line, int quoteIndex)
+    {
+        int previous = quoteIndex - 1;
+        if (previous < 0)
+        {
+            return false;
+        }
+
+        if (line[previous] == '@')
+        {
+            return true;
+        }
+
+        return line[previous] == '$' && previous - 1 >= 0 && line[previous - 1] == '@';
     }
 
     private static string RewriteIl2CppListCreation(string line) =>
