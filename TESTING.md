@@ -14,7 +14,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Use this during normal iteration. It avoids MSBuild/package/build-gate fixtures and should be much faster than full portable coverage.
 
-Generator diagnostics that validate `S1InteropType` and `S1InteropMember` strings use synthetic in-memory game assemblies here, so the compile-time safety checks stay portable while still proving the game-reference path.
+Generator diagnostics that validate `S1InteropType` and `S1InteropMember` strings use synthetic in-memory game assemblies here, so the compile-time safety checks stay portable while still proving the game-reference path, including method overload parameter checks.
 
 ### Portable
 

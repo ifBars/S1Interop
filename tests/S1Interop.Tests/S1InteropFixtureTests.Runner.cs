@@ -133,6 +133,10 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorReportsMissingDeclaredMembersWhenGameReferencesExist();
         count++;
+        S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies();
+        count++;
+        S1InteropTypeRegistryGeneratorReportsWrongMethodParameterTypesWhenGameReferencesExist();
+        count++;
         BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases();
         count++;
         BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes();
@@ -288,6 +292,10 @@ internal sealed partial class S1InteropFixtureTests
         S1InteropTypeRegistryGeneratorSkipsReferenceValidationWhenGameReferencesAreAbsent();
         count++;
         S1InteropTypeRegistryGeneratorReportsMissingDeclaredMembersWhenGameReferencesExist();
+        count++;
+        S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies();
+        count++;
+        S1InteropTypeRegistryGeneratorReportsWrongMethodParameterTypesWhenGameReferencesExist();
         count++;
         BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases();
         count++;

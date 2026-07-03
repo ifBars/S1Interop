@@ -425,6 +425,159 @@ internal sealed partial class S1InteropFixtureTests
             $"S1InteropMember declarations should report S1I003 when the member name is absent from the referenced owner type. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
+    private void S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.Management
+            {
+                public sealed class TransitRoute
+                {
+                }
+            }
+
+            namespace ScheduleOne.ItemFramework
+            {
+                public sealed class ItemInstance
+                {
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    public bool IsDestinationValid(ScheduleOne.Management.TransitRoute route, ScheduleOne.ItemFramework.ItemInstance item, ref string reason)
+                    {
+                        return true;
+                    }
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.Management
+            {
+                public sealed class TransitRoute
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.ItemFramework
+            {
+                public sealed class ItemInstance
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    public bool IsDestinationValid(Il2CppScheduleOne.Management.TransitRoute route, Il2CppScheduleOne.ItemFramework.ItemInstance item, ref string reason)
+                    {
+                        return true;
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
+            [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference, il2CppGameReference]);
+
+        Assert(
+            diagnostics.All(diagnostic => diagnostic.Id != "S1I001" && diagnostic.Id != "S1I002" && diagnostic.Id != "S1I003"),
+            $"Alias-based S1InteropMember method parameter declarations should validate against both Mono and IL2CPP referenced signatures. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorReportsWrongMethodParameterTypesWhenGameReferencesExist()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.Management
+            {
+                public sealed class TransitRoute
+                {
+                }
+            }
+
+            namespace ScheduleOne.ItemFramework
+            {
+                public sealed class ItemInstance
+                {
+                }
+            }
+
+            namespace ScheduleOne.PlayerScripts
+            {
+                public sealed class PlayerCamera
+                {
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    public bool IsDestinationValid(ScheduleOne.Management.TransitRoute route, ScheduleOne.ItemFramework.ItemInstance item, ref string reason)
+                    {
+                        return true;
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+            [assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "PlayerCamera", "string&" })]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I003" &&
+                diagnostic.GetMessage().Contains("IsDestinationValid", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("MoveItemBehaviour", StringComparison.Ordinal)),
+            $"S1InteropMember method declarations should report S1I003 when the named overload has the right arity but wrong parameter types. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
     private void BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases()
     {
         const string il2CppSource =
