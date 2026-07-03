@@ -71,6 +71,13 @@ tests/S1Interop.Tests/
   Portable and local integration coverage
 ```
 
+Additional project docs:
+
+- [`AGENTS.md`](AGENTS.md) - repository instructions for coding agents and automation.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) - module boundaries and migration flow.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) - local development and contribution workflow.
+- [`TESTING.md`](TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
+
 ## Compile-time generators
 
 S1Interop has two generator layers:
