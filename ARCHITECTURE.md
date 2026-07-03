@@ -159,7 +159,7 @@ Current supported strategy:
 4. Build and verify in sandboxed copies.
 5. Report unsupported or ambiguous cases instead of guessing.
 
-The generated SDK surface is intentionally usage-driven. `sdkgen` and migration-time facade generation inspect source plus local reference metadata, then emit declarations and type-scoped facades for the types a mod touches. When generated facade output contains `S1InteropType` attributes, the applied plan must also install `S1Interop.Generators`; the generated SDK source and Roslyn generator package are one compile-time unit. Avoid manual per-game-type wrappers or static catalogs of every Schedule One type; those do not scale and make drift harder to detect.
+The generated SDK surface is intentionally usage-driven. `sdkgen` and migration-time facade generation inspect source plus local reference metadata, then emit declarations and type-scoped facades for the types a mod touches. When generated facade output contains `S1InteropType` attributes, the applied plan must also install `S1Interop.Generators`; the generated SDK source and Roslyn generator package are one compile-time unit. Focused real-mod tests should compile the public CLI-generated SDK source against both Mono and IL2CPP reference surfaces rather than only validating in-memory alias plans. Avoid manual per-game-type wrappers or static catalogs of every Schedule One type; those do not scale and make drift harder to detect.
 
 Future possible strategy:
 
@@ -174,7 +174,7 @@ The test harness is a console executable with explicit modes:
 - `--quick`: fast analyzer, rewriter, migration-planning, and generator checks.
 - `--portable`: CI-safe coverage without private local fixtures.
 - `--integration`: local real-mod and game-path coverage.
-- `--integration-hoverboard`: focused Hoverboard SDK/facade generation coverage.
+- `--integration-hoverboard`: focused Hoverboard `sdkgen` coverage that compiles generated SDK source against Mono and IL2CPP references.
 - `--integration-backend-neutral`: focused real-mod backend-neutral facade coverage.
 - `--integration-build-gates`: heavier real-mod build verification gates.
 - `--all`: portable plus integration when local workspace dependencies exist.

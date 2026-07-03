@@ -1870,7 +1870,13 @@ internal sealed partial class S1InteropFixtureTests
         string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
         string monoAssembly = Path.Combine(monoGamePath, "Schedule I_Data", "Managed", "Assembly-CSharp.dll");
         string il2CppAssembly = Path.Combine(il2CppGamePath, "MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll");
-        if (!File.Exists(sourceProject) || !File.Exists(monoAssembly) || !File.Exists(il2CppAssembly))
+        string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+        string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+        if (!File.Exists(sourceProject) ||
+            !File.Exists(monoAssembly) ||
+            !File.Exists(il2CppAssembly) ||
+            !File.Exists(monoMelonLoader) ||
+            !File.Exists(il2CppMelonLoader))
         {
             Console.WriteLine("Skipping Hoverboard SDK generation fixture because Hoverboard or local game references are not available.");
             return;
@@ -1917,6 +1923,8 @@ internal sealed partial class S1InteropFixtureTests
                 !facadeSource.Contains("global using WeatherConditions =", StringComparison.Ordinal),
                 "Namespace-scoped inferred SDK declarations should not create broad simple-name global aliases.");
 
+            BuildHoverboardGeneratedSdkScaffoldAgainstBothReferenceSurfaces(tempRoot, facadeSource, monoGamePath, il2CppGamePath);
+
             Assert(
                 string.Equals(ComputeSha256(sourceProject), originalProjectHash, StringComparison.Ordinal),
                 "Hoverboard SDK generation fixture should not mutate the real project file.");
@@ -1925,6 +1933,61 @@ internal sealed partial class S1InteropFixtureTests
         {
             DeleteDirectoryIfExists(tempRoot);
         }
+    }
+
+    private void BuildHoverboardGeneratedSdkScaffoldAgainstBothReferenceSurfaces(
+        string tempRoot,
+        string facadeSource,
+        string monoGamePath,
+        string il2CppGamePath)
+    {
+        string scaffoldDirectory = Path.Combine(tempRoot, "FreshHoverboardGeneratedSdkMod");
+        ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+        Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for generated Hoverboard SDK validation. Output: {create.Output}");
+
+        string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshHoverboardGeneratedSdkMod.csproj");
+        string starterPath = Path.Combine(scaffoldDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+        File.WriteAllText(starterPath, facadeSource);
+        File.WriteAllText(
+            Path.Combine(scaffoldDirectory, "HoverboardProbe.cs"),
+            """
+            namespace FreshHoverboardGeneratedSdkMod;
+
+            internal static class HoverboardProbe
+            {
+                public static string Probe(object? skateboard, object? weather)
+                {
+                    S1Interop.Skating.Skateboard.Handle board = S1Interop.Skating.Skateboard.As(skateboard);
+                    S1Interop.Weather.WeatherConditions.Handle conditions = S1Interop.Weather.WeatherConditions.As(weather);
+
+                    return $"{S1Interop.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
+                }
+            }
+            """);
+
+        string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+        string packageCache = Path.Combine(tempRoot, "NuGetPackages");
+
+        ProcessResult monoBuild = RunDotNet(
+            "build",
+            scaffoldProject,
+            "--nologo",
+            "-v:minimal",
+            $"-p:MonoGamePath={monoGamePath}",
+            $"-p:RestorePackagesPath={packageCache}",
+            $"-p:RestoreAdditionalProjectSources={packageSource}");
+        Assert(monoBuild.ExitCode == 0, $"Fresh scaffold with Hoverboard sdkgen output should build against Mono references. Output: {monoBuild.Output}");
+
+        ProcessResult il2CppBuild = RunDotNet(
+            "build",
+            scaffoldProject,
+            "--nologo",
+            "-v:minimal",
+            "-p:S1InteropReferenceRuntime=Il2Cpp",
+            $"-p:Il2CppGamePath={il2CppGamePath}",
+            $"-p:RestorePackagesPath={packageCache}",
+            $"-p:RestoreAdditionalProjectSources={packageSource}");
+        Assert(il2CppBuild.ExitCode == 0, $"Fresh scaffold with Hoverboard sdkgen output should build against IL2CPP references without source changes. Output: {il2CppBuild.Output}");
     }
 
     private void VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy()

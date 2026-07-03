@@ -68,6 +68,7 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - Use `--quick` for fast analyzer/rewriter/generator iteration.
 - Use `--portable` for public CI-safe coverage.
 - Use focused integration lanes first when validating behavior against real local mod copies or local game assemblies; reserve full `--integration` for broad sweeps.
+- Prefer focused CLI-output tests over duplicated in-memory scaffold builds when validating generated SDK behavior against both runtime reference surfaces.
 - If a test needs local game paths or sibling repositories, keep it in integration coverage or skip cleanly when dependencies are absent.
 - Tests must not mutate real sibling projects. Copy fixtures into temp directories and clean them afterwards.
 

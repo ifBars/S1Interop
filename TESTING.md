@@ -42,7 +42,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
 ```
 
-- `--integration-hoverboard`: fast real-mod coverage for `sdkgen --apply`, generated facade declarations, and namespace-scoped SDK inference from local reference metadata.
+- `--integration-hoverboard`: fast real-mod coverage for `sdkgen --apply`, generated facade declarations, namespace-scoped SDK inference from local reference metadata, and compiling the CLI-generated SDK source against Mono and IL2CPP references.
 - `--integration-backend-neutral`: broader real-mod backend-neutral coverage without the heaviest build-gate fixtures.
 - `--integration-build-gates`: slower real-mod build verification for Mono/IL2CPP migration gates.
 
@@ -124,7 +124,7 @@ Test files are split by concern:
 - Add portable build-gate coverage for verifier behavior that can be modeled with synthetic projects.
 - Add integration coverage for real open-source mods or local game assemblies.
 - If a fixture requires private local state, skip cleanly or keep it in `--integration`.
-- Prefer targeted integration modes for real-mod evidence. Add a new focused lane when a domain becomes slow enough that the full integration suite discourages regular use.
+- Prefer targeted integration modes for real-mod evidence. Add a new focused lane when a domain becomes slow enough that the full integration suite discourages regular use, and avoid duplicating expensive scaffold builds when a public CLI-output test already proves the same runtime surfaces.
 
 ## Temp Files and Real Projects
 

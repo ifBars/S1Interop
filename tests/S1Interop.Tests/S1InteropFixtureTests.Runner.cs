@@ -411,8 +411,6 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
         count++;
-        BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
-        count++;
         SdkGenApplyGeneratesHoverboardFacadesFromReferenceMetadata();
         count++;
         SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
@@ -431,8 +429,6 @@ internal sealed partial class S1InteropFixtureTests
 
         int count = 0;
         VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
-        count++;
-        BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
         count++;
         SdkGenApplyGeneratesHoverboardFacadesFromReferenceMetadata();
         count++;
