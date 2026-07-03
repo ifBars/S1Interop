@@ -8,6 +8,10 @@ public sealed class DirectMemberReflectionLookupRewriter
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex PropertyAccessorRegex = new(
+        @"\.GetProperty\s*\([^)]*\)\s*\.\s*(?<accessor>GetMethod|SetMethod)\b",
+        RegexOptions.Compiled);
+
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!IsSupportedRiskKind(risk) || !File.Exists(risk.FilePath))
@@ -117,7 +121,7 @@ public sealed class DirectMemberReflectionLookupRewriter
             return false;
         }
 
-        string replacement = $"{prefix}S1Interop.Generated.S1InteropMemberRegistry.{target.MemberAlias}{GetAccessorSuffix(lookupKind)};";
+        string replacement = $"{prefix}{GetReplacementExpression(target, lookupKind, statement)};";
         lines.RemoveRange(startIndex, endIndex - startIndex + 1);
         lines.Insert(startIndex, replacement);
         return true;
@@ -359,6 +363,20 @@ public sealed class DirectMemberReflectionLookupRewriter
 
     private static bool HasTypedAccessor(MemberAccessTarget target) =>
         target.Kind is MemberAccessKind.Field or MemberAccessKind.Property or MemberAccessKind.FieldOrProperty;
+
+    private static string GetReplacementExpression(MemberAccessTarget target, MemberAccessKind kind, string statement)
+    {
+        string expression = $"S1Interop.Generated.S1InteropMemberRegistry.{target.MemberAlias}{GetAccessorSuffix(kind)}";
+        if (kind != MemberAccessKind.Property)
+        {
+            return expression;
+        }
+
+        Match accessor = PropertyAccessorRegex.Match(statement);
+        return accessor.Success
+            ? $"{expression}!.{accessor.Groups["accessor"].Value}"
+            : expression;
+    }
 
     private static string GetAccessorSuffix(MemberAccessKind kind) =>
         kind == MemberAccessKind.Field ? "FieldInfo" : "PropertyInfo";
