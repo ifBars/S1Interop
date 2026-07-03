@@ -139,7 +139,7 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Both paths create or use an editable `S1Interop.Generated/S1Interop.BackendNeutral.cs` file where you can add `S1InteropType` and `S1InteropMember` declarations as your mod starts touching game APIs.
+Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
 
 Use `--apply` only after reviewing the dry-run output.
 
@@ -148,8 +148,7 @@ Use `--apply` only after reviewing the dry-run output.
 `S1InteropMember` helpers still use reflection under the hood, but generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
 
 ```csharp
-S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.LandVehicleTag> vehicle =
-    S1Interop.Vehicles.LandVehicle.As(rawVehicle);
+S1Interop.Vehicles.LandVehicle.Handle vehicle = S1Interop.Vehicles.LandVehicle.As(rawVehicle);
 
 if (vehicle.HasValue)
 {
@@ -158,6 +157,8 @@ if (vehicle.HasValue)
 ```
 
 Prefer type-scoped facades such as `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
+
+The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches.
 
 ## Install as a local tool
 

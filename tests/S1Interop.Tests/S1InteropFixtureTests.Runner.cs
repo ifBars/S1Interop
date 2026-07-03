@@ -352,6 +352,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
         count++;
+        SdkGenApplyGeneratesHoverboardFacadesFromReferenceMetadata();
+        count++;
         VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy();
         count++;
         VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy();
@@ -387,5 +389,92 @@ internal sealed partial class S1InteropFixtureTests
         DualRuntimeMigrationAddsGeneratedMonoGuardDefines();
         count++;
         return count;
+    }
+
+    public int RunIntegrationBackendNeutral(bool requireWorkspace)
+    {
+        if (!CanRunIntegration(requireWorkspace))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        S1FuelModInjectedTypesAreAnalyzed();
+        count++;
+        BackendNeutralRegistryCompilesRealS1FuelModFacadeTargets();
+        count++;
+        BackendNeutralScaffoldBuildsRealS1FuelModFacadeTargetsAgainstBothReferenceSurfaces();
+        count++;
+        SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
+        count++;
+        BackendNeutralScaffoldBuildsRealBarsGraphicsFacadeTargetsAgainstBothReferenceSurfaces();
+        count++;
+        VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
+        count++;
+        BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
+        count++;
+        SdkGenApplyGeneratesHoverboardFacadesFromReferenceMetadata();
+        count++;
+        SdkFacadeGeneratorDetectsGunsAlwaysAccurateNamespaces();
+        count++;
+        DuplicateLangVersionRealModsDoNotRequireCSharp10Migration();
+        count++;
+        return count;
+    }
+
+    public int RunIntegrationHoverboard(bool requireWorkspace)
+    {
+        if (!CanRunIntegration(requireWorkspace))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        VerifyMigrationConvergesOnHoverboardWithoutMutatingSource();
+        count++;
+        BackendNeutralScaffoldBuildsRealHoverboardNamespaceScopedFacadeTargets();
+        count++;
+        SdkGenApplyGeneratesHoverboardFacadesFromReferenceMetadata();
+        count++;
+        DuplicateLangVersionRealModsDoNotRequireCSharp10Migration();
+        count++;
+        return count;
+    }
+
+    public int RunIntegrationBuildGates(bool requireWorkspace)
+    {
+        if (!CanRunIntegration(requireWorkspace))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        VerifyMigrationBuildGateConvertsMonoOnlyS1FuelModCopy();
+        count++;
+        VerifyMigrationBuildGateConvertsMonoOnlyBotanistFixCopy();
+        count++;
+        VerifyMigrationBuildGateConvertsMonoOnlyS1VoiceChatCopy();
+        count++;
+        VerifyMigrationBuildGateConvertsRealBarsGraphics();
+        count++;
+        VerifyMigrationBuildGateCollapsesStagedIl2CppWrapperReferences();
+        count++;
+        return count;
+    }
+
+    private bool CanRunIntegration(bool requireWorkspace)
+    {
+        if (TryGetWorkspaceRoot(out _))
+        {
+            return true;
+        }
+
+        if (requireWorkspace)
+        {
+            throw new DirectoryNotFoundException("Could not locate the broader ScheduleOne workspace required by integration tests.");
+        }
+
+        Console.WriteLine("Skipping local integration fixtures because the broader ScheduleOne workspace was not found.");
+        return false;
     }
 }

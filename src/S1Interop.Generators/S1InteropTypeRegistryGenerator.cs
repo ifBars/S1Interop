@@ -658,23 +658,50 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             builder.AppendLine("{");
             builder.AppendLine($"    internal static class {facadeName.TypeName}");
             builder.AppendLine("    {");
+            builder.AppendLine("        public readonly struct Handle");
+            builder.AppendLine("        {");
+            builder.AppendLine($"            private readonly {handleType} value;");
+            builder.AppendLine();
+            builder.AppendLine($"            internal Handle({handleType} value)");
+            builder.AppendLine("            {");
+            builder.AppendLine("                this.value = value;");
+            builder.AppendLine("            }");
+            builder.AppendLine();
+            builder.AppendLine($"            internal {handleType} Value => value;");
+            builder.AppendLine("            public object? Instance => value.Instance;");
+            builder.AppendLine("            public bool HasValue => value.HasValue;");
+            builder.AppendLine("            public override string ToString() => value.ToString();");
+            builder.AppendLine($"            public static implicit operator {handleType}(Handle handle) => handle.value;");
+            builder.AppendLine("        }");
+            builder.AppendLine();
             builder.AppendLine($"        public static global::System.Type? Type => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias};");
             builder.AppendLine($"        public static string TypeName => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias}Name;");
             builder.AppendLine($"        public static object? Create(params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}(args);");
             builder.AppendLine($"        public static T? Create<T>(params object?[] args) where T : class => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}<T>(args);");
             builder.AppendLine($"        public static bool Is(object? instance) => S1Interop.Generated.S1InteropTypeRegistry.Is{entry.Alias}(instance);");
-            builder.AppendLine($"        public static bool TryAs(object? instance, out {handleType} value) => S1Interop.Generated.S1InteropTypeRegistry.TryAs{entry.Alias}(instance, out value);");
-            builder.AppendLine($"        public static {handleType} As(object? instance) => S1Interop.Generated.S1InteropTypeRegistry.As{entry.Alias}(instance);");
-            builder.AppendLine($"        public static object? Get({handleType} instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance, memberName);");
+            builder.AppendLine("        public static bool TryAs(object? instance, out Handle value)");
+            builder.AppendLine("        {");
+            builder.AppendLine($"            if (!S1Interop.Generated.S1InteropTypeRegistry.TryAs{entry.Alias}(instance, out {handleType} generatedValue))");
+            builder.AppendLine("            {");
+            builder.AppendLine("                value = default;");
+            builder.AppendLine("                return false;");
+            builder.AppendLine("            }");
+            builder.AppendLine();
+            builder.AppendLine("            value = new Handle(generatedValue);");
+            builder.AppendLine("            return true;");
+            builder.AppendLine("        }");
+            builder.AppendLine();
+            builder.AppendLine($"        public static Handle As(object? instance) => new Handle(S1Interop.Generated.S1InteropTypeRegistry.As{entry.Alias}(instance));");
+            builder.AppendLine($"        public static object? Get(Handle instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance.Value, memberName);");
             builder.AppendLine($"        public static object? Get(object? instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance, memberName);");
-            builder.AppendLine($"        public static bool TrySet({handleType} instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance, memberName, value);");
+            builder.AppendLine($"        public static bool TrySet(Handle instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance.Value, memberName, value);");
             builder.AppendLine($"        public static bool TrySet(object? instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance, memberName, value);");
-            builder.AppendLine($"        public static object? Invoke({handleType} instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance, methodName, args);");
+            builder.AppendLine($"        public static object? Invoke(Handle instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance.Value, methodName, args);");
             builder.AppendLine($"        public static object? Invoke(object? instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance, methodName, args);");
 
             foreach (S1InteropMemberEntry member in membersByOwnerAlias[entry.Alias].OrderBy(member => member.MemberName, StringComparer.Ordinal))
             {
-                GenerateTypeFacadeMember(builder, member, handleType);
+                GenerateTypeFacadeMember(builder, member);
             }
 
             builder.AppendLine("    }");
@@ -682,7 +709,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         }
     }
 
-    private static void GenerateTypeFacadeMember(StringBuilder builder, S1InteropMemberEntry member, string handleType)
+    private static void GenerateTypeFacadeMember(StringBuilder builder, S1InteropMemberEntry member)
     {
         string memberName = ToPascalIdentifier(member.MemberName);
         if (member.Kind == S1InteropMemberKind.Method)
@@ -694,9 +721,9 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             }
             else
             {
-                builder.AppendLine($"        public static object? {memberName}({handleType} instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}(instance, args);");
+                builder.AppendLine($"        public static object? {memberName}(Handle instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}(instance.Value, args);");
                 builder.AppendLine($"        public static object? {memberName}(object? instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}(instance, args);");
-                builder.AppendLine($"        public static T? {memberName}<T>({handleType} instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}<T>(instance, args);");
+                builder.AppendLine($"        public static T? {memberName}<T>(Handle instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}<T>(instance.Value, args);");
                 builder.AppendLine($"        public static T? {memberName}<T>(object? instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.Invoke{member.Alias}<T>(instance, args);");
             }
 
@@ -712,13 +739,13 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         }
         else
         {
-            builder.AppendLine($"        public static object? Get{memberName}({handleType} instance) => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}(instance);");
+            builder.AppendLine($"        public static object? Get{memberName}(Handle instance) => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}(instance.Value);");
             builder.AppendLine($"        public static object? Get{memberName}(object instance) => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}(instance);");
-            builder.AppendLine($"        public static T? Get{memberName}<T>({handleType} instance) where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(instance);");
+            builder.AppendLine($"        public static T? Get{memberName}<T>(Handle instance) where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(instance.Value);");
             builder.AppendLine($"        public static T? Get{memberName}<T>(object instance) where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(instance);");
-            builder.AppendLine($"        public static T? Get{memberName}Value<T>({handleType} instance) where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(instance);");
+            builder.AppendLine($"        public static T? Get{memberName}Value<T>(Handle instance) where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(instance.Value);");
             builder.AppendLine($"        public static T? Get{memberName}Value<T>(object instance) where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(instance);");
-            builder.AppendLine($"        public static bool TrySet{memberName}({handleType} instance, object? value) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(instance, value);");
+            builder.AppendLine($"        public static bool TrySet{memberName}(Handle instance, object? value) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(instance.Value, value);");
             builder.AppendLine($"        public static bool TrySet{memberName}(object instance, object? value) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(instance, value);");
         }
     }

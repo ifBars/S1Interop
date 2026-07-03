@@ -708,19 +708,25 @@ internal sealed partial class S1InteropFixtureTests
         Assert(typedFacadeArgs[1] is "il2cpp:typed-facade", "Generated typed-handle invoker should preserve by-ref copy-back behavior.");
 
         MethodInfo? facadeAs = hudFacadeType.GetMethod("As", [typeof(object)]);
+        Type facadeHandleType = hudFacadeType.GetNestedType("Handle") ?? throw new InvalidOperationException("Generated type-scoped facade should expose a nested Handle type.");
         MethodInfo? facadeGetScale = hudFacadeType.GetMethods()
-            .FirstOrDefault(method => method.Name == "GetScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
+            .FirstOrDefault(method => method.Name == "GetScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { facadeHandleType }));
         MethodInfo? facadeGetScaleValue = hudFacadeType.GetMethods()
-            .FirstOrDefault(method => method.Name == "GetScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
-        MethodInfo? facadeTrySetScale = hudFacadeType.GetMethod("TrySetScale", [handleType, typeof(object)]);
+            .FirstOrDefault(method => method.Name == "GetScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { facadeHandleType }));
+        MethodInfo? facadeTrySetScale = hudFacadeType.GetMethod("TrySetScale", [facadeHandleType, typeof(object)]);
         MethodInfo? facadeSetLevel = hudFacadeType.GetMethods()
-            .FirstOrDefault(method => method.Name == "SetLevel" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType, typeof(object[]) }));
+            .FirstOrDefault(method => method.Name == "SetLevel" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { facadeHandleType, typeof(object[]) }));
         Assert(facadeAs is not null, "Generated type-scoped facade should expose As.");
+        Assert(facadeHandleType.GetProperty("HasValue") is not null, "Generated type-scoped facade Handle should expose HasValue.");
+        Assert(facadeHandleType.GetProperty("Instance") is not null, "Generated type-scoped facade Handle should expose Instance.");
         Assert(facadeGetScale is not null, "Generated type-scoped facade should expose member-name getter methods.");
         Assert(facadeGetScaleValue is not null, "Generated type-scoped facade should expose typed value getters.");
         Assert(facadeTrySetScale is not null, "Generated type-scoped facade should expose member-name setters.");
         Assert(facadeSetLevel is not null, "Generated type-scoped facade should expose method-name invokers.");
         object facadeHandle = facadeAs!.Invoke(null, [hud]) ?? throw new InvalidOperationException("HUD facade As should return a handle.");
+        Assert(facadeHandleType.IsInstanceOfType(facadeHandle), "Generated type-scoped facade As should return the nested facade Handle type.");
+        Assert(facadeHandleType.GetProperty("HasValue")?.GetValue(facadeHandle) is true, "Generated type-scoped facade Handle should report a non-empty value.");
+        Assert(ReferenceEquals(facadeHandleType.GetProperty("Instance")?.GetValue(facadeHandle), hud), "Generated type-scoped facade Handle should retain the backend instance.");
         Assert(facadeTrySetScale!.Invoke(null, [facadeHandle, "55"]) is true, "Generated type-scoped facade setter should write values.");
         Assert(facadeGetScale!.Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade getter should read values.");
         Assert(facadeGetScaleValue!.MakeGenericMethod(typeof(int)).Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade value getter should preserve typed convenience.");
