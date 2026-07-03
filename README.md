@@ -143,6 +143,22 @@ Use `new` to create a backend-neutral mod scaffold. Use `init` when you already 
 
 Use `--apply` only after reviewing the dry-run output.
 
+## Backend-neutral member access
+
+`S1InteropMember` helpers still use reflection under the hood, but generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
+
+```csharp
+S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.LandVehicleTag> vehicle =
+    S1Interop.Vehicles.LandVehicle.As(rawVehicle);
+
+if (vehicle.HasValue)
+{
+    float? throttle = S1Interop.Vehicles.LandVehicle.GetCurrentThrottleValue<float>(vehicle);
+}
+```
+
+Prefer type-scoped facades such as `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
+
 ## Install as a local tool
 
 Until packages are published, pack and install from a local source:

@@ -636,6 +636,7 @@ internal sealed partial class S1InteropFixtureTests
         Type memberRegistryType = assembly.GetType("S1Interop.Generated.S1InteropMemberRegistry", throwOnError: true)!;
         Type objectCastType = assembly.GetType("S1Interop.Generated.S1InteropObjectCast", throwOnError: true)!;
         Type delegateBridgeType = assembly.GetType("S1Interop.Generated.S1InteropDelegateBridge", throwOnError: true)!;
+        Type hudFacadeType = assembly.GetType("S1Interop.UI.HUD", throwOnError: true)!;
         Type memberKindType = assembly.GetTypes().Single(type => type.Name == "S1InteropMemberKind");
 
         object? backend = runtimeType.GetProperty("Backend")?.GetValue(null);
@@ -676,13 +677,77 @@ internal sealed partial class S1InteropFixtureTests
         Assert(string.Equals(invokeHudOverload!.Invoke(null, [hud, "SetLevel", new[] { "int", "string&" }, facadeOverloadArgs]) as string, "done", StringComparison.Ordinal), "Generated alias-level overload invoker should route through cached parameter-specific member lookup.");
         Assert(facadeOverloadArgs[1] is "il2cpp:facade-overload", "Generated alias-level overload invoker should preserve by-ref copy-back behavior.");
 
+        Type hudTagType = typeRegistryType.GetNestedType("HudTag") ?? throw new InvalidOperationException("Generated type registry should expose HudTag.");
+        Type handleType = assembly.GetType("S1Interop.Generated.S1InteropObject`1", throwOnError: true)!.MakeGenericType(hudTagType);
+        MethodInfo? tryAsHud = typeRegistryType.GetMethod("TryAsHud");
+        MethodInfo? asHud = typeRegistryType.GetMethod("AsHud", [typeof(object)]);
+        Assert(tryAsHud is not null, "Generated type registry should expose TryAsHud.");
+        Assert(asHud is not null, "Generated type registry should expose AsHud.");
+        object?[] typedHandleArgs = [hud, null];
+        Assert(tryAsHud!.Invoke(null, typedHandleArgs) is true, "Generated typed handle helper should accept the matching backend object.");
+        object typedHud = typedHandleArgs[1] ?? throw new InvalidOperationException("TryAsHud should return a typed handle.");
+        Assert(handleType.IsInstanceOfType(typedHud), "Generated typed handle should use the alias-specific tag type.");
+        Assert(handleType.GetProperty("HasValue")?.GetValue(typedHud) is true, "Generated typed handle should report a non-null value.");
+        Assert(ReferenceEquals(handleType.GetProperty("Instance")?.GetValue(typedHud), hud), "Generated typed handle should retain the original backend object.");
+        object?[] wrongHandleArgs = [new object(), null];
+        Assert(tryAsHud.Invoke(null, wrongHandleArgs) is false, "Generated typed handle helper should reject unrelated objects.");
+        object? missingHandle = asHud!.Invoke(null, [new object()]);
+        Assert(missingHandle is not null && handleType.GetProperty("HasValue")?.GetValue(missingHandle) is false, "Generated AsHud should return an empty handle for unrelated objects.");
+
+        MethodInfo? getHudTyped = typeRegistryType.GetMethod("GetHud", [handleType, typeof(string)]);
+        MethodInfo? trySetHudTyped = typeRegistryType.GetMethod("TrySetHud", [handleType, typeof(string), typeof(object)]);
+        MethodInfo? invokeHudTyped = typeRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "InvokeHud" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType, typeof(string), typeof(object[]) }));
+        Assert(getHudTyped is not null, "Generated type registry should expose a typed-handle GetHud helper.");
+        Assert(trySetHudTyped is not null, "Generated type registry should expose a typed-handle TrySetHud helper.");
+        Assert(invokeHudTyped is not null, "Generated type registry should expose a typed-handle InvokeHud helper.");
+        Assert(trySetHudTyped!.Invoke(null, [typedHud, "Scale", "33"]) is true, "Generated typed-handle setter should write values through the member registry.");
+        Assert(getHudTyped!.Invoke(null, [typedHud, "Scale"]) is 33, "Generated typed-handle getter should read values through the member registry.");
+        object?[] typedFacadeArgs = ["34", "typed-facade"];
+        Assert(string.Equals(invokeHudTyped!.Invoke(null, [typedHud, "SetLevel", typedFacadeArgs]) as string, "done", StringComparison.Ordinal), "Generated typed-handle invoker should route through the member registry.");
+        Assert(typedFacadeArgs[1] is "il2cpp:typed-facade", "Generated typed-handle invoker should preserve by-ref copy-back behavior.");
+
+        MethodInfo? facadeAs = hudFacadeType.GetMethod("As", [typeof(object)]);
+        MethodInfo? facadeGetScale = hudFacadeType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
+        MethodInfo? facadeGetScaleValue = hudFacadeType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
+        MethodInfo? facadeTrySetScale = hudFacadeType.GetMethod("TrySetScale", [handleType, typeof(object)]);
+        MethodInfo? facadeSetLevel = hudFacadeType.GetMethods()
+            .FirstOrDefault(method => method.Name == "SetLevel" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType, typeof(object[]) }));
+        Assert(facadeAs is not null, "Generated type-scoped facade should expose As.");
+        Assert(facadeGetScale is not null, "Generated type-scoped facade should expose member-name getter methods.");
+        Assert(facadeGetScaleValue is not null, "Generated type-scoped facade should expose typed value getters.");
+        Assert(facadeTrySetScale is not null, "Generated type-scoped facade should expose member-name setters.");
+        Assert(facadeSetLevel is not null, "Generated type-scoped facade should expose method-name invokers.");
+        object facadeHandle = facadeAs!.Invoke(null, [hud]) ?? throw new InvalidOperationException("HUD facade As should return a handle.");
+        Assert(facadeTrySetScale!.Invoke(null, [facadeHandle, "55"]) is true, "Generated type-scoped facade setter should write values.");
+        Assert(facadeGetScale!.Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade getter should read values.");
+        Assert(facadeGetScaleValue!.MakeGenericMethod(typeof(int)).Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade value getter should preserve typed convenience.");
+        object?[] facadeTypeArgs = ["56", "typed-facade-class"];
+        Assert(string.Equals(facadeSetLevel!.Invoke(null, [facadeHandle, facadeTypeArgs]) as string, "done", StringComparison.Ordinal), "Generated type-scoped facade method should route through member registry.");
+        Assert(facadeTypeArgs[1] is "il2cpp:typed-facade-class", "Generated type-scoped facade method should preserve by-ref copy-back behavior.");
+
         MethodInfo? trySetScale = memberRegistryType.GetMethod("TrySetHudScale", [typeof(object), typeof(object)]);
         Assert(trySetScale is not null, "Generated member registry should expose TrySetHudScale.");
         object? setResult = trySetScale!.Invoke(null, [hud, "42"]);
         Assert(setResult is true, "Generated field setter should convert string values to the reflected integer field type.");
 
+        MethodInfo? getScaleTyped = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetHudScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
+        MethodInfo? getScaleValueTyped = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetHudScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
+        MethodInfo? trySetScaleTyped = memberRegistryType.GetMethod("TrySetHudScale", [handleType, typeof(object)]);
+        Assert(getScaleTyped is not null, "Generated member registry should expose a typed-handle GetHudScale helper.");
+        Assert(getScaleValueTyped is not null, "Generated member registry should expose a typed-handle GetHudScaleValue helper.");
+        Assert(trySetScaleTyped is not null, "Generated member registry should expose a typed-handle TrySetHudScale helper.");
+        Assert(trySetScaleTyped!.Invoke(null, [typedHud, "44"]) is true, "Generated typed-handle member setter should write values.");
+        Assert(getScaleTyped!.Invoke(null, [typedHud]) is 44, "Generated typed-handle member getter should read values.");
+        object? typedScaleValue = getScaleValueTyped!.MakeGenericMethod(typeof(int)).Invoke(null, [typedHud]);
+        Assert(typedScaleValue is 44, $"Generated typed-handle value getter should preserve value-type convenience. Result={typedScaleValue}");
+
         object? scale = hud.GetType().GetField("Scale")?.GetValue(hud);
-        Assert(scale is 42, $"Generated field setter should update the fake Il2Cpp field. Scale={scale}");
+        Assert(scale is 44, $"Generated field setter should update the fake Il2Cpp field. Scale={scale}");
 
         object fieldKind = Enum.Parse(memberKindType, "Field");
         MethodInfo? getInstanceValue = memberRegistryType.GetMethods()
@@ -692,7 +757,7 @@ internal sealed partial class S1InteropFixtureTests
         Assert(getInstanceValue is not null, "Generated member registry should expose typed GetInstanceValue.");
         Assert(trySetInstanceValue is not null, "Generated member registry should expose typed TrySetInstanceValue.");
         object? dynamicScale = getInstanceValue!.Invoke(null, [hud, "Scale", fieldKind]);
-        Assert(dynamicScale is 42, $"Generated dynamic instance getter should read from the fake Il2Cpp object. Scale={dynamicScale}");
+        Assert(dynamicScale is 44, $"Generated dynamic instance getter should read from the fake Il2Cpp object. Scale={dynamicScale}");
         object? dynamicSetResult = trySetInstanceValue!.Invoke(null, [hud, "Scale", "99", fieldKind]);
         Assert(dynamicSetResult is true, "Generated dynamic instance setter should convert values and write through cached instance member lookup.");
         Assert(hud.GetType().GetField("Scale")?.GetValue(hud) is 99, "Generated dynamic instance setter should update the fake Il2Cpp field.");
