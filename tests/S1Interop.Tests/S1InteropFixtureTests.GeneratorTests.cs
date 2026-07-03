@@ -1399,6 +1399,16 @@ internal sealed partial class S1InteropFixtureTests
                         public static Type? WeedTypeByName => Type.GetType("ScheduleOne.Product.WeedDefinition", false);
                         public static Type? MoneyManagerType => AccessTools.TypeByName("Il2CppScheduleOne.Money.MoneyManager");
                         public static ScheduleOne.Product.WeedDefinition? Find() => null;
+
+                        public static void RunConsoleCommand()
+                        {
+                            var commandList = new Il2CppSystem.Collections.Generic.List<string>();
+                            commandList.Add("rain");
+
+                            var command = new Il2CppScheduleOne.Console.SetWeather();
+                            command.Execute(commandList);
+                            new Il2CppScheduleOne.Console.ClearTrash().Execute(null);
+                        }
                     }
                 }
                 """);
@@ -1418,6 +1428,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_string_type_lookups"),
                 "ScheduleOne string type lookup calls should plan a backend-neutral registry rewrite.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_type_facade_invocations"),
+                "Simple ScheduleOne object creation and instance calls should plan a backend-neutral type facade rewrite.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
@@ -1426,6 +1439,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_string_type_lookups"),
                 "Migration apply should rewrite ScheduleOne string type lookup calls.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_type_facade_invocations"),
+                "Migration apply should rewrite simple ScheduleOne object creation and instance calls.");
             Assert(File.Exists(generatedFacade), "Migration apply should generate the SDK facade for type aliases.");
 
             string migratedSource = File.ReadAllText(tempSource);
@@ -1440,9 +1456,17 @@ internal sealed partial class S1InteropFixtureTests
                 migratedSource.Contains("Type? MoneyManagerType => S1Interop.Generated.S1InteropTypeRegistry.MoneyManager;", StringComparison.Ordinal),
                 "Migration should rewrite obvious string-based game type lookups to generated backend-neutral registry properties.");
             Assert(
+                migratedSource.Contains("var commandList = new System.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
+                migratedSource.Contains("var command = S1Interop.Console.SetWeather.Create();", StringComparison.Ordinal) &&
+                migratedSource.Contains("S1Interop.Console.SetWeather.Invoke(command, \"Execute\", commandList);", StringComparison.Ordinal) &&
+                migratedSource.Contains("S1Interop.Console.ClearTrash.Invoke(S1Interop.Console.ClearTrash.Create(), \"Execute\", (object?)null);", StringComparison.Ordinal),
+                $"Migration should route simple ScheduleOne command construction and invocation through generated type facades. Migrated source:{Environment.NewLine}{migratedSource}");
+            Assert(
                 !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(Il2CppScheduleOne.UI.HUD)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
+                !migratedSource.Contains("new Il2CppSystem.Collections.Generic.List<string>()", StringComparison.Ordinal) &&
+                !migratedSource.Contains("new Il2CppScheduleOne.Console.SetWeather()", StringComparison.Ordinal) &&
                 !migratedSource.Contains("ScheduleOne.Product.WeedDefinition? Find()", StringComparison.Ordinal),
                 "Migration should remove fully-qualified ScheduleOne type tokens from code when the alias is unique.");
             Assert(
@@ -1460,6 +1484,10 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Money.MoneyManager\", Alias = \"MoneyManager\", Il2CppTypeName = \"Il2CppScheduleOne.Money.MoneyManager\")]", StringComparison.Ordinal),
                 "Generated facade should register string-discovered type lookup aliases for backend-neutral reflection cache generation.");
+            Assert(
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Console.SetWeather\", Alias = \"SetWeather\", Il2CppTypeName = \"Il2CppScheduleOne.Console.SetWeather\")]", StringComparison.Ordinal) &&
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Console.ClearTrash\", Alias = \"ClearTrash\", Il2CppTypeName = \"Il2CppScheduleOne.Console.ClearTrash\")]", StringComparison.Ordinal),
+                "Generated facade should register type-facade invocation targets for backend-neutral command construction.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");

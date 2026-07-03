@@ -238,6 +238,17 @@ public sealed class MigrationPlanner
                 true,
                 "Generate S1Interop global using facade for detected ScheduleOne namespaces so source can move away from manual Mono/IL2CPP using blocks."));
 
+            foreach (string sourceFile in SdkTypeFacadeInvocationRewriter.FindFilesWithRewritableInvocations(project.ProjectPath, facadePlan.TypeAliases))
+            {
+                operations.Add(new MigrationOperation(
+                    "rewrite_scheduleone_type_facade_invocations",
+                    sourceFile,
+                    null,
+                    "low",
+                    true,
+                    "Rewrite simple ScheduleOne object construction and instance calls through generated backend-neutral type facades."));
+            }
+
             foreach (string sourceFile in SdkTypeAliasRewriter.FindFilesWithRewritableTypeAliases(project.ProjectPath, facadePlan.TypeAliases))
             {
                 operations.Add(new MigrationOperation(
