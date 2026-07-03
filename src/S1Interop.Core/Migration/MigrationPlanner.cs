@@ -248,6 +248,17 @@ public sealed class MigrationPlanner
                     true,
                     "Rewrite unique fully-qualified ScheduleOne type references to generated S1Interop type aliases."));
             }
+
+            foreach (string sourceFile in SdkStringTypeLookupRewriter.FindFilesWithRewritableTypeLookups(project.ProjectPath, facadePlan.TypeAliases))
+            {
+                operations.Add(new MigrationOperation(
+                    "rewrite_scheduleone_string_type_lookups",
+                    sourceFile,
+                    null,
+                    "low",
+                    true,
+                    "Rewrite simple ScheduleOne string type lookups to generated backend-neutral type registry properties."));
+            }
         }
 
         if (options.IncludeSourceRisks && project.SourceInterop is not null && project.SourceInterop.SourceRisks.Count > 0)

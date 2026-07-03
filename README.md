@@ -12,7 +12,7 @@ It is an alpha tool. It can already inspect real mod projects, scaffold dual-run
 - Add IL2CPP configurations for Mono-only projects when `migrate --dual-runtime` can infer the source Mono configuration.
 - Update a sibling `.sln` so generated configurations appear in Visual Studio.
 - Move machine-specific game paths into ignored `local.build.props` scaffolding.
-- Rewrite simple ScheduleOne using directives, generated type facades, UnityEvent listener calls, Harmony overload bindings, and other handled source patterns.
+- Rewrite simple ScheduleOne using directives, generated type facades, string-based game type lookups, UnityEvent listener calls, Harmony overload bindings, and other handled source patterns.
 - Generate opt-in Roslyn compile-time helpers for backend-specific type-name/reflection caches.
 - Generate a source-risk report for cases that still need deliberate review, such as Harmony transpilers or unsafe delegate surfaces.
 - Run the migration in a throwaway sandbox with `verify-migration` before touching the real project.
@@ -74,9 +74,9 @@ tests/S1Interop.Tests/
 Additional project docs:
 
 - [`AGENTS.md`](AGENTS.md) - repository instructions for coding agents and automation.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) - module boundaries and migration flow.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) - local development and contribution workflow.
-- [`TESTING.md`](TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
+- [`docs/architecture.md`](docs/architecture.md) - module boundaries and migration flow.
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) - local development and contribution workflow.
+- [`docs/TESTING.md`](docs/TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
 
 ## Compile-time generators
 
@@ -141,6 +141,8 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migratio
 ```
 
 Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
+
+Migration can also route simple string-based game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` can become `S1Interop.Generated.S1InteropTypeRegistry.NPCInventory`, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
 
 When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type/member strings during compilation. Missing type names report `S1I001`; member declarations with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
 

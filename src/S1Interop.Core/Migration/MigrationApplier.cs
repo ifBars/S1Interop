@@ -87,6 +87,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("generate_source_risk_report", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("conditionalize_scheduleone_usings", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_fully_qualified_scheduleone_types", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_scheduleone_string_type_lookups", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_unity_event_listeners", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_delegate_assignments", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_delegate_arguments", StringComparison.OrdinalIgnoreCase) &&
@@ -122,6 +123,7 @@ public sealed class MigrationApplier
                 "install_s1interop_generator_package" => ApplyS1InteropGeneratorPackageReference(document),
                 "conditionalize_scheduleone_usings" => ApplyScheduleOneUsingConditionalization(operation.FilePath, backupRoot, fileChanges),
                 "rewrite_fully_qualified_scheduleone_types" => ApplyFullyQualifiedScheduleOneTypeRewrite(projectPath, operation.FilePath, backupRoot, fileChanges),
+                "rewrite_scheduleone_string_type_lookups" => ApplyScheduleOneStringTypeLookupRewrite(projectPath, operation.FilePath, backupRoot, fileChanges),
                 "injected_type_missing_registertype" => ApplyInjectedTypeRegistration(operation, backupRoot, fileChanges),
                 "injected_type_missing_intptr_constructor" => ApplyInjectedTypeIntPtrConstructor(operation, backupRoot, fileChanges),
                 "injected_member_requires_hidefromil2cpp" => ApplyHideFromIl2CppAttribute(operation, backupRoot, fileChanges),
@@ -327,6 +329,7 @@ public sealed class MigrationApplier
             "generate_backend_neutral_starter" => 10,
             "install_s1interop_generator_package" => 10,
             "rewrite_fully_qualified_scheduleone_types" => 20,
+            "rewrite_scheduleone_string_type_lookups" => 20,
             "conditionalize_scheduleone_usings" => 20,
             "rewrite_unity_event_listeners" => 20,
             "rewrite_harmony_overload_bindings" => 20,
@@ -1677,6 +1680,38 @@ public sealed class MigrationApplier
 
         string original = File.ReadAllText(sourcePath);
         string rewritten = SdkTypeAliasRewriter.RewriteSource(original, plan.TypeAliases);
+        if (string.Equals(original, rewritten, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllText(sourcePath, rewritten, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
+    private static bool ApplyScheduleOneStringTypeLookupRewrite(
+        string projectPath,
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        var generator = new SdkFacadeGenerator();
+        ProjectAnalysis project = AnalyzeProject(projectPath);
+        SdkFacadePlan plan = generator.Plan(project);
+        if (plan.TypeAliases.Count == 0)
+        {
+            return false;
+        }
+
+        string original = File.ReadAllText(sourcePath);
+        string rewritten = SdkStringTypeLookupRewriter.RewriteSource(original, plan.TypeAliases);
         if (string.Equals(original, rewritten, StringComparison.Ordinal))
         {
             return false;

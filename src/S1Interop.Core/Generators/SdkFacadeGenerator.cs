@@ -135,6 +135,7 @@ public sealed class SdkFacadeGenerator
 
         var monoTypesByAlias = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         var explicitSourceAliasKeys = new HashSet<string>(StringComparer.Ordinal);
+        var globalUsingCandidateKeys = new HashSet<string>(StringComparer.Ordinal);
         var suppressGlobalUsingKeys = new HashSet<string>(StringComparer.Ordinal);
         HashSet<string> localTypeNames = DiscoverLocalTypeNames(projectDirectory);
         ReferenceTypeCatalog referenceTypes = DiscoverReferenceTypes(project);
@@ -166,34 +167,30 @@ public sealed class SdkFacadeGenerator
                 explicitSourceAliasKeys.Add(GetAliasKey(alias, monoType));
             }
 
-            foreach (Match match in FullyQualifiedScheduleOneTypeRegex.Matches(source))
+            foreach (CSharpSourceSegment segment in CSharpSourceScanner.EnumerateCodeSegments(source))
             {
-                string type = match.Groups["type"].Value;
-                if (IsUsingDirectiveMatch(source, match.Index))
+                foreach (Match match in FullyQualifiedScheduleOneTypeRegex.Matches(segment.Text))
                 {
-                    continue;
-                }
+                    int sourceIndex = segment.StartIndex + match.Index;
+                    if (IsUsingDirectiveMatch(source, sourceIndex))
+                    {
+                        continue;
+                    }
 
+                    string monoType = ToMonoTypeName(match.Groups["type"].Value);
+                    string alias = GetSimpleTypeName(monoType);
+                    if (TryAddAliasCandidate(monoTypesByAlias, alias, monoType))
+                    {
+                        globalUsingCandidateKeys.Add(GetAliasKey(alias, monoType));
+                    }
+                }
+            }
+
+            foreach (string type in DiscoverStringLiteralTypeNames(source))
+            {
                 string monoType = ToMonoTypeName(type);
-                string[] parts = monoType.Split('.');
-                string alias = parts.Last();
-                if (string.IsNullOrWhiteSpace(alias))
-                {
-                    continue;
-                }
-
-                if (parts.Length >= 2 && string.Equals(parts[^2], alias, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (!monoTypesByAlias.TryGetValue(alias, out SortedSet<string>? monoTypes))
-                {
-                    monoTypes = new SortedSet<string>(StringComparer.Ordinal);
-                    monoTypesByAlias[alias] = monoTypes;
-                }
-
-                monoTypes.Add(monoType);
+                string alias = GetSimpleTypeName(monoType);
+                TryAddAliasCandidate(monoTypesByAlias, alias, monoType);
             }
 
             foreach (SdkTypeAlias alias in DiscoverNamespaceScopedAliases(source, localTypeNames, referenceTypes.AllTypes))
@@ -210,7 +207,8 @@ public sealed class SdkFacadeGenerator
             {
                 string monoType = pair.Value.Single();
                 string aliasKey = GetAliasKey(pair.Key, monoType);
-                bool generateGlobalUsing = !explicitSourceAliasKeys.Contains(aliasKey) &&
+                bool generateGlobalUsing = globalUsingCandidateKeys.Contains(aliasKey) &&
+                                           !explicitSourceAliasKeys.Contains(aliasKey) &&
                                            !suppressGlobalUsingKeys.Contains(aliasKey);
                 return new SdkTypeAlias(pair.Key, monoType, $"Il2Cpp{monoType}", generateGlobalUsing);
             })
@@ -446,6 +444,25 @@ public sealed class SdkFacadeGenerator
         string alias,
         string monoType)
     {
+        TryAddAliasCandidate(monoTypesByAlias, alias, monoType);
+    }
+
+    private static bool TryAddAliasCandidate(
+        Dictionary<string, SortedSet<string>> monoTypesByAlias,
+        string alias,
+        string monoType)
+    {
+        if (string.IsNullOrWhiteSpace(alias))
+        {
+            return false;
+        }
+
+        string[] parts = monoType.Split('.');
+        if (parts.Length >= 2 && string.Equals(parts[^2], alias, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         if (!monoTypesByAlias.TryGetValue(alias, out SortedSet<string>? monoTypes))
         {
             monoTypes = new SortedSet<string>(StringComparer.Ordinal);
@@ -453,6 +470,7 @@ public sealed class SdkFacadeGenerator
         }
 
         monoTypes.Add(monoType);
+        return true;
     }
 
     private static string ToMonoTypeName(string type) =>
@@ -524,6 +542,17 @@ public sealed class SdkFacadeGenerator
         return prefix.TrimStart().StartsWith("using ", StringComparison.Ordinal);
     }
 
+    private static IEnumerable<string> DiscoverStringLiteralTypeNames(string source)
+    {
+        foreach (string literal in CSharpSourceScanner.EnumerateStringLiteralValues(source))
+        {
+            foreach (Match match in FullyQualifiedScheduleOneTypeRegex.Matches(literal))
+            {
+                yield return match.Groups["type"].Value;
+            }
+        }
+    }
+
     private static bool IsGeneratedOrBuildOutput(string projectDirectory, string file)
     {
         return WorkspaceTraversal.HasExcludedPathPart(projectDirectory, file);
@@ -538,4 +567,5 @@ public sealed class SdkFacadeGenerator
         HashSet<string> Il2CppTypes,
         bool HasMonoSurface,
         bool HasIl2CppSurface);
+
 }

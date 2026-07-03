@@ -1631,6 +1631,10 @@ internal sealed partial class S1InteropFixtureTests
                 facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.PlayerCamera\", Alias = \"GamePlayerCamera\", Il2CppTypeName = \"Il2CppScheduleOne.PlayerScripts.PlayerCamera\")]", StringComparison.Ordinal),
                 "BarsGraphics SDK generation should infer concrete facade declarations from source aliases and local reference metadata.");
             Assert(
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Interaction.InteractionManager\", Alias = \"InteractionManager\", Il2CppTypeName = \"Il2CppScheduleOne.Interaction.InteractionManager\")]", StringComparison.Ordinal) &&
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Weather.EnvironmentManager\", Alias = \"EnvironmentManager\", Il2CppTypeName = \"Il2CppScheduleOne.Weather.EnvironmentManager\")]", StringComparison.Ordinal),
+                "BarsGraphics SDK generation should infer registry declarations from paired string type names used by reflection-based runtime throttles.");
+            Assert(
                 !facadeSource.Contains("global using GameHud =", StringComparison.Ordinal) &&
                 !facadeSource.Contains("global using GamePlayerCamera =", StringComparison.Ordinal),
                 "Source-declared backend aliases should not be duplicated as broad generated global aliases.");

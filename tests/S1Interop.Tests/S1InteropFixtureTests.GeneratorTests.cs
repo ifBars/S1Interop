@@ -1301,6 +1301,7 @@ internal sealed partial class S1InteropFixtureTests
                         private static ScheduleOne.Product.WeedDefinition? weed;
                         private static ScheduleOne.Persistence.Datas.QuestEntryData? questEntry;
                         private static ScheduleOne.Other.QuestEntryData? collidingQuestEntry;
+                        private static Type? npcInventoryType = AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory");
                     }
                 }
                 """);
@@ -1334,6 +1335,13 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 plan.TypeAliases.All(alias => alias.Alias != "QuestEntryData"),
                 "Facade plan should skip aliases when multiple fully-qualified types share the same simple name.");
+            Assert(
+                plan.TypeAliases.Any(alias =>
+                    alias.Alias == "NPCInventory" &&
+                    alias.MonoType == "ScheduleOne.NPCs.NPCInventory" &&
+                    alias.Il2CppType == "Il2CppScheduleOne.NPCs.NPCInventory" &&
+                    !alias.GenerateGlobalUsing),
+                "Facade plan should infer registry aliases from string-held ScheduleOne type lookups without adding broad global aliases.");
             Assert(
                 facadeSource.Contains("global using WeedDefinition = ScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal) &&
                 facadeSource.Contains("global using WeedDefinition = Il2CppScheduleOne.Product.WeedDefinition;", StringComparison.Ordinal),
@@ -1387,6 +1395,8 @@ internal sealed partial class S1InteropFixtureTests
                         public const string VerbatimTypeName = @"ScheduleOne.Product.WeedDefinition";
                         // ScheduleOne.Product.WeedDefinition should remain readable in comments.
                         public static Type WeedType => typeof(ScheduleOne.Product.WeedDefinition);
+                        public static Type? WeedTypeByName => Type.GetType("ScheduleOne.Product.WeedDefinition", false);
+                        public static Type? MoneyManagerType => AccessTools.TypeByName("Il2CppScheduleOne.Money.MoneyManager");
                         public static ScheduleOne.Product.WeedDefinition? Find() => null;
                     }
                 }
@@ -1404,11 +1414,17 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_fully_qualified_scheduleone_types"),
                 "Fully-qualified ScheduleOne types should plan a source rewrite when the alias is unique.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_string_type_lookups"),
+                "ScheduleOne string type lookup calls should plan a backend-neutral registry rewrite.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "rewrite_fully_qualified_scheduleone_types"),
                 "Migration apply should rewrite fully-qualified ScheduleOne type references.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_scheduleone_string_type_lookups"),
+                "Migration apply should rewrite ScheduleOne string type lookup calls.");
             Assert(File.Exists(generatedFacade), "Migration apply should generate the SDK facade for type aliases.");
 
             string migratedSource = File.ReadAllText(tempSource);
@@ -1417,6 +1433,10 @@ internal sealed partial class S1InteropFixtureTests
                 migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
                 migratedSource.Contains("WeedDefinition? Find()", StringComparison.Ordinal),
                 "Migration should replace fully-qualified ScheduleOne type tokens with the generated alias.");
+            Assert(
+                migratedSource.Contains("Type? WeedTypeByName => S1Interop.Generated.S1InteropTypeRegistry.WeedDefinition;", StringComparison.Ordinal) &&
+                migratedSource.Contains("Type? MoneyManagerType => S1Interop.Generated.S1InteropTypeRegistry.MoneyManager;", StringComparison.Ordinal),
+                "Migration should rewrite obvious string-based game type lookups to generated backend-neutral registry properties.");
             Assert(
                 !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("ScheduleOne.Product.WeedDefinition? Find()", StringComparison.Ordinal),
@@ -1433,6 +1453,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Product.WeedDefinition\", Alias = \"WeedDefinition\", Il2CppTypeName = \"Il2CppScheduleOne.Product.WeedDefinition\")]", StringComparison.Ordinal),
                 "Generated facade should register rewritten aliases for backend-neutral reflection cache generation.");
+            Assert(
+                facadeSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Money.MoneyManager\", Alias = \"MoneyManager\", Il2CppTypeName = \"Il2CppScheduleOne.Money.MoneyManager\")]", StringComparison.Ordinal),
+                "Generated facade should register string-discovered type lookup aliases for backend-neutral reflection cache generation.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
