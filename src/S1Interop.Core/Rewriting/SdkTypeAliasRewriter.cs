@@ -172,6 +172,8 @@ public static class SdkTypeAliasRewriter
         string segment = code.ToString();
         foreach (SdkTypeAlias alias in aliases)
         {
+            segment = ReplaceTypeofToken(segment, alias.MonoType, alias.Alias);
+            segment = ReplaceTypeofToken(segment, alias.Il2CppType, alias.Alias);
             segment = ReplaceTypeToken(segment, alias.MonoType, alias.Alias);
             segment = ReplaceTypeToken(segment, alias.Il2CppType, alias.Alias);
         }
@@ -200,6 +202,12 @@ public static class SdkTypeAliasRewriter
     {
         string pattern = $@"(?<![A-Za-z0-9_]){Regex.Escape(typeName)}(?![A-Za-z0-9_])";
         return Regex.Replace(code, pattern, alias);
+    }
+
+    private static string ReplaceTypeofToken(string code, string typeName, string alias)
+    {
+        string pattern = $@"\btypeof\s*\(\s*{Regex.Escape(typeName)}\s*\)";
+        return Regex.Replace(code, pattern, $"S1Interop.Generated.S1InteropTypeRegistry.{alias}");
     }
 
     private static bool IsGeneratedFacade(string file) =>

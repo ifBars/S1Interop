@@ -1395,6 +1395,7 @@ internal sealed partial class S1InteropFixtureTests
                         public const string VerbatimTypeName = @"ScheduleOne.Product.WeedDefinition";
                         // ScheduleOne.Product.WeedDefinition should remain readable in comments.
                         public static Type WeedType => typeof(ScheduleOne.Product.WeedDefinition);
+                        public static Type HudType => typeof(Il2CppScheduleOne.UI.HUD);
                         public static Type? WeedTypeByName => Type.GetType("ScheduleOne.Product.WeedDefinition", false);
                         public static Type? MoneyManagerType => AccessTools.TypeByName("Il2CppScheduleOne.Money.MoneyManager");
                         public static ScheduleOne.Product.WeedDefinition? Find() => null;
@@ -1430,15 +1431,18 @@ internal sealed partial class S1InteropFixtureTests
             string migratedSource = File.ReadAllText(tempSource);
             string facadeSource = File.ReadAllText(generatedFacade);
             Assert(
-                migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
+                migratedSource.Contains("Type WeedType => S1Interop.Generated.S1InteropTypeRegistry.WeedDefinition;", StringComparison.Ordinal) &&
+                migratedSource.Contains("Type HudType => S1Interop.Generated.S1InteropTypeRegistry.HUD;", StringComparison.Ordinal) &&
                 migratedSource.Contains("WeedDefinition? Find()", StringComparison.Ordinal),
-                "Migration should replace fully-qualified ScheduleOne type tokens with the generated alias.");
+                "Migration should route typeof game type lookups through the generated registry while keeping ordinary type positions on generated aliases.");
             Assert(
                 migratedSource.Contains("Type? WeedTypeByName => S1Interop.Generated.S1InteropTypeRegistry.WeedDefinition;", StringComparison.Ordinal) &&
                 migratedSource.Contains("Type? MoneyManagerType => S1Interop.Generated.S1InteropTypeRegistry.MoneyManager;", StringComparison.Ordinal),
                 "Migration should rewrite obvious string-based game type lookups to generated backend-neutral registry properties.");
             Assert(
                 !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&
+                !migratedSource.Contains("typeof(Il2CppScheduleOne.UI.HUD)", StringComparison.Ordinal) &&
+                !migratedSource.Contains("typeof(WeedDefinition)", StringComparison.Ordinal) &&
                 !migratedSource.Contains("ScheduleOne.Product.WeedDefinition? Find()", StringComparison.Ordinal),
                 "Migration should remove fully-qualified ScheduleOne type tokens from code when the alias is unique.");
             Assert(
