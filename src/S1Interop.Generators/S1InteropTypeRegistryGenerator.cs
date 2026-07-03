@@ -51,6 +51,32 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
     private const string UnityEventBridgeAttributeMetadataName = "S1Interop.S1InteropGenerateUnityEventBridgeAttribute";
     private const string DelegateEventBridgeAttributeMetadataName = "S1Interop.S1InteropGenerateDelegateEventBridgeAttribute";
 
+#pragma warning disable RS2008
+    private static readonly DiagnosticDescriptor TypeNotFoundDiagnostic = new(
+        "S1I001",
+        "S1Interop type was not found",
+        "S1Interop type '{0}' for alias '{1}' was not found in referenced {2} assemblies",
+        "S1Interop",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor MemberOwnerNotFoundDiagnostic = new(
+        "S1I002",
+        "S1Interop member owner was not declared",
+        "S1Interop member '{0}' references owner alias '{1}', but no S1InteropType declaration with that alias was found",
+        "S1Interop",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor MemberNotFoundDiagnostic = new(
+        "S1I003",
+        "S1Interop member was not found",
+        "S1Interop member '{0}' for owner alias '{1}' was not found on type '{2}' in referenced {3} assemblies",
+        "S1Interop",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+#pragma warning restore RS2008
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(static output =>
@@ -66,6 +92,11 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             .Select(static (compilation, _) => GetAssemblyMemberEntries(compilation));
         IncrementalValueProvider<S1InteropBridgeRequests> bridgeRequests = context.CompilationProvider
             .Select(static (compilation, _) => GetBridgeRequests(compilation));
+
+        context.RegisterSourceOutput(context.CompilationProvider, static (sourceContext, compilation) =>
+        {
+            ReportDeclarationDiagnostics(sourceContext, compilation);
+        });
 
         IncrementalValuesProvider<S1InteropTypeEntry> attributedTypeEntries = context.SyntaxProvider
             .CreateSyntaxProvider(
@@ -160,6 +191,201 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             .Select(entry => entry!.Value)
             .ToImmutableArray();
     }
+
+    private static void ReportDeclarationDiagnostics(SourceProductionContext context, Compilation compilation)
+    {
+        ImmutableArray<S1InteropTypeDiagnosticTarget> typeTargets = GetDeclaredTypeDiagnosticTargets(compilation);
+        ImmutableArray<S1InteropMemberDiagnosticTarget> memberTargets = GetDeclaredMemberDiagnosticTargets(compilation);
+        if (typeTargets.IsDefaultOrEmpty && memberTargets.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        bool hasMonoSurface = HasRuntimeSurface(compilation, RuntimeBackend.Mono);
+        bool hasIl2CppSurface = HasRuntimeSurface(compilation, RuntimeBackend.Il2Cpp);
+        if (!hasMonoSurface && !hasIl2CppSurface)
+        {
+            return;
+        }
+
+        Dictionary<string, S1InteropTypeEntry> entriesByAlias = typeTargets
+            .Select(target => target.Entry)
+            .GroupBy(entry => entry.Alias, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (S1InteropTypeDiagnosticTarget target in typeTargets)
+        {
+            if (hasMonoSurface && compilation.GetTypeByMetadataName(target.Entry.MonoTypeName) is null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    TypeNotFoundDiagnostic,
+                    target.Location,
+                    target.Entry.MonoTypeName,
+                    target.Entry.Alias,
+                    "Mono"));
+            }
+
+            if (hasIl2CppSurface && compilation.GetTypeByMetadataName(target.Entry.Il2CppTypeName) is null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    TypeNotFoundDiagnostic,
+                    target.Location,
+                    target.Entry.Il2CppTypeName,
+                    target.Entry.Alias,
+                    "IL2CPP"));
+            }
+        }
+
+        foreach (S1InteropMemberDiagnosticTarget target in memberTargets)
+        {
+            if (!entriesByAlias.TryGetValue(target.Entry.OwnerAlias, out S1InteropTypeEntry ownerEntry))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    MemberOwnerNotFoundDiagnostic,
+                    target.Location,
+                    target.Entry.MemberName,
+                    target.Entry.OwnerAlias));
+                continue;
+            }
+
+            if (hasMonoSurface)
+            {
+                ReportMissingMemberDiagnostic(context, compilation, target, ownerEntry.MonoTypeName, "Mono");
+            }
+
+            if (hasIl2CppSurface)
+            {
+                ReportMissingMemberDiagnostic(context, compilation, target, ownerEntry.Il2CppTypeName, "IL2CPP");
+            }
+        }
+    }
+
+    private static ImmutableArray<S1InteropTypeDiagnosticTarget> GetDeclaredTypeDiagnosticTargets(Compilation compilation)
+    {
+        INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(AttributeMetadataName);
+        if (attributeType is null)
+        {
+            return ImmutableArray<S1InteropTypeDiagnosticTarget>.Empty;
+        }
+
+        var targets = ImmutableArray.CreateBuilder<S1InteropTypeDiagnosticTarget>();
+        foreach (AttributeData attribute in compilation.Assembly.GetAttributes().Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType)))
+        {
+            S1InteropTypeEntry? entry = TryCreateEntry(attribute);
+            if (entry is not null)
+            {
+                targets.Add(new S1InteropTypeDiagnosticTarget(entry.Value, GetAttributeLocation(attribute)));
+            }
+        }
+
+        foreach (INamedTypeSymbol typeSymbol in GetSourceTypeSymbols(compilation))
+        {
+            AttributeData? attribute = typeSymbol.GetAttributes()
+                .FirstOrDefault(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType));
+            S1InteropTypeEntry? entry = attribute is null ? null : TryCreateEntry(attribute);
+            if (entry is null)
+            {
+                continue;
+            }
+
+            S1InteropTypeEntry resolvedEntry = string.IsNullOrWhiteSpace(entry.Value.Alias)
+                ? entry.Value.WithAlias(SanitizeIdentifier(typeSymbol.Name))
+                : entry.Value;
+            targets.Add(new S1InteropTypeDiagnosticTarget(resolvedEntry, GetAttributeLocation(attribute!)));
+        }
+
+        return targets.Distinct(S1InteropTypeDiagnosticTargetComparer.Instance).ToImmutableArray();
+    }
+
+    private static ImmutableArray<S1InteropMemberDiagnosticTarget> GetDeclaredMemberDiagnosticTargets(Compilation compilation)
+    {
+        INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(MemberAttributeMetadataName);
+        if (attributeType is null)
+        {
+            return ImmutableArray<S1InteropMemberDiagnosticTarget>.Empty;
+        }
+
+        return compilation.Assembly.GetAttributes()
+            .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
+            .Select(attribute => (Entry: TryCreateMemberEntry(attribute), Location: GetAttributeLocation(attribute)))
+            .Where(target => target.Entry is not null)
+            .Select(target => new S1InteropMemberDiagnosticTarget(target.Entry!.Value, target.Location))
+            .Distinct(S1InteropMemberDiagnosticTargetComparer.Instance)
+            .ToImmutableArray();
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetSourceTypeSymbols(Compilation compilation)
+    {
+        foreach (SyntaxTree syntaxTree in compilation.SyntaxTrees)
+        {
+            SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
+            foreach (TypeDeclarationSyntax typeDeclaration in syntaxTree.GetRoot().DescendantNodes().OfType<TypeDeclarationSyntax>())
+            {
+                if (semanticModel.GetDeclaredSymbol(typeDeclaration) is INamedTypeSymbol typeSymbol)
+                {
+                    yield return typeSymbol;
+                }
+            }
+        }
+    }
+
+    private static Location? GetAttributeLocation(AttributeData attribute) =>
+        attribute.ApplicationSyntaxReference?.GetSyntax() is AttributeSyntax syntax
+            ? syntax.GetLocation()
+            : null;
+
+    private static bool HasRuntimeSurface(Compilation compilation, RuntimeBackend runtime)
+    {
+        string[] probeTypes = runtime == RuntimeBackend.Il2Cpp
+            ? DefaultIl2CppRuntimeProbeTypeNames
+            : DefaultMonoRuntimeProbeTypeNames;
+        return probeTypes.Any(typeName => compilation.GetTypeByMetadataName(typeName) is not null);
+    }
+
+    private static void ReportMissingMemberDiagnostic(
+        SourceProductionContext context,
+        Compilation compilation,
+        S1InteropMemberDiagnosticTarget target,
+        string runtimeTypeName,
+        string runtimeName)
+    {
+        INamedTypeSymbol? ownerType = compilation.GetTypeByMetadataName(runtimeTypeName);
+        if (ownerType is null || HasMember(ownerType, target.Entry))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            MemberNotFoundDiagnostic,
+            target.Location,
+            target.Entry.MemberName,
+            target.Entry.OwnerAlias,
+            runtimeTypeName,
+            runtimeName));
+    }
+
+    private static bool HasMember(INamedTypeSymbol ownerType, S1InteropMemberEntry entry)
+    {
+        IEnumerable<ISymbol> members = ownerType.GetMembers(entry.MemberName);
+        if (entry.IsStatic)
+        {
+            members = members.Where(member => member.IsStatic);
+        }
+
+        return entry.Kind switch
+        {
+            S1InteropMemberKind.Field => members.Any(member => member.Kind == SymbolKind.Field),
+            S1InteropMemberKind.Property => members.Any(member => member.Kind == SymbolKind.Property),
+            S1InteropMemberKind.Method => members.OfType<IMethodSymbol>().Any(method => ParameterCountMatches(method, entry)),
+            _ => members.Any(member =>
+                member.Kind == SymbolKind.Field ||
+                member.Kind == SymbolKind.Property ||
+                (member is IMethodSymbol method && ParameterCountMatches(method, entry)))
+        };
+    }
+
+    private static bool ParameterCountMatches(IMethodSymbol method, S1InteropMemberEntry entry) =>
+        entry.ParameterTypeNames.IsDefaultOrEmpty || method.Parameters.Length == entry.ParameterTypeNames.Length;
 
     private static ImmutableArray<S1InteropMemberEntry> GetAssemblyMemberEntries(Compilation compilation)
     {
@@ -2835,6 +3061,32 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         public ImmutableArray<string> ParameterTypeNames { get; }
     }
 
+    private readonly struct S1InteropTypeDiagnosticTarget
+    {
+        public S1InteropTypeDiagnosticTarget(S1InteropTypeEntry entry, Location? location)
+        {
+            Entry = entry;
+            Location = location;
+        }
+
+        public S1InteropTypeEntry Entry { get; }
+
+        public Location? Location { get; }
+    }
+
+    private readonly struct S1InteropMemberDiagnosticTarget
+    {
+        public S1InteropMemberDiagnosticTarget(S1InteropMemberEntry entry, Location? location)
+        {
+            Entry = entry;
+            Location = location;
+        }
+
+        public S1InteropMemberEntry Entry { get; }
+
+        public Location? Location { get; }
+    }
+
     private sealed class S1InteropTypeEntryComparer : IEqualityComparer<S1InteropTypeEntry>
     {
         public static readonly S1InteropTypeEntryComparer Instance = new();
@@ -2855,6 +3107,17 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                 return hash;
             }
         }
+    }
+
+    private sealed class S1InteropTypeDiagnosticTargetComparer : IEqualityComparer<S1InteropTypeDiagnosticTarget>
+    {
+        public static readonly S1InteropTypeDiagnosticTargetComparer Instance = new();
+
+        public bool Equals(S1InteropTypeDiagnosticTarget x, S1InteropTypeDiagnosticTarget y) =>
+            S1InteropTypeEntryComparer.Instance.Equals(x.Entry, y.Entry);
+
+        public int GetHashCode(S1InteropTypeDiagnosticTarget obj) =>
+            S1InteropTypeEntryComparer.Instance.GetHashCode(obj.Entry);
     }
 
     private sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1InteropMemberEntry>
@@ -2887,5 +3150,16 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
                 return hash;
             }
         }
+    }
+
+    private sealed class S1InteropMemberDiagnosticTargetComparer : IEqualityComparer<S1InteropMemberDiagnosticTarget>
+    {
+        public static readonly S1InteropMemberDiagnosticTargetComparer Instance = new();
+
+        public bool Equals(S1InteropMemberDiagnosticTarget x, S1InteropMemberDiagnosticTarget y) =>
+            S1InteropMemberEntryComparer.Instance.Equals(x.Entry, y.Entry);
+
+        public int GetHashCode(S1InteropMemberDiagnosticTarget obj) =>
+            S1InteropMemberEntryComparer.Instance.GetHashCode(obj.Entry);
     }
 }

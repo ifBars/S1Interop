@@ -88,6 +88,47 @@ internal sealed partial class S1InteropFixtureTests
                 StringComparer.Ordinal);
     }
 
+    private static ImmutableArray<Diagnostic> RunS1InteropGeneratorDiagnostics(
+        string source,
+        IReadOnlyList<MetadataReference> additionalReferences,
+        params string[] symbols)
+    {
+        CSharpParseOptions parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Latest)
+            .WithPreprocessorSymbols(symbols);
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            "SyntheticMod." + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            GetTrustedPlatformReferences().Concat(additionalReferences),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new S1InteropTypeRegistryGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation outputCompilation, out ImmutableArray<Diagnostic> generatorDiagnostics);
+
+        return generatorDiagnostics
+            .Concat(outputCompilation.GetDiagnostics())
+            .ToImmutableArray();
+    }
+
+    private static MetadataReference CreateMetadataReferenceFromSource(string assemblyName, string source)
+    {
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            assemblyName,
+            [CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest))],
+            GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        Microsoft.CodeAnalysis.Emit.EmitResult emitResult = compilation.Emit(stream);
+        Assert(
+            emitResult.Success,
+            $"Synthetic metadata reference {assemblyName} failed to compile: {string.Join(Environment.NewLine, emitResult.Diagnostics)}");
+
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
+
     private static System.Reflection.Assembly CompileAndLoadS1InteropGeneratedAssembly(string source, params string[] symbols)
     {
         return CompileAndLoadS1InteropGeneratedAssembly(source, assemblyName: null, symbols);

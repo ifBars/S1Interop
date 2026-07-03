@@ -300,6 +300,131 @@ internal sealed partial class S1InteropFixtureTests
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
+    private void S1InteropTypeRegistryGeneratorValidatesDeclaredTypesAgainstReferencedGameAssemblies()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.PlayerScripts
+            {
+                public sealed class PlayerCamera
+                {
+                    public static PlayerCamera? Instance { get; set; }
+                    public object? container;
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+            [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.All(diagnostic => diagnostic.Id != "S1I001" && diagnostic.Id != "S1I002" && diagnostic.Id != "S1I003"),
+            $"Valid S1InteropType and S1InteropMember declarations should not report reference validation diagnostics. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorReportsMissingDeclaredTypesWhenGameReferencesExist()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.DoesNotExist", Alias = "MissingCamera")]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I001" &&
+                diagnostic.GetMessage().Contains("ScheduleOne.PlayerScripts.DoesNotExist", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("MissingCamera", StringComparison.Ordinal)),
+            $"Missing S1InteropType declarations should report S1I001 when Mono game references are available. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorSkipsReferenceValidationWhenGameReferencesAreAbsent()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.DoesNotExist", Alias = "MissingCamera")]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, []);
+
+        Assert(
+            diagnostics.All(diagnostic => diagnostic.Id != "S1I001"),
+            $"Missing S1InteropType declarations should not report S1I001 when no game reference surface is available. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorReportsMissingDeclaredMembersWhenGameReferencesExist()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.PlayerScripts
+            {
+                public sealed class PlayerCamera
+                {
+                    public static PlayerCamera? Instance { get; set; }
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
+            [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
+            [assembly: S1Interop.S1InteropMember("MissingOwner", "Instance", Alias = "MissingOwnerInstance", IsStatic = true)]
+
+            namespace SyntheticMod;
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I002" &&
+                diagnostic.GetMessage().Contains("MissingOwner", StringComparison.Ordinal)),
+            $"S1InteropMember declarations should report S1I002 when their owner alias is not declared. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I003" &&
+                diagnostic.GetMessage().Contains("container", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("PlayerCamera", StringComparison.Ordinal)),
+            $"S1InteropMember declarations should report S1I003 when the member name is absent from the referenced owner type. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
     private void BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases()
     {
         const string il2CppSource =

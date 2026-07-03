@@ -55,6 +55,7 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - `S1Interop.Cli` owns command parsing, command dispatch, and user-facing reporting.
 - `S1Interop.Core` owns project analysis, migration planning, migration application, rollback, source rewriting, sandbox verification, and migration-time generated files.
 - `S1Interop.Generators` is the Roslyn source-generator package consumed by mod projects. Keep it additive: it can emit generated source and diagnostics, but it must not assume it can rewrite existing user code.
+- Generator diagnostics that validate game type/member strings must only fail when the relevant Mono/IL2CPP reference surface is available in the current compilation.
 - Keep CLI code thin. Put reusable behavior in Core.
 - Keep Core analysis, migration, rewriting, and generation boundaries separate. A new rule should have an obvious owner.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
