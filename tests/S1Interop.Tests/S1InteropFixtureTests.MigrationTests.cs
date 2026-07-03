@@ -1434,6 +1434,77 @@ internal sealed partial class S1InteropFixtureTests
             "BarsGraphics aliases should feed generated backend-neutral registry attributes.");
     }
 
+    private void BackendNeutralScaffoldBuildsRealBarsGraphicsFacadeTargetsAgainstBothReferenceSurfaces()
+    {
+        string projectPath = Path.Combine(WorkspaceRoot, "BarsGraphics", "BarsGraphics.csproj");
+        string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
+        string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
+        string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
+        string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
+        if (!File.Exists(projectPath) || !File.Exists(monoMelonLoader) || !File.Exists(il2CppMelonLoader))
+        {
+            Console.WriteLine("Skipping BarsGraphics backend-neutral scaffold build fixture because BarsGraphics or local game roots are not available.");
+            return;
+        }
+
+        ProjectAnalysis project = analyzer.Analyze(projectPath).Projects.Single();
+        SdkFacadePlan facadePlan = new SdkFacadeGenerator().Plan(project);
+        SdkTypeAlias[] aliases = facadePlan.TypeAliases
+            .Where(alias =>
+                alias.Alias.Equals("GameHud", StringComparison.Ordinal) ||
+                alias.Alias.Equals("GamePlayerCamera", StringComparison.Ordinal))
+            .OrderBy(alias => alias.Alias, StringComparer.Ordinal)
+            .ToArray();
+        Assert(aliases.Length == 2, "BarsGraphics should expose GameHud and GamePlayerCamera aliases for backend-neutral scaffold validation.");
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string scaffoldDirectory = Path.Combine(tempRoot, "FreshBarsGraphicsFacadeMod");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+            Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for BarsGraphics alias validation. Output: {create.Output}");
+
+            string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshBarsGraphicsFacadeMod.csproj");
+            string starterPath = Path.Combine(scaffoldDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+            File.WriteAllText(starterPath, BuildBackendNeutralRegistrySource(aliases));
+            string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+            string packageCache = Path.Combine(tempRoot, "NuGetPackages");
+
+            ProcessResult monoBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                $"-p:MonoGamePath={monoGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(monoBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real BarsGraphics aliases should build against Mono references. Output: {monoBuild.Output}");
+
+            ProcessResult il2CppBuild = RunDotNet(
+                "build",
+                scaffoldProject,
+                "--nologo",
+                "-v:minimal",
+                "-p:S1InteropReferenceRuntime=Il2Cpp",
+                $"-p:Il2CppGamePath={il2CppGamePath}",
+                $"-p:RestorePackagesPath={packageCache}",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
+            Assert(il2CppBuild.ExitCode == 0, $"Fresh backend-neutral scaffold with real BarsGraphics aliases should build against IL2CPP references without source changes. Output: {il2CppBuild.Output}");
+
+            string starterSource = File.ReadAllText(starterPath);
+            Assert(
+                starterSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.HUD\", Alias = \"GameHud\", Il2CppTypeName = \"Il2CppScheduleOne.UI.HUD\")]", StringComparison.Ordinal) &&
+                starterSource.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.PlayerCamera\", Alias = \"GamePlayerCamera\", Il2CppTypeName = \"Il2CppScheduleOne.PlayerScripts.PlayerCamera\")]", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.Generated.S1InteropTypeRegistry.GetGameHud(instance, memberName)", StringComparison.Ordinal),
+                "Fresh backend-neutral scaffold should compile generated helpers from real BarsGraphics aliases.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void VerifyMigrationSucceedsOnS1FuelModWithoutMutatingSource()
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "S1FuelMod");

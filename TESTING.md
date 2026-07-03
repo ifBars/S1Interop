@@ -42,6 +42,22 @@ Portable plus integration when the local workspace is available:
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug
 ```
 
+## Backend-Neutral Local Validation
+
+Use the backend-neutral build validator for demo projects or new mods that should compile from one source tree against both reference surfaces:
+
+```powershell
+.\tests\Run-BackendNeutralBuildValidation.ps1 `
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
+  -MonoGamePath "C:\Path\To\Schedule I_alternate" `
+  -Il2CppGamePath "C:\Path\To\Schedule I_public" `
+  -GeneratorPackageSource .\artifacts\packages
+```
+
+The script checks expected MelonLoader and Unity reference files before building. It does not launch the game or copy files into `Mods/`.
+
+For runtime smoke tests, keep the mod/project local, deploy only the built DLL being tested, and verify explicit MelonLoader log lines such as backend selection and resolved type/member probes. Do not commit game assemblies, generated IL2CPP wrappers, logs, or copied game installs.
+
 ## CI-Equivalent Local Validation
 
 GitHub Actions runs on Windows with .NET 8 and executes:

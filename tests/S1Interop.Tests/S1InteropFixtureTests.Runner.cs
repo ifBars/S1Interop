@@ -332,6 +332,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         SdkFacadeGeneratorDetectsBarsGraphicsBackendAliasPairs();
         count++;
+        BackendNeutralScaffoldBuildsRealBarsGraphicsFacadeTargetsAgainstBothReferenceSurfaces();
+        count++;
         MigrationApplyAndRollbackAddsHideFromIl2CppOnS1FuelModFixture();
         count++;
         MigrationApplyConditionalizesS1FuelModGameConstructor();
