@@ -1,7 +1,13 @@
+using System.Text.RegularExpressions;
+
 namespace S1Interop.Core;
 
 public sealed class DirectMemberReflectionLookupRewriter
 {
+    private static readonly Regex ReflectionLookupReceiverRegex = new(
+        @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
+        RegexOptions.Compiled);
+
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!IsSupportedRiskKind(risk) || !File.Exists(risk.FilePath))
@@ -80,10 +86,20 @@ public sealed class DirectMemberReflectionLookupRewriter
 
         string firstLine = lines[startIndex];
         string statement = string.Join(" ", lines.Skip(startIndex).Take(endIndex - startIndex + 1).Select(line => line.Trim()));
+        if (IsPartOfFieldPropertyFallbackPair(lines, startIndex, statement))
+        {
+            return false;
+        }
+
         MemberAccessTarget? target = null;
         MemberAccessKind lookupKind = MemberAccessKind.FieldOrProperty;
         foreach (MemberAccessTarget candidate in targets)
         {
+            if (!CanUseTargetForStatement(candidate, startIndex, endIndex))
+            {
+                continue;
+            }
+
             if (CanRewriteStatement(statement, candidate, out lookupKind))
             {
                 target = candidate;
@@ -106,6 +122,46 @@ public sealed class DirectMemberReflectionLookupRewriter
         lines.Insert(startIndex, replacement);
         return true;
     }
+
+    private static bool CanUseTargetForStatement(MemberAccessTarget target, int startIndex, int endIndex)
+    {
+        int targetIndex = target.Line - 1;
+        return targetIndex >= startIndex && targetIndex <= endIndex;
+    }
+
+    private static bool IsPartOfFieldPropertyFallbackPair(IReadOnlyList<string> lines, int startIndex, string statement)
+    {
+        Match lookup = ReflectionLookupReceiverRegex.Match(statement);
+        if (!lookup.Success)
+        {
+            return false;
+        }
+
+        string receiver = NormalizeReceiver(lookup.Groups["receiver"].Value);
+        string oppositeKind = lookup.Groups["kind"].Value.Equals("Field", StringComparison.Ordinal)
+            ? "Property"
+            : "Field";
+        string sourceWindow = GetSourceWindow(lines, Math.Max(0, startIndex - 8), maxLineCount: 20);
+        foreach (Match candidate in ReflectionLookupReceiverRegex.Matches(sourceWindow))
+        {
+            if (candidate.Groups["kind"].Value.Equals(oppositeKind, StringComparison.Ordinal) &&
+                NormalizeReceiver(candidate.Groups["receiver"].Value).Equals(receiver, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetSourceWindow(IReadOnlyList<string> lines, int startIndex, int maxLineCount)
+    {
+        int endIndex = Math.Min(lines.Count, startIndex + maxLineCount);
+        return string.Join('\n', lines.Skip(startIndex).Take(endIndex - startIndex));
+    }
+
+    private static string NormalizeReceiver(string receiver) =>
+        Regex.Replace(receiver, @"\s+", string.Empty);
 
     private static bool TryGetReplacementPrefix(string firstLine, out string prefix)
     {
@@ -147,7 +203,7 @@ public sealed class DirectMemberReflectionLookupRewriter
         }
 
         string statement = string.Join(" ", lines.Skip(startIndex).Take(endIndex - startIndex + 1).Select(sourceLine => sourceLine.Trim()));
-        return targets.Any(target => CanRewriteStatement(statement, target, out _));
+        return targets.Any(target => CanUseTargetForStatement(target, startIndex, endIndex) && CanRewriteStatement(statement, target, out _));
     }
 
     private static bool TryFindStatementStart(IReadOnlyList<string> lines, int lineIndex, out int startIndex)
@@ -214,8 +270,7 @@ public sealed class DirectMemberReflectionLookupRewriter
     {
         lookupKind = MemberAccessKind.FieldOrProperty;
         if (!(StartsWithSafeStatementPrefix(statement) || IsAssignmentPrefix(statement)) ||
-            !(statement.Contains($"typeof({target.OwnerAlias})", StringComparison.Ordinal) ||
-              statement.Contains($"typeof({target.OwnerTypeName})", StringComparison.Ordinal)) ||
+            !HasSupportedReceiver(statement, target) ||
             !TryGetLookupKind(statement, target.MemberName, out lookupKind) ||
             statement.Contains("?.", StringComparison.Ordinal))
         {
@@ -224,6 +279,12 @@ public sealed class DirectMemberReflectionLookupRewriter
 
         return target.Kind == MemberAccessKind.FieldOrProperty || target.Kind == lookupKind;
     }
+
+    private static bool HasSupportedReceiver(string statement, MemberAccessTarget target) =>
+        statement.Contains($"typeof({target.OwnerAlias})", StringComparison.Ordinal) ||
+        statement.Contains($"typeof({target.OwnerTypeName})", StringComparison.Ordinal) ||
+        statement.Contains(".GetType().Get", StringComparison.Ordinal) ||
+        statement.Contains(".GetType() .Get", StringComparison.Ordinal);
 
     private static bool StartsWithSafeStatementPrefix(string statement)
     {

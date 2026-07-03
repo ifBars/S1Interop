@@ -16,6 +16,10 @@ public sealed class MemberAccessTargetCatalog
         @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
 
+    private static readonly Regex InstanceGetTypeFieldOrPropertyRegex = new(
+        @"(?<receiver>[_A-Za-z][A-Za-z0-9_]*)\s*\.\s*GetType\s*\(\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
+        RegexOptions.Compiled);
+
     private static readonly Regex FieldOrPropertyHelperRegex = new(
         @"(?<helper>[A-Za-z_][A-Za-z0-9_.]*)\s*\.\s*Try(?<operation>Get|Set)(?<static>Static)?FieldOrProperty\s*\(\s*(?<target>[_A-Za-z][A-Za-z0-9_]*)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
         RegexOptions.Compiled);
@@ -104,6 +108,27 @@ public sealed class MemberAccessTargetCatalog
                     SanitizeAlias(memberName),
                     IsStatic: IsStaticMemberLookup(lines, index),
                     Kind: GetMemberAccessKind(match.Groups["kind"].Value)));
+            }
+
+            foreach (Match instanceMatch in InstanceGetTypeFieldOrPropertyRegex.Matches(lines[index]))
+            {
+                string receiver = instanceMatch.Groups["receiver"].Value;
+                if (!identifierTypes.TryGetValue(receiver, out string? ownerTypeName))
+                {
+                    continue;
+                }
+
+                string ownerAlias = GetSimpleTypeName(ownerTypeName);
+                string memberName = instanceMatch.Groups["member"].Value;
+                targets.Add(new MemberAccessTarget(
+                    Path.GetFullPath(sourceFile),
+                    index + 1,
+                    ownerAlias,
+                    ownerTypeName,
+                    memberName,
+                    SanitizeAlias(memberName),
+                    IsStatic: false,
+                    Kind: GetMemberAccessKind(instanceMatch.Groups["kind"].Value)));
             }
 
             foreach (MemberAccessTarget target in DiscoverHelperTargets(sourceFile, lines[index], index + 1, identifierTypes))
@@ -346,6 +371,7 @@ public sealed class MemberAccessTargetCatalog
         }
 
         return typeName.StartsWith("ScheduleOne.", StringComparison.Ordinal) ||
+               typeName.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal) ||
                scheduleOneUsings.ContainsKey(typeName) ||
                scheduleOneUsings.Count == 1 ||
                TryInferNamespaceByLeaf(typeName, scheduleOneUsings.Values, out _);
@@ -361,6 +387,11 @@ public sealed class MemberAccessTargetCatalog
         string sourceType,
         IReadOnlyDictionary<string, string> scheduleOneUsings)
     {
+        if (sourceType.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal))
+        {
+            return sourceType["Il2Cpp".Length..];
+        }
+
         if (sourceType.StartsWith("ScheduleOne.", StringComparison.Ordinal))
         {
             return sourceType;

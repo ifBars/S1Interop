@@ -504,7 +504,7 @@ public sealed class SourceInteropAnalyzer
     private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
-        if (!TypeOfFieldOrPropertyLookupRegex.IsMatch(line))
+        if (!ReflectionLookupReceiverRegex.IsMatch(line))
         {
             return false;
         }

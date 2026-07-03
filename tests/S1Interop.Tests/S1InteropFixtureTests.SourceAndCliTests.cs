@@ -673,13 +673,19 @@ internal sealed partial class S1InteropFixtureTests
                             BindingFlags.Public | BindingFlags.Static);
                         return property;
                     }
+
+                    public static FieldInfo? GetTeleportField(Il2CppScheduleOne.PlayerScripts.Player targetPlayer)
+                    {
+                        var teleportField = targetPlayer.GetType().GetField("teleport", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        return teleportField;
+                    }
                 }
                 """);
 
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 2,
+                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 3,
                 $"Source analyzer should report direct typeof(...).GetField/GetProperty lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
             Assert(
                 risks.Where(risk => risk.Kind == "DirectMemberReflectionLookup").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
@@ -712,12 +718,16 @@ internal sealed partial class S1InteropFixtureTests
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal),
-                "Generated member-access targets should include direct member reflection declarations and static metadata.");
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal),
+                "Generated member-access targets should include direct member reflection declarations, static metadata, and typed GetType receiver declarations.");
             string rewrittenSource = File.ReadAllText(tempSource);
             Assert(
                 rewrittenSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
-                rewrittenSource.Contains("var property = S1Interop.Generated.S1InteropMemberRegistry.UserDataDirectoryPropertyInfo;", StringComparison.Ordinal),
+                rewrittenSource.Contains("var property = S1Interop.Generated.S1InteropMemberRegistry.UserDataDirectoryPropertyInfo;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("var teleportField = S1Interop.Generated.S1InteropMemberRegistry.teleportFieldInfo;", StringComparison.Ordinal) &&
+                !rewrittenSource.Contains("targetPlayer.GetType().GetField(\"teleport\"", StringComparison.Ordinal),
                 $"Direct member reflection lookups should be rewritten to generated typed metadata accessors. Source:{Environment.NewLine}{rewrittenSource}");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
