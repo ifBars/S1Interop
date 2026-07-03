@@ -83,6 +83,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         LocalPathDiagnosticsDetectAnyWindowsDriveLetter();
         count++;
+        MigrationUsesRuntimeGamePathSlotsForCustomRuntimeConfigurations();
+        count++;
         MigrationPreservesLocalPropsUnderOsConditionedGameDir();
         count++;
         MigrationApplyAndRollbackScaffoldsLocalReferenceProperties();
@@ -126,6 +128,8 @@ internal sealed partial class S1InteropFixtureTests
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
+        count++;
+        S1InteropTypeRegistryGeneratorMergesDuplicateAliases();
         count++;
         S1InteropTypeRegistryGeneratorValidatesDeclaredTypesAgainstReferencedGameAssemblies();
         count++;
@@ -206,6 +210,8 @@ internal sealed partial class S1InteropFixtureTests
         MsBuildOsPlatformConditionsAreEvaluated();
         count++;
         LocalPathDiagnosticsDetectAnyWindowsDriveLetter();
+        count++;
+        MigrationUsesRuntimeGamePathSlotsForCustomRuntimeConfigurations();
         count++;
         MigrationPreservesLocalPropsUnderOsConditionedGameDir();
         count++;
@@ -290,6 +296,8 @@ internal sealed partial class S1InteropFixtureTests
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
+        count++;
+        S1InteropTypeRegistryGeneratorMergesDuplicateAliases();
         count++;
         S1InteropTypeRegistryGeneratorValidatesDeclaredTypesAgainstReferencedGameAssemblies();
         count++;

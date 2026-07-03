@@ -652,9 +652,10 @@ public sealed class MigrationApplier
 
         foreach (AbsolutePropertyValue property in absoluteProperties)
         {
-            string localPropertyName = distinctValueCountsByPropertyName[property.PropertyName] > 1
-                ? CreateScopedLocalPropertyName(property, usedPropertyNames)
-                : property.PropertyName;
+            string localPropertyName = TryGetRuntimeGamePathPropertyName(property, movedProperties)
+                ?? (distinctValueCountsByPropertyName[property.PropertyName] > 1
+                    ? CreateScopedLocalPropertyName(property, usedPropertyNames)
+                    : property.PropertyName);
             movedProperties[localPropertyName] = property.Value;
 
             if (string.Equals(localPropertyName, property.PropertyName, StringComparison.OrdinalIgnoreCase))
@@ -873,6 +874,64 @@ public sealed class MigrationApplier
         }
 
         return properties;
+    }
+
+    private static string? TryGetRuntimeGamePathPropertyName(
+        AbsolutePropertyValue property,
+        IReadOnlyDictionary<string, string> movedProperties)
+    {
+        if (!string.Equals(property.PropertyName, "GamePath", StringComparison.OrdinalIgnoreCase) ||
+            !LooksLikeGameRoot(property.Value))
+        {
+            return null;
+        }
+
+        string? condition = FirstNonEmpty(property.PropertyGroupCondition, property.PropertyCondition);
+        if (condition is null)
+        {
+            return null;
+        }
+
+        string? runtimePropertyName = GetRuntimeGamePathPropertyName(condition);
+        if (runtimePropertyName is null)
+        {
+            return null;
+        }
+
+        if (!movedProperties.TryGetValue(runtimePropertyName, out string? existingValue) ||
+            string.Equals(existingValue, property.Value, StringComparison.OrdinalIgnoreCase))
+        {
+            return runtimePropertyName;
+        }
+
+        return null;
+    }
+
+    private static string? GetRuntimeGamePathPropertyName(string condition)
+    {
+        string[] configurationNames = ConfigurationConditionRegex.Matches(condition)
+            .Cast<Match>()
+            .Select(match => match.Groups["name"].Value)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (configurationNames.Length == 0)
+        {
+            return null;
+        }
+
+        if (configurationNames.All(IsIl2CppConfiguration))
+        {
+            return "Il2CppGamePath";
+        }
+
+        if (configurationNames.All(IsMonoConfiguration))
+        {
+            return "MonoGamePath";
+        }
+
+        return null;
     }
 
     private static bool CanCollapseToRootRelativePath(string value)
@@ -2311,6 +2370,9 @@ public sealed class MigrationApplier
     private static bool IsIl2CppConfiguration(string configuration) =>
         configuration.Contains("il2cpp", StringComparison.OrdinalIgnoreCase) ||
         configuration.Contains("cpp", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsMonoConfiguration(string configuration) =>
+        configuration.Contains("mono", StringComparison.OrdinalIgnoreCase);
 
     private static string GetTargetFrameworkForOperation(MigrationOperation operation)
     {

@@ -318,6 +318,7 @@ internal sealed partial class S1InteropFixtureTests
                 tempSource,
                 """
                 using System.Reflection;
+                using GameOffenceNotice = ScheduleOne.UI.OffenceNoticeUI;
 
                 namespace ReflectionFallbackMod;
 
@@ -448,13 +449,13 @@ internal sealed partial class S1InteropFixtureTests
 
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"GameOffenceNotice\", Alias = \"GameOffenceNotice\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.OffenceNoticeUI\", Alias = \"GameOffenceNotice\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"GameOffenceNotice\", \"container\", Alias = \"container\")]", StringComparison.Ordinal),
                 "Generated member-access targets should include typed owner/member declarations.");
 
             string migratedSource = File.ReadAllText(tempSource);
             Assert(
-                migratedSource.Contains("return S1Interop.Types.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
+                migratedSource.Contains("return S1Interop.UI.OffenceNoticeUI.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
                 "Simple typed fallback getter should be rewritten through the generated type-scoped facade.");
             Assert(

@@ -199,7 +199,7 @@ Every developer has different Schedule One install paths. Pass paths explicitly 
 .\.tools\s1interop verify-migration . --dual-runtime --build --il2cpp-game-path "<your IL2CPP Schedule I install>" --mono-game-path "<your Mono Schedule I install>"
 ```
 
-If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Do not commit that file.
+If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Do not commit that file. Those property names are stable override points for Visual Studio, Rider, and command-line builds, even when the project uses custom configurations such as `MonoStable` or `Il2cppDevelopment`.
 
 ## Commands
 

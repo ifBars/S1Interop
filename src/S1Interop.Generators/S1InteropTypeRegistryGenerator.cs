@@ -107,7 +107,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
         IncrementalValueProvider<ImmutableArray<S1InteropTypeEntry>> allEntries = assemblyEntries
             .Combine(attributedTypeEntries.Collect())
-            .Select(static (input, _) => input.Left.AddRange(input.Right).Distinct(S1InteropTypeEntryComparer.Instance).ToImmutableArray());
+            .Select(static (input, _) => MergeTypeEntries(input.Left.AddRange(input.Right)));
 
         context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(memberEntries), static (sourceContext, input) =>
         {
@@ -621,6 +621,40 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             SanitizeIdentifier(alias ?? GetSimpleName(monoTypeName)),
             monoTypeName,
             il2CppTypeName ?? ToIl2CppTypeName(monoTypeName));
+    }
+
+    private static ImmutableArray<S1InteropTypeEntry> MergeTypeEntries(ImmutableArray<S1InteropTypeEntry> entries)
+    {
+        var merged = new Dictionary<string, S1InteropTypeEntry>(StringComparer.Ordinal);
+        foreach (S1InteropTypeEntry entry in entries)
+        {
+            if (!merged.TryGetValue(entry.Alias, out S1InteropTypeEntry existing) ||
+                ShouldPreferTypeEntry(entry, existing))
+            {
+                merged[entry.Alias] = entry;
+            }
+        }
+
+        return merged.Values.ToImmutableArray();
+    }
+
+    private static bool ShouldPreferTypeEntry(S1InteropTypeEntry candidate, S1InteropTypeEntry existing)
+    {
+        bool candidateHasExplicitIl2CppName = !string.Equals(
+            candidate.Il2CppTypeName,
+            ToIl2CppTypeName(candidate.MonoTypeName),
+            StringComparison.Ordinal);
+        bool existingHasExplicitIl2CppName = !string.Equals(
+            existing.Il2CppTypeName,
+            ToIl2CppTypeName(existing.MonoTypeName),
+            StringComparison.Ordinal);
+
+        if (candidateHasExplicitIl2CppName != existingHasExplicitIl2CppName)
+        {
+            return candidateHasExplicitIl2CppName;
+        }
+
+        return false;
     }
 
     private static S1InteropMemberEntry? TryCreateMemberEntry(AttributeData attribute)

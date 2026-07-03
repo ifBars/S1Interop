@@ -210,6 +210,13 @@ docs/internal/
 *.local.md
 ```
 
+Migration moves committed Schedule One install paths into `local.build.props`. Runtime game roots use stable property names:
+
+- `MonoGamePath`
+- `Il2CppGamePath`
+
+Project files should keep configuration-local `GamePath` aliases that point at those runtime properties. This keeps Visual Studio, Rider, and command-line overrides predictable for custom configurations such as `MonoStable`, `MonoDevelopment`, `Il2cppStable`, and `Il2cppDevelopment`.
+
 ## Packaging
 
 The CLI packages as a local/global .NET tool with package id `S1Interop`.

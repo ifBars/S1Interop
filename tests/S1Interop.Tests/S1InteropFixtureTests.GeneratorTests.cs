@@ -300,6 +300,32 @@ internal sealed partial class S1InteropFixtureTests
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
+    private void S1InteropTypeRegistryGeneratorMergesDuplicateAliases()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Law.GameOffenceNotice", Alias = "GameOffenceNotice")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Law.GameOffenceNotice", Alias = "GameOffenceNotice", Il2CppTypeName = "Il2CppScheduleOne.Law.GameOffenceNotice")]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+            """;
+
+        string generated = RunTypeRegistryGenerator(source, "IL2CPP");
+
+        Assert(
+            CountOccurrences(generated, "public readonly struct GameOffenceNoticeTag") == 1 &&
+            CountOccurrences(generated, "public const string GameOffenceNoticeName") == 1,
+            $"Duplicate S1InteropType aliases should emit one registry helper set. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public const string GameOffenceNoticeName = \"Il2CppScheduleOne.Law.GameOffenceNotice\";", StringComparison.Ordinal),
+            $"Merged duplicate aliases should prefer explicit Il2CppTypeName metadata. Generated source:{Environment.NewLine}{generated}");
+    }
+
     private void S1InteropTypeRegistryGeneratorValidatesDeclaredTypesAgainstReferencedGameAssemblies()
     {
         MetadataReference monoGameReference = CreateMetadataReferenceFromSource(

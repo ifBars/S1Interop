@@ -12,6 +12,10 @@ public sealed class MemberAccessTargetCatalog
         @"^\s*using\s+(?<namespace>ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;",
         RegexOptions.Compiled);
 
+    private static readonly Regex UsingAliasRegex = new(
+        @"^\s*using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\s*;",
+        RegexOptions.Compiled);
+
     private static readonly Regex TypeOfFieldOrPropertyRegex = new(
         @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
@@ -108,7 +112,7 @@ public sealed class MemberAccessTargetCatalog
                     continue;
                 }
 
-                string ownerAlias = GetSimpleTypeName(ownerTypeName);
+                string ownerAlias = GetSimpleTypeName(match.Groups["type"].Value);
                 string memberName = match.Groups["member"].Value;
                 targets.Add(new MemberAccessTarget(
                     Path.GetFullPath(sourceFile),
@@ -231,6 +235,13 @@ public sealed class MemberAccessTargetCatalog
         var usings = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in lines)
         {
+            Match aliasMatch = UsingAliasRegex.Match(line);
+            if (aliasMatch.Success)
+            {
+                usings[aliasMatch.Groups["alias"].Value] = NormalizeScheduleOneTypeName(aliasMatch.Groups["type"].Value);
+                continue;
+            }
+
             Match match = UsingRegex.Match(line);
             if (!match.Success)
             {
@@ -244,6 +255,11 @@ public sealed class MemberAccessTargetCatalog
 
         return usings;
     }
+
+    private static string NormalizeScheduleOneTypeName(string typeName) =>
+        typeName.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal)
+            ? typeName["Il2Cpp".Length..]
+            : typeName;
 
     private static string[] DiscoverScheduleOneNamespaces(IReadOnlyDictionary<string, string> scheduleOneUsings)
     {

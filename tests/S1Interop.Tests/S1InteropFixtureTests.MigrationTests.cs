@@ -93,6 +93,82 @@ internal sealed partial class S1InteropFixtureTests
         }
     }
 
+    private void MigrationUsesRuntimeGamePathSlotsForCustomRuntimeConfigurations()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "BarsStyleMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <Configurations>MonoStable;Il2cppStable;MonoDevelopment;Il2cppDevelopment</Configurations>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='MonoStable'">
+                    <DefineConstants>MONO;STABLE</DefineConstants>
+                    <GamePath Condition="'$(GamePath)'==''">D:\SteamLibrary\steamapps\common\Schedule I_alternate</GamePath>
+                    <ManagedPath Condition="'$(ManagedPath)'==''">$(GamePath)\Schedule I_Data\Managed</ManagedPath>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='MonoDevelopment'">
+                    <DefineConstants>MONO;STABLE;DEV</DefineConstants>
+                    <GamePath Condition="'$(GamePath)'==''">D:\SteamLibrary\steamapps\common\Schedule I_alternate</GamePath>
+                    <ManagedPath Condition="'$(ManagedPath)'==''">$(GamePath)\Schedule I_Data\Managed</ManagedPath>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Il2cppStable'">
+                    <DefineConstants>IL2CPP;STABLE</DefineConstants>
+                    <GamePath Condition="'$(GamePath)'==''">D:\SteamLibrary\steamapps\common\Schedule I_public</GamePath>
+                    <ManagedPath Condition="'$(ManagedPath)'==''">$(GamePath)\MelonLoader\Il2CppAssemblies</ManagedPath>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)'=='Il2cppDevelopment'">
+                    <DefineConstants>IL2CPP;STABLE;DEV</DefineConstants>
+                    <GamePath Condition="'$(GamePath)'==''">D:\SteamLibrary\steamapps\common\Schedule I_public</GamePath>
+                    <ManagedPath Condition="'$(ManagedPath)'==''">$(GamePath)\MelonLoader\Il2CppAssemblies</ManagedPath>
+                  </PropertyGroup>
+                </Project>
+                """);
+
+            WorkspaceAnalysis before = analyzer.Analyze(tempProject);
+            MigrationPlan plan = new MigrationPlanner().Plan(before, new MigrationPlannerOptions(DualRuntime: false));
+            MigrationApplyResult applyResult = new MigrationApplier().Apply(plan);
+
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "local_path_in_project"),
+                "Migration should move committed runtime game paths into local.build.props.");
+
+            string projectText = File.ReadAllText(tempProject);
+            string localPropsText = File.ReadAllText(Path.Combine(tempRoot, "local.build.props"));
+            string examplePropsText = File.ReadAllText(Path.Combine(tempRoot, "local.build.props.example"));
+
+            Assert(
+                projectText.Contains("<GamePath Condition=\"'$(GamePath)'==''\">$(MonoGamePath)</GamePath>", StringComparison.Ordinal),
+                "Mono runtime configurations should resolve GamePath through MonoGamePath.");
+            Assert(
+                projectText.Contains("<GamePath Condition=\"'$(GamePath)'==''\">$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal),
+                "Il2Cpp runtime configurations should resolve GamePath through Il2CppGamePath.");
+            Assert(
+                !projectText.Contains("GamePath_Default", StringComparison.Ordinal),
+                "Runtime game paths should not use opaque scoped fallback names.");
+            Assert(
+                localPropsText.Contains("<MonoGamePath>D:\\SteamLibrary\\steamapps\\common\\Schedule I_alternate</MonoGamePath>", StringComparison.Ordinal),
+                "local.build.props should preserve the moved Mono game path in a clear runtime property.");
+            Assert(
+                localPropsText.Contains("<Il2CppGamePath>D:\\SteamLibrary\\steamapps\\common\\Schedule I_public</Il2CppGamePath>", StringComparison.Ordinal),
+                "local.build.props should preserve the moved Il2Cpp game path in a clear runtime property.");
+            Assert(
+                examplePropsText.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
+                examplePropsText.Contains("<Il2CppGamePath>", StringComparison.Ordinal),
+                "local.build.props.example should show both runtime-specific game path slots.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void MigrationPreservesLocalPropsUnderOsConditionedGameDir()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
