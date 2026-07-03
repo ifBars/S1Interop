@@ -34,6 +34,20 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Integration tests may depend on the broader local Schedule One workspace, sibling mod checkouts, and local Mono/IL2CPP game installs. They should not run in public CI unless those dependencies are deliberately provided.
 
+Use focused lanes during normal local iteration:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
+```
+
+- `--integration-hoverboard`: fast real-mod coverage for `sdkgen --apply`, generated facade declarations, and namespace-scoped SDK inference from local reference metadata.
+- `--integration-backend-neutral`: broader real-mod backend-neutral coverage without the heaviest build-gate fixtures.
+- `--integration-build-gates`: slower real-mod build verification for Mono/IL2CPP migration gates.
+
+Run the full `--integration` lane when a change crosses multiple migration domains or before a broad release-facing validation pass. Do not use it as the default iteration loop.
+
 ### All
 
 Portable plus integration when the local workspace is available:
@@ -110,6 +124,7 @@ Test files are split by concern:
 - Add portable build-gate coverage for verifier behavior that can be modeled with synthetic projects.
 - Add integration coverage for real open-source mods or local game assemblies.
 - If a fixture requires private local state, skip cleanly or keep it in `--integration`.
+- Prefer targeted integration modes for real-mod evidence. Add a new focused lane when a domain becomes slow enough that the full integration suite discourages regular use.
 
 ## Temp Files and Real Projects
 

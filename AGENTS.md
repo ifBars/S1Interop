@@ -40,6 +40,16 @@ Local integration tests require the broader Schedule One workspace and local gam
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 
+Prefer focused integration lanes while iterating:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
+```
+
+Use the full `--integration` lane only when broad release-facing local validation is worth the runtime.
+
 ## Architecture Rules
 
 - `S1Interop.Cli` owns command parsing, command dispatch, and user-facing reporting.
@@ -48,6 +58,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 - Keep CLI code thin. Put reusable behavior in Core.
 - Keep Core analysis, migration, rewriting, and generation boundaries separate. A new rule should have an obvious owner.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
+- Treat backend-neutral type coverage as generated SDK output from source usage and reference metadata. Do not build or maintain a hand-written wrapper catalog for every Schedule One type.
 - Migration changes must be reversible through manifest and backup behavior.
 - Build verification must run against sandbox copies, never directly against user projects.
 
@@ -56,7 +67,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 - Add or update focused tests when adding diagnostics, migration operations, rewrite behavior, generator output, CLI commands, or verifier classification.
 - Use `--quick` for fast analyzer/rewriter/generator iteration.
 - Use `--portable` for public CI-safe coverage.
-- Use `--integration` when validating behavior against real local mod copies or local game assemblies.
+- Use focused integration lanes first when validating behavior against real local mod copies or local game assemblies; reserve full `--integration` for broad sweeps.
 - If a test needs local game paths or sibling repositories, keep it in integration coverage or skip cleanly when dependencies are absent.
 - Tests must not mutate real sibling projects. Copy fixtures into temp directories and clean them afterwards.
 

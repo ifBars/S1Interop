@@ -154,10 +154,12 @@ The long-term goal is to reduce manual Mono/IL2CPP conditionals and make more mo
 Current supported strategy:
 
 1. Analyze runtime-specific project references and source risks.
-2. Generate type/member declarations and helper surfaces.
+2. Generate type/member declarations and helper surfaces from the game types the mod source actually uses.
 3. Rewrite safe call sites to generated helpers.
 4. Build and verify in sandboxed copies.
 5. Report unsupported or ambiguous cases instead of guessing.
+
+The generated SDK surface is intentionally usage-driven. `sdkgen` and migration-time facade generation inspect source plus local reference metadata, then emit declarations and type-scoped facades for the types a mod touches. Avoid manual per-game-type wrappers or static catalogs of every Schedule One type; those do not scale and make drift harder to detect.
 
 Future possible strategy:
 
@@ -172,6 +174,9 @@ The test harness is a console executable with explicit modes:
 - `--quick`: fast analyzer, rewriter, migration-planning, and generator checks.
 - `--portable`: CI-safe coverage without private local fixtures.
 - `--integration`: local real-mod and game-path coverage.
+- `--integration-hoverboard`: focused Hoverboard SDK/facade generation coverage.
+- `--integration-backend-neutral`: focused real-mod backend-neutral facade coverage.
+- `--integration-build-gates`: heavier real-mod build verification gates.
 - `--all`: portable plus integration when local workspace dependencies exist.
 
 Keep private local dependencies out of portable tests. Integration tests may depend on local mod copies and game installs, but they must skip cleanly or be explicit about missing prerequisites.
