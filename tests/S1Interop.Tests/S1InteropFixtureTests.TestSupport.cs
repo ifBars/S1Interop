@@ -90,7 +90,12 @@ internal sealed partial class S1InteropFixtureTests
 
     private static System.Reflection.Assembly CompileAndLoadS1InteropGeneratedAssembly(string source, params string[] symbols)
     {
-        Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols);
+        return CompileAndLoadS1InteropGeneratedAssembly(source, assemblyName: null, symbols);
+    }
+
+    private static System.Reflection.Assembly CompileAndLoadS1InteropGeneratedAssembly(string source, string? assemblyName, params string[] symbols)
+    {
+        Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols, assemblyName);
         using var assemblyStream = new MemoryStream();
         Microsoft.CodeAnalysis.Emit.EmitResult emitResult = outputCompilation.Emit(assemblyStream);
         Assert(
@@ -103,11 +108,16 @@ internal sealed partial class S1InteropFixtureTests
 
     private static Compilation RunS1InteropGeneratorCompilation(string source, params string[] symbols)
     {
+        return RunS1InteropGeneratorCompilation(source, symbols, assemblyName: null);
+    }
+
+    private static Compilation RunS1InteropGeneratorCompilation(string source, IReadOnlyList<string> symbols, string? assemblyName)
+    {
         CSharpParseOptions parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Latest)
             .WithPreprocessorSymbols(symbols);
         CSharpCompilation compilation = CSharpCompilation.Create(
-            "SyntheticMod." + Guid.NewGuid().ToString("N"),
+            assemblyName ?? "SyntheticMod." + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source, parseOptions)],
             GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

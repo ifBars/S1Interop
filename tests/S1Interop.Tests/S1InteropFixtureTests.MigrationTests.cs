@@ -1277,7 +1277,8 @@ internal sealed partial class S1InteropFixtureTests
             string generated = RunTypeRegistryGenerator(source);
 
             Assert(
-                generated.Contains("public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();", StringComparison.Ordinal),
+                generated.Contains("public static S1InteropRuntimeBackend Backend", StringComparison.Ordinal) &&
+                generated.Contains("cachedBackend is null || cachedBackend == S1InteropRuntimeBackend.Unknown", StringComparison.Ordinal),
                 "Copied S1FuelMod facade targets should compile through backend-neutral runtime detection.");
             Assert(
                 facadePlan.TypeAliases.Take(12).All(alias =>

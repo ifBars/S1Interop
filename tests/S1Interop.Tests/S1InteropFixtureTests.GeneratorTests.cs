@@ -130,6 +130,11 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
         Assert(
+            runtimeGenerated.Contains("ResolveFromKnownGameAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("System.Reflection.Assembly.Load(assemblyName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("ResolveFromAssembly(\"Assembly-CSharp\", runtimeTypeName)", StringComparison.Ordinal),
+            $"Backend-neutral type registry should try known game assemblies when a type is not already loaded. Generated source:{Environment.NewLine}{runtimeGenerated}");
+        Assert(
             il2CppGenerated.Contains("internal static class S1InteropObjectCast", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool Is<T>(object? value, out T? result) where T : class", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? As<T>(object? value) where T : class", StringComparison.Ordinal) &&
@@ -138,7 +143,7 @@ internal sealed partial class S1InteropFixtureTests
             $"Generated type registry should include a backend-neutral object cast helper for IL2CPP TryCast<T> proxy unwrapping. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("internal static class S1InteropDelegateBridge", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static TDelegate Convert<TDelegate>(TDelegate listener) where TDelegate : class", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static TDelegate? Convert<TDelegate>(TDelegate? listener) where TDelegate : class", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppInterop.Runtime.DelegateSupport", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("method.MakeGenericMethod(delegateType)", StringComparison.Ordinal),
             $"Generated type registry should include a backend-neutral delegate bridge for reflected IL2CPP DelegateSupport conversion. Generated source:{Environment.NewLine}{il2CppGenerated}");
@@ -256,7 +261,8 @@ internal sealed partial class S1InteropFixtureTests
             runtimeGenerated.Contains("constructor.Invoke(converted)", StringComparison.Ordinal),
             $"Backend-neutral type registry should emit object-based type facade helpers that do not require compiling against backend-specific types. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static S1InteropRuntimeBackend Backend", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("cachedBackend is null || cachedBackend == S1InteropRuntimeBackend.Unknown", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsMono => Backend == S1InteropRuntimeBackend.Mono;", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsIl2Cpp => Backend == S1InteropRuntimeBackend.Il2Cpp;", StringComparison.Ordinal),
             $"Backend-neutral generator output should detect and cache the runtime backend. Generated source:{Environment.NewLine}{runtimeGenerated}");
@@ -332,7 +338,9 @@ internal sealed partial class S1InteropFixtureTests
         string generated = RunTypeRegistryGenerator(il2CppSource);
         Assert(
             generated.Contains("S1InteropTypeRegistry.Resolve(\"Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase\")", StringComparison.Ordinal) &&
-            generated.Contains("S1InteropTypeRegistry.Resolve(\"ScheduleOne.GameManager\")", StringComparison.Ordinal),
+            generated.Contains("S1InteropTypeRegistry.Resolve(\"ScheduleOne.GameManager\")", StringComparison.Ordinal) &&
+            generated.Contains("S1InteropTypeRegistry.IsAssemblyLoaded(\"Il2CppInterop.Runtime\")", StringComparison.Ordinal) &&
+            generated.Contains("S1InteropTypeRegistry.IsAssemblyLoaded(\"Assembly-CSharp\")", StringComparison.Ordinal),
             $"Backend-neutral runtime detection should emit default backend probes even when a new mod has no registered type aliases. Generated source:{Environment.NewLine}{generated}");
 
         System.Reflection.Assembly monoAssembly = CompileAndLoadS1InteropGeneratedAssembly(monoSource);
@@ -348,6 +356,15 @@ internal sealed partial class S1InteropFixtureTests
         object? isIl2Cpp = il2CppRuntimeType.GetProperty("IsIl2Cpp")?.GetValue(null);
         Assert(string.Equals(il2CppBackend?.ToString(), "Il2Cpp", StringComparison.Ordinal), $"Backend-neutral runtime detection should select Il2Cpp from the default Il2CppInterop marker. Backend={il2CppBackend}");
         Assert(isIl2Cpp is true, "Backend-neutral runtime IsIl2Cpp should be true when the default Il2Cpp marker is loadable.");
+
+        System.Reflection.Assembly assemblyNameOnly = CompileAndLoadS1InteropGeneratedAssembly(
+            "namespace SyntheticMod { internal static class Core { } }",
+            assemblyName: "Il2CppInterop.Runtime");
+        Type assemblyNameOnlyRuntimeType = assemblyNameOnly.GetType("S1Interop.Generated.S1InteropRuntime", throwOnError: true)!;
+        object? assemblyNameOnlyBackend = assemblyNameOnlyRuntimeType.GetProperty("Backend")?.GetValue(null);
+        Assert(
+            string.Equals(assemblyNameOnlyBackend?.ToString(), "Il2Cpp", StringComparison.Ordinal),
+            $"Backend-neutral runtime detection should select IL2CPP from loaded assembly names when marker types are not available. Backend={assemblyNameOnlyBackend}");
     }
 
     private void BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes()

@@ -21,10 +21,29 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         "Il2CppScheduleOne.GameManager"
     ];
 
+    private static readonly string[] DefaultIl2CppRuntimeProbeAssemblyNames =
+    [
+        "Il2CppInterop.Runtime",
+        "Il2Cppmscorlib",
+        "Il2CppAssembly-CSharp"
+    ];
+
     private static readonly string[] DefaultMonoRuntimeProbeTypeNames =
     [
         "ScheduleOne.GameManager",
         "ScheduleOne.PlayerScripts.PlayerCamera"
+    ];
+
+    private static readonly string[] DefaultMonoRuntimeProbeAssemblyNames =
+    [
+        "Assembly-CSharp"
+    ];
+
+    private static readonly string[] DefaultGameAssemblyProbeNames =
+    [
+        "Assembly-CSharp",
+        "Il2CppAssembly-CSharp",
+        "Il2CppScheduleOne.Core"
     ];
 
     private const string AttributeMetadataName = "S1Interop.S1InteropTypeAttribute";
@@ -304,7 +323,18 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         if (runtime == RuntimeBackend.Unknown)
         {
             builder.AppendLine("        private static S1InteropRuntimeBackend? cachedBackend;");
-            builder.AppendLine("        public static S1InteropRuntimeBackend Backend => cachedBackend ??= DetectBackend();");
+            builder.AppendLine("        public static S1InteropRuntimeBackend Backend");
+            builder.AppendLine("        {");
+            builder.AppendLine("            get");
+            builder.AppendLine("            {");
+            builder.AppendLine("                if (cachedBackend is null || cachedBackend == S1InteropRuntimeBackend.Unknown)");
+            builder.AppendLine("                {");
+            builder.AppendLine("                    cachedBackend = DetectBackend();");
+            builder.AppendLine("                }");
+            builder.AppendLine();
+            builder.AppendLine("                return cachedBackend.Value;");
+            builder.AppendLine("            }");
+            builder.AppendLine("        }");
             builder.AppendLine("        public static bool IsMono => Backend == S1InteropRuntimeBackend.Mono;");
             builder.AppendLine("        public static bool IsIl2Cpp => Backend == S1InteropRuntimeBackend.Il2Cpp;");
             builder.AppendLine();
@@ -337,6 +367,22 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
             foreach (string typeName in DefaultMonoRuntimeProbeTypeNames)
             {
                 builder.AppendLine($"            if (S1InteropTypeRegistry.Resolve(\"{Escape(typeName)}\") is not null)");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Mono;");
+                builder.AppendLine("            }");
+            }
+
+            foreach (string assemblyName in DefaultIl2CppRuntimeProbeAssemblyNames)
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.IsAssemblyLoaded(\"{Escape(assemblyName)}\"))");
+                builder.AppendLine("            {");
+                builder.AppendLine("                return S1InteropRuntimeBackend.Il2Cpp;");
+                builder.AppendLine("            }");
+            }
+
+            foreach (string assemblyName in DefaultMonoRuntimeProbeAssemblyNames)
+            {
+                builder.AppendLine($"            if (S1InteropTypeRegistry.IsAssemblyLoaded(\"{Escape(assemblyName)}\"))");
                 builder.AppendLine("            {");
                 builder.AppendLine("                return S1InteropRuntimeBackend.Mono;");
                 builder.AppendLine("            }");
@@ -407,6 +453,10 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("                {");
         builder.AppendLine("                    type = ResolveFromLoadedAssemblies(runtimeTypeName);");
         builder.AppendLine("                }");
+        builder.AppendLine("                if (type is null)");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    type = ResolveFromKnownGameAssemblies(runtimeTypeName);");
+        builder.AppendLine("                }");
         builder.AppendLine("                Cache[runtimeTypeName] = type;");
         builder.AppendLine("            }");
         builder.AppendLine();
@@ -464,6 +514,19 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            return runtimeType is not null && runtimeType.IsInstanceOfType(instance);");
         builder.AppendLine("        }");
         builder.AppendLine();
+        builder.AppendLine("        public static bool IsAssemblyLoaded(string assemblyName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies())");
+        builder.AppendLine("            {");
+        builder.AppendLine("                if (string.Equals(assembly.GetName().Name, assemblyName, System.StringComparison.OrdinalIgnoreCase))");
+        builder.AppendLine("                {");
+        builder.AppendLine("                    return true;");
+        builder.AppendLine("                }");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            return false;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
         builder.AppendLine("        private static System.Type? ResolveFromLoadedAssemblies(string runtimeTypeName)");
         builder.AppendLine("        {");
         builder.AppendLine("            foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies())");
@@ -492,6 +555,35 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Type? ResolveFromKnownGameAssemblies(string runtimeTypeName)");
+        builder.AppendLine("        {");
+        foreach (string assemblyName in DefaultGameAssemblyProbeNames)
+        {
+            builder.AppendLine($"            System.Type? {SanitizeLocalName(assemblyName)}Type = ResolveFromAssembly(\"{Escape(assemblyName)}\", runtimeTypeName);");
+            builder.AppendLine($"            if ({SanitizeLocalName(assemblyName)}Type is not null)");
+            builder.AppendLine("            {");
+            builder.AppendLine($"                return {SanitizeLocalName(assemblyName)}Type;");
+            builder.AppendLine("            }");
+            builder.AppendLine();
+        }
+
+        builder.AppendLine("            return null;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine("        private static System.Type? ResolveFromAssembly(string assemblyName, string runtimeTypeName)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            try");
+        builder.AppendLine("            {");
+        builder.AppendLine("                System.Reflection.Assembly assembly = System.Reflection.Assembly.Load(assemblyName);");
+        builder.AppendLine("                System.Type? type = assembly.GetType(runtimeTypeName, throwOnError: false);");
+        builder.AppendLine("                return type;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            catch");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return null;");
+        builder.AppendLine("            }");
         builder.AppendLine("        }");
         builder.AppendLine();
         builder.AppendLine("        private static System.Collections.Generic.IEnumerable<System.Type> GetLoadableTypes(System.Reflection.Assembly assembly)");
@@ -617,6 +709,17 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("    }");
     }
 
+    private static string SanitizeLocalName(string value)
+    {
+        var builder = new StringBuilder();
+        foreach (char character in value)
+        {
+            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
+        }
+
+        return builder.ToString();
+    }
+
     private static void GenerateDelegateBridge(StringBuilder builder)
     {
         builder.AppendLine();
@@ -624,7 +727,7 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("    {");
         builder.AppendLine("        private static readonly System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?> ConvertDelegateCache = new System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo?>(System.StringComparer.Ordinal);");
         builder.AppendLine();
-        builder.AppendLine("        public static TDelegate Convert<TDelegate>(TDelegate listener) where TDelegate : class");
+        builder.AppendLine("        public static TDelegate? Convert<TDelegate>(TDelegate? listener) where TDelegate : class");
         builder.AppendLine("        {");
         builder.AppendLine("            if (listener is null || !S1InteropRuntime.IsIl2Cpp || listener is not System.Delegate delegateValue)");
         builder.AppendLine("            {");
@@ -1514,6 +1617,10 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
         builder.AppendLine("            }");
         builder.AppendLine();
         builder.AppendLine("            if (!TryGetDictionaryTypes(original.GetType(), out System.Type? keyType, out System.Type? valueType))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine("            if (keyType is null || valueType is null)");
         builder.AppendLine("            {");
         builder.AppendLine("                return false;");
         builder.AppendLine("            }");
