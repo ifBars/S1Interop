@@ -1348,8 +1348,7 @@ internal sealed partial class S1InteropFixtureTests
                 .ToArray();
 
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshS1FuelFacadeMod");
-            string cliProject = Path.Combine(WorkspaceRoot, "S1Interop", "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
-            ProcessResult create = RunDotNet("run", "--project", cliProject, "--", "new", scaffoldDirectory, "--apply");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
             Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for real facade alias validation. Output: {create.Output}");
 
             string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshS1FuelFacadeMod.csproj");

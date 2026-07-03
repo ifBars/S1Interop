@@ -1638,7 +1638,6 @@ internal sealed partial class S1InteropFixtureTests
         {
             string tempProject = Path.Combine(tempRoot, "FreshBackendNeutralMod.csproj");
             string starterPath = Path.Combine(tempRoot, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
-            string cliProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
             File.WriteAllText(
                 tempProject,
                 """
@@ -1650,7 +1649,7 @@ internal sealed partial class S1InteropFixtureTests
                 </Project>
                 """);
 
-            ProcessResult dryRun = RunDotNet("run", "--project", cliProject, "--", "init", tempProject);
+            ProcessResult dryRun = RunCli("init", tempProject);
             Assert(dryRun.ExitCode == 0, $"s1interop init dry-run should succeed. Output: {dryRun.Output}");
             Assert(
                 dryRun.Output.Contains("install_s1interop_generator_package", StringComparison.Ordinal) &&
@@ -1658,7 +1657,7 @@ internal sealed partial class S1InteropFixtureTests
                 $"s1interop init dry-run should plan generator install and starter generation. Output: {dryRun.Output}");
             Assert(!File.Exists(starterPath), "s1interop init dry-run should not write the starter file.");
 
-            ProcessResult apply = RunDotNet("run", "--project", cliProject, "--", "init", tempProject, "--apply");
+            ProcessResult apply = RunCli("init", tempProject, "--apply");
             Assert(apply.ExitCode == 0, $"s1interop init --apply should succeed. Output: {apply.Output}");
             Assert(File.Exists(starterPath), "s1interop init --apply should create the backend-neutral starter file.");
 
@@ -1678,7 +1677,7 @@ internal sealed partial class S1InteropFixtureTests
                 "Backend-neutral starter should keep bridge generation opt-in while seeding editable type/member examples.");
 
             string manifestPath = ExtractManifestPath(apply.Output);
-            ProcessResult rollback = RunDotNet("run", "--project", cliProject, "--", "migrate", "rollback", manifestPath);
+            ProcessResult rollback = RunCli("migrate", "rollback", manifestPath);
             Assert(rollback.ExitCode == 0, $"s1interop migrate rollback should restore init changes. Output: {rollback.Output}");
             Assert(!File.Exists(starterPath), "Rollback should remove the backend-neutral starter file created by init.");
             Assert(
@@ -1704,9 +1703,8 @@ internal sealed partial class S1InteropFixtureTests
             string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
             string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
             string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
-            string cliProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
 
-            ProcessResult dryRun = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory);
+            ProcessResult dryRun = RunCli("new", targetDirectory);
             Assert(dryRun.ExitCode == 0, $"s1interop new dry-run should succeed. Output: {dryRun.Output}");
             Assert(
                 dryRun.Output.Contains("S1Interop new project dry-run", StringComparison.Ordinal) &&
@@ -1715,7 +1713,7 @@ internal sealed partial class S1InteropFixtureTests
                 $"s1interop new dry-run should print planned scaffold files. Output: {dryRun.Output}");
             Assert(!Directory.Exists(targetDirectory), "s1interop new dry-run should not create the target directory.");
 
-            ProcessResult apply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");
+            ProcessResult apply = RunCli("new", targetDirectory, "--apply");
             Assert(apply.ExitCode == 0, $"s1interop new --apply should succeed. Output: {apply.Output}");
             Assert(File.Exists(projectPath), "s1interop new should create the project file.");
             Assert(File.Exists(corePath), "s1interop new should create the core source file.");
@@ -1794,7 +1792,7 @@ internal sealed partial class S1InteropFixtureTests
                 }
             }
 
-            ProcessResult secondApply = RunDotNet("run", "--project", cliProject, "--", "new", targetDirectory, "--apply");
+            ProcessResult secondApply = RunCli("new", targetDirectory, "--apply");
             Assert(secondApply.ExitCode == 2, $"s1interop new should refuse to overwrite a non-empty target. Output: {secondApply.Output}");
         }
         finally

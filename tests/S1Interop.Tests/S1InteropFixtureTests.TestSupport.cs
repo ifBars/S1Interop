@@ -273,8 +273,24 @@ internal sealed partial class S1InteropFixtureTests
 
     private static ProcessResult RunDotNet(params string[] arguments)
     {
+        return RunProcess("dotnet", arguments);
+    }
+
+    private static ProcessResult RunCli(params string[] arguments)
+    {
+        string cliAssembly = Path.Combine(AppContext.BaseDirectory, "S1Interop.Cli.dll");
+        if (!File.Exists(cliAssembly))
+        {
+            throw new FileNotFoundException("Could not locate the built S1Interop CLI assembly next to the test host.", cliAssembly);
+        }
+
+        return RunDotNet([cliAssembly, .. arguments]);
+    }
+
+    private static ProcessResult RunProcess(string fileName, params string[] arguments)
+    {
         using var process = new Process();
-        process.StartInfo.FileName = "dotnet";
+        process.StartInfo.FileName = fileName;
         foreach (string argument in arguments)
         {
             process.StartInfo.ArgumentList.Add(argument);
@@ -290,7 +306,7 @@ internal sealed partial class S1InteropFixtureTests
         if (!process.WaitForExit(milliseconds: 120_000))
         {
             process.Kill(entireProcessTree: true);
-            throw new TimeoutException($"dotnet {string.Join(' ', arguments)} timed out.");
+            throw new TimeoutException($"{fileName} {string.Join(' ', arguments)} timed out.");
         }
 
         return new ProcessResult(process.ExitCode, output + error);

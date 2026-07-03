@@ -182,6 +182,12 @@ s1interop migrate rollback <manifest.json> [--format text|json]
 
 ## Tests
 
+Quick tests skip MSBuild/package/build-gate fixtures so analyzer, rewriter, migration-planning, and generator changes can be checked faster:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --quick
+```
+
 Portable tests run without private local fixtures:
 
 ```powershell
