@@ -146,6 +146,8 @@ Migration can also route simple game type lookups through the generated registry
 
 For simple command-style patterns, migration can route object construction and calls through generated type facades. A shape like `var command = new Il2CppScheduleOne.Console.SetWeather(); command.Execute(args);` can become `S1Interop.Console.SetWeather.Create()` plus `S1Interop.Console.SetWeather.Invoke(command, "Execute", args)`. Simple `Il2CppSystem.Collections.Generic.List<T>` construction is rewritten to managed `System.Collections.Generic.List<T>` so generated invocation helpers can convert it to the active backend parameter type.
 
+Simple IL2CPP-backed object pattern casts can move to the generated object-cast helper. For example, `if (value is UniversalRenderPipelineAsset asset)` and `return phone is Component c ? c.gameObject : null;` can route through `S1Interop.Generated.S1InteropObjectCast`, while value-type patterns are left unchanged.
+
 When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type/member strings during compilation. Missing type names report `S1I001`; member declarations with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
 
 Use `--apply` only after reviewing the dry-run output.

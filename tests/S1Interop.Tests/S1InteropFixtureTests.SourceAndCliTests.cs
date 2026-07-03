@@ -1609,6 +1609,21 @@ internal sealed partial class S1InteropFixtureTests
 
                         return false;
                     }
+
+                    public static object? PhoneGameObject(object? phone)
+                    {
+                        return phone is Component c ? c.gameObject : null;
+                    }
+
+                    public static float? ReadScale(object? scale)
+                    {
+                        return scale is float f ? f : null;
+                    }
+                }
+
+                public sealed class Component
+                {
+                    public object gameObject = new();
                 }
 
                 public sealed class Mask
@@ -1652,6 +1667,12 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 CountOccurrences(migratedSource, "S1Interop.Generated.S1InteropObjectCast.Is<UniversalRenderPipelineAsset>") == 2,
                 "Object cast migration should rewrite the risky cast once without rewriting existing generated-helper usage.");
+            Assert(
+                migratedSource.Contains("return S1Interop.Generated.S1InteropObjectCast.Is<Component>(phone, out Component? c) ? c.gameObject : null;", StringComparison.Ordinal),
+                "Object cast migration should rewrite simple return ternary pattern casts through S1InteropObjectCast.");
+            Assert(
+                migratedSource.Contains("return scale is float f ? f : null;", StringComparison.Ordinal),
+                "Object cast migration should not rewrite value-type pattern casts because S1InteropObjectCast is class-constrained.");
             Assert(
                 migratedSource.Contains("if (undoMaskGo?.GetComponent<Mask>() != null) // remove rounded mask, the button is transparent anyway", StringComparison.Ordinal),
                 "Object cast migration should not report or rewrite harmless GetComponent checks just because comments contain the word 'is'.");
