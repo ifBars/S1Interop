@@ -53,7 +53,7 @@ public sealed class SourceInteropAnalyzer
         RegexOptions.Compiled);
 
     private static readonly Regex ReflectionLookupWithVariableReceiverRegex = new(
-        @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\)|[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Get(?<kind>Field|Property)\s*\(",
+        @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\)|[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*(?<member>""[A-Za-z_][A-Za-z0-9_]*""|[A-Za-z_][A-Za-z0-9_]*)",
         RegexOptions.Compiled);
 
     private static readonly Regex TypeAliasAssignmentRegex = new(
@@ -512,7 +512,7 @@ public sealed class SourceInteropAnalyzer
             return false;
         }
 
-        string window = GetSourceWindow(lines, Math.Max(0, index - 15), maxLineCount: 31);
+        string window = GetSourceWindow(lines, Math.Max(0, index - 8), maxLineCount: 17);
         return HasFieldPropertyFallbackPair(window);
     }
 
@@ -526,6 +526,12 @@ public sealed class SourceInteropAnalyzer
         }
 
         string receiver = lookup.Groups["receiver"].Value;
+        if (receiver.Contains("typeof(", StringComparison.Ordinal) &&
+            !IsPotentialTypeOfMemberReceiver(receiver))
+        {
+            return false;
+        }
+
         if (!receiver.Contains("typeof(", StringComparison.Ordinal) &&
             !HasKnownBackendGetTypeReceiver(lines, index, receiver))
         {
@@ -569,6 +575,11 @@ public sealed class SourceInteropAnalyzer
                 continue;
             }
 
+            if (!IsActionableFieldPropertyFallbackLookup(lookup, sourceWindow))
+            {
+                continue;
+            }
+
             if (HasReflectionLookup(sourceWindow, lookup.Receiver, "Property"))
             {
                 return true;
@@ -593,17 +604,82 @@ public sealed class SourceInteropAnalyzer
             string receiver = NormalizeReflectionReceiver(match.Groups["receiver"].Value);
             if (aliases.TryGetValue(receiver, out string? normalizedReceiver))
             {
-                lookups.Add(new ReflectionLookup(normalizedReceiver, match.Groups["kind"].Value));
+                lookups.Add(new ReflectionLookup(normalizedReceiver, match.Groups["kind"].Value, match.Groups["member"].Value));
             }
             else if (receiver.Contains("typeof(", StringComparison.Ordinal) ||
                      receiver.Contains(".GetType()", StringComparison.Ordinal))
             {
-                lookups.Add(new ReflectionLookup(receiver, match.Groups["kind"].Value));
+                lookups.Add(new ReflectionLookup(receiver, match.Groups["kind"].Value, match.Groups["member"].Value));
             }
         }
 
         return lookups;
     }
+
+    private static bool IsActionableFieldPropertyFallbackLookup(ReflectionLookup lookup, string sourceWindow)
+    {
+        if (!IsQuotedString(lookup.MemberExpression))
+        {
+            return true;
+        }
+
+        if (lookup.Receiver.Contains("typeof(", StringComparison.Ordinal))
+        {
+            return IsPotentialTypeOfMemberReceiver(lookup.Receiver);
+        }
+
+        return HasKnownBackendGetTypeReceiver(sourceWindow, lookup.Receiver);
+    }
+
+    private static bool HasKnownBackendGetTypeReceiver(string sourceWindow, string receiver)
+    {
+        Match receiverMatch = GetTypeReceiverRegex.Match(receiver);
+        if (!receiverMatch.Success)
+        {
+            return false;
+        }
+
+        string receiverName = receiverMatch.Groups["name"].Value.Split('.')[^1];
+        foreach (Match declaration in BackendTypedIdentifierRegex.Matches(sourceWindow))
+        {
+            if (declaration.Groups["name"].Value.Equals(receiverName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPotentialTypeOfMemberReceiver(string receiver)
+    {
+        Match match = Regex.Match(receiver, @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)");
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string typeName = match.Groups["type"].Value;
+        if (IsIgnoredReflectionOwnerTypeName(typeName))
+        {
+            return false;
+        }
+
+        return IsScheduleOneTypeName(typeName) || !typeName.Contains('.', StringComparison.Ordinal);
+    }
+
+    private static bool IsIgnoredReflectionOwnerTypeName(string typeName)
+    {
+        string simpleName = typeName.Split('.').Last();
+        return typeName.StartsWith("Melon", StringComparison.Ordinal) ||
+               typeName.StartsWith("MelonLoader.", StringComparison.Ordinal) ||
+               simpleName.StartsWith("Melon", StringComparison.Ordinal);
+    }
+
+    private static bool IsQuotedString(string value) =>
+        value.Length >= 2 &&
+        value[0] == '"' &&
+        value[^1] == '"';
 
     private static Dictionary<string, string> GetTypeAliases(string sourceWindow)
     {
@@ -1041,5 +1117,5 @@ public sealed class SourceInteropAnalyzer
 
     private sealed record ClassSpan(string Name, string BaseType, int StartLine, int EndLine);
 
-    private sealed record ReflectionLookup(string Receiver, string Kind);
+    private sealed record ReflectionLookup(string Receiver, string Kind, string MemberExpression);
 }

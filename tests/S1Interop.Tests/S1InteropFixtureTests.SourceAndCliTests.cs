@@ -295,7 +295,6 @@ internal sealed partial class S1InteropFixtureTests
         {
             string tempProject = Path.Combine(tempRoot, "ReflectionFallbackMod.csproj");
             string tempSource = Path.Combine(tempRoot, "ReflectionFallback.cs");
-            string reportPath = Path.Combine(tempRoot, "S1Interop.Generated", SourceRiskReportGenerator.ReportFileName);
             string targetPath = Path.Combine(tempRoot, "S1Interop.Generated", MemberAccessTargetGenerator.SourceFileName);
             File.WriteAllText(
                 tempProject,
@@ -339,6 +338,18 @@ internal sealed partial class S1InteropFixtureTests
                         return property?.GetValue(notice);
                     }
 
+                    public static object? ReadPhoneScreen(ScheduleOne.DevUtilities.Phone phone)
+                    {
+                        FieldInfo? field = phone.GetType().GetField("homeScreen", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            return field.GetValue(phone);
+                        }
+
+                        PropertyInfo? property = phone.GetType().GetProperty("homeScreen", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return property?.GetValue(phone);
+                    }
+
                     public static object? ReadRenderScale(object pipeline)
                     {
                         PropertyInfo? property = pipeline.GetType().GetProperty("renderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -349,6 +360,18 @@ internal sealed partial class S1InteropFixtureTests
 
                         FieldInfo? field = pipeline.GetType().GetField("m_RenderScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                         return field?.GetValue(pipeline);
+                    }
+
+                    public static string? ReadMelonFilePath(object fileObj)
+                    {
+                        FieldInfo? field = fileObj.GetType().GetField("FilePath", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
+                            return field.GetValue(fileObj) as string;
+                        }
+
+                        PropertyInfo? property = fileObj.GetType().GetProperty("FilePath", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        return property?.GetValue(fileObj) as string;
                     }
 
                     public static object? RuntimeSpecific(object notice)
@@ -367,8 +390,11 @@ internal sealed partial class S1InteropFixtureTests
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 3,
-                "Source analyzer should report field-first and property-first reflection fallbacks while ignoring the runtime-guarded fallback.");
+                risks.Count(risk => risk.Kind == "FieldPropertyReflectionFallback") == 2,
+                $"Source analyzer should report typed reflection fallbacks while ignoring runtime-guarded and arbitrary fixed-name object fallbacks. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Where(risk => risk.Kind == "FieldPropertyReflectionFallback").Select(risk => risk.Evidence))}");
+            Assert(
+                risks.Where(risk => risk.Kind == "FieldPropertyReflectionFallback").All(risk => !risk.Evidence.Contains("FilePath", StringComparison.Ordinal)),
+                "Reflection fallback risk should not report fixed-name fallback against an arbitrary object receiver such as MelonPreferences internals.");
             Assert(
                 risks.Where(risk => risk.Kind == "FieldPropertyReflectionFallback").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
                 "Reflection fallback risk should point developers toward generated S1InteropMember accessors.");
@@ -377,9 +403,12 @@ internal sealed partial class S1InteropFixtureTests
             ProjectMigrationPlan projectPlan = plan.Projects.Single();
             Assert(
                 projectPlan.Operations.Any(operation =>
-                    operation.RuleId == "source_risk_field_property_reflection_fallback" &&
-                    !operation.Automatic),
-                "Migration plan should surface field/property reflection fallback as manual generated-accessor guidance.");
+                    operation.RuleId == "rewrite_member_access_fallbacks" &&
+                    operation.Automatic),
+                "Migration plan should automatically rewrite simple typed field/property fallback getters.");
+            Assert(
+                !projectPlan.Operations.Any(operation => operation.RuleId == "source_risk_field_property_reflection_fallback"),
+                "Automatically rewritable field/property fallback risks should not remain as manual source-risk guidance.");
             Assert(
                 projectPlan.Operations.Any(operation =>
                     operation.RuleId == "generate_member_access_targets" &&
@@ -404,10 +433,9 @@ internal sealed partial class S1InteropFixtureTests
                 applyResult.Operations.Any(operation => operation.RuleId == "rewrite_member_access_fallbacks"),
                 "Migration apply should rewrite simple typed member-access fallback getters.");
             Assert(
-                applyResult.Operations.Any(operation => operation.RuleId == "generate_source_risk_report"),
-                "Migration apply should create a source-risk report for reflection fallback guidance.");
+                applyResult.Operations.All(operation => operation.RuleId != "generate_source_risk_report"),
+                "Migration apply should not create a source-risk report when all reflection fallback risks are automatically handled.");
             Assert(File.Exists(targetPath), "Generated member-access target declarations were not written.");
-            Assert(File.Exists(reportPath), "Source-risk report was not written for reflection fallback guidance.");
 
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
@@ -425,17 +453,10 @@ internal sealed partial class S1InteropFixtureTests
                 !migratedSource.Contains("notice.GetType().GetField(\"container\"", StringComparison.Ordinal),
                 "Simple dynamic object fallback getter should be rewritten through the backend-neutral instance member registry.");
 
-            string report = File.ReadAllText(reportPath);
-            Assert(
-                report.Contains("Field Property Reflection Fallback", StringComparison.Ordinal) &&
-                report.Contains("S1InteropMember", StringComparison.Ordinal),
-                "Source-risk report should include field/property reflection fallback guidance.");
-
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
             Assert(rollbackResult.RestoredFiles.Contains(tempProject), "Rollback should restore the generator package reference change.");
             Assert(rollbackResult.RestoredFiles.Contains(tempSource), "Rollback should restore the rewritten source file.");
             Assert(rollbackResult.RemovedFiles.Contains(targetPath), "Rollback should remove generated member-access target declarations.");
-            Assert(rollbackResult.RemovedFiles.Contains(reportPath), "Rollback should remove the generated source-risk report.");
         }
         finally
         {
@@ -697,12 +718,15 @@ internal sealed partial class S1InteropFixtureTests
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 4,
+                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 3,
                 $"Source analyzer should report direct typeof(...).GetField/GetProperty lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
             Assert(
                 risks.All(risk => !risk.Evidence.Contains("GetEnumeratorCurrent", StringComparison.Ordinal) &&
                                   !risk.Evidence.Contains("GetProperty(\"Current\")", StringComparison.Ordinal)),
                 "Direct member reflection lookup risk should skip untyped runtime collection/enumerator reflection that cannot produce a backend-neutral game member declaration.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("MelonEnvironment", StringComparison.Ordinal)),
+                "Direct member reflection lookup risk should skip MelonLoader-owned reflection internals.");
             Assert(
                 risks.Where(risk => risk.Kind == "DirectMemberReflectionLookup").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
                 "Direct member reflection lookup risk should point developers toward generated S1InteropMember declarations.");
@@ -734,15 +758,15 @@ internal sealed partial class S1InteropFixtureTests
             string generatedTargets = File.ReadAllText(targetPath);
             Assert(
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"MelonEnvironment\", \"UserDataDirectory\", Alias = \"UserDataDirectory\", Kind = S1Interop.S1InteropMemberKind.Property, IsStatic = true)]", StringComparison.Ordinal) &&
+                !generatedTargets.Contains("MelonEnvironment", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"SystemInfo\", \"deviceUniqueIdentifier\", Alias = \"deviceUniqueIdentifier\", Kind = S1Interop.S1InteropMemberKind.Property)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal),
-                "Generated member-access targets should include direct member reflection declarations, static metadata, and typed GetType receiver declarations.");
+                "Generated member-access targets should include direct member reflection declarations and typed GetType receiver declarations while skipping MelonLoader internals.");
             string rewrittenSource = File.ReadAllText(tempSource);
             Assert(
                 rewrittenSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
-                rewrittenSource.Contains("var property = S1Interop.Generated.S1InteropMemberRegistry.UserDataDirectoryPropertyInfo;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("var property = typeof(MelonEnvironment).GetProperty(\"UserDataDirectory\",", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var originalMethod = S1Interop.Generated.S1InteropMemberRegistry.deviceUniqueIdentifierPropertyInfo!.GetMethod;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var teleportField = S1Interop.Generated.S1InteropMemberRegistry.teleportFieldInfo;", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("typeof(SystemInfo).GetProperty(\"deviceUniqueIdentifier\").GetMethod", StringComparison.Ordinal) &&

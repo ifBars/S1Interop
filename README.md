@@ -111,6 +111,8 @@ Generated method and type facades also include typed convenience helpers such as
 
 When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Simple typed metadata cache assignments such as `targetPlayer.GetType().GetField("teleport", flags)` can also move to generated `FieldInfo` or `PropertyInfo` accessors when the receiver type is known. Property accessor chains such as `.GetProperty("Name").GetMethod` keep the final accessor when rewritten. Untyped runtime reflection such as enumerator `Current` lookups is not reported as a backend migration risk unless S1Interop can tie it to a game/backend member surface. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
+Generated member declarations intentionally skip MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, and `MelonPreferences` helpers. Those can still be valid mod code, but they are not Schedule One backend-neutral SDK surface and should not be converted into S1Interop member targets.
+
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
 
 Roslyn source generators are additive: they can emit new C# and diagnostics, but they cannot rewrite existing source calls or modify IL. A single-DLL compatibility path is still possible, but it needs one of these shapes:

@@ -59,6 +59,12 @@ public sealed class MemberAccessTargetCatalog
         "void"
     };
 
+    private static readonly string[] IgnoredOwnerTypePrefixes =
+    [
+        "Melon",
+        "MelonLoader."
+    ];
+
     public IReadOnlyList<MemberAccessTarget> Discover(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -97,6 +103,11 @@ public sealed class MemberAccessTargetCatalog
             if (match.Success)
             {
                 string ownerTypeName = ResolveRuntimeTypeName(match.Groups["type"].Value, scheduleOneUsings);
+                if (IsIgnoredOwnerTypeName(ownerTypeName))
+                {
+                    continue;
+                }
+
                 string ownerAlias = GetSimpleTypeName(ownerTypeName);
                 string memberName = match.Groups["member"].Value;
                 targets.Add(new MemberAccessTarget(
@@ -486,6 +497,15 @@ public sealed class MemberAccessTargetCatalog
     {
         int separator = typeName.LastIndexOf('.');
         return separator < 0 ? typeName : typeName[(separator + 1)..];
+    }
+
+    private static bool IsIgnoredOwnerTypeName(string typeName)
+    {
+        string normalized = typeName.Trim();
+        string simpleName = GetSimpleTypeName(normalized);
+        return IgnoredOwnerTypePrefixes.Any(prefix =>
+            normalized.StartsWith(prefix, StringComparison.Ordinal) ||
+            simpleName.StartsWith(prefix, StringComparison.Ordinal));
     }
 
     private static string SanitizeAlias(string value)
