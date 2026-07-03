@@ -44,6 +44,14 @@ public sealed class SourceInteropAnalyzer
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex GetTypeReceiverRegex = new(
+        @"(?<name>[A-Za-z_][A-Za-z0-9_.]*)\s*\.\s*GetType\s*\(\s*\)",
+        RegexOptions.Compiled);
+
+    private static readonly Regex BackendTypedIdentifierRegex = new(
+        @"(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)+)(?:\?)?(?:\s*<[^>\r\n;()]+>)?\s+(?<name>[_A-Za-z][A-Za-z0-9_]*)\b",
+        RegexOptions.Compiled);
+
     private static readonly Regex ReflectionLookupWithVariableReceiverRegex = new(
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\)|[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*Get(?<kind>Field|Property)\s*\(",
         RegexOptions.Compiled);
@@ -504,7 +512,15 @@ public sealed class SourceInteropAnalyzer
     private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
-        if (!ReflectionLookupReceiverRegex.IsMatch(line))
+        Match lookup = ReflectionLookupReceiverRegex.Match(line);
+        if (!lookup.Success)
+        {
+            return false;
+        }
+
+        string receiver = lookup.Groups["receiver"].Value;
+        if (!receiver.Contains("typeof(", StringComparison.Ordinal) &&
+            !HasKnownBackendGetTypeReceiver(lines, index, receiver))
         {
             return false;
         }
@@ -513,6 +529,28 @@ public sealed class SourceInteropAnalyzer
         string backwardWindow = GetSourceWindow(lines, Math.Max(0, index - 15), Math.Min(16, index + 1));
         return !HasFieldPropertyFallbackPair(sourceWindow) &&
                !HasFieldPropertyFallbackPair(backwardWindow);
+    }
+
+    private static bool HasKnownBackendGetTypeReceiver(IReadOnlyList<string> lines, int index, string receiver)
+    {
+        Match receiverMatch = GetTypeReceiverRegex.Match(receiver);
+        if (!receiverMatch.Success)
+        {
+            return false;
+        }
+
+        string receiverName = receiverMatch.Groups["name"].Value.Split('.')[^1];
+        int startIndex = Math.Max(0, index - 30);
+        string sourceWindow = GetSourceWindow(lines, startIndex, index - startIndex + 1);
+        foreach (Match declaration in BackendTypedIdentifierRegex.Matches(sourceWindow))
+        {
+            if (declaration.Groups["name"].Value.Equals(receiverName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasFieldPropertyFallbackPair(string sourceWindow)

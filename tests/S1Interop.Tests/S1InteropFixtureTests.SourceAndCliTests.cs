@@ -685,6 +685,12 @@ internal sealed partial class S1InteropFixtureTests
                         var teleportField = targetPlayer.GetType().GetField("teleport", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                         return teleportField;
                     }
+
+                    public static PropertyInfo? GetEnumeratorCurrent(object enumerator)
+                    {
+                        var current = enumerator.GetType().GetProperty("Current");
+                        return current;
+                    }
                 }
                 """);
 
@@ -693,6 +699,10 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 4,
                 $"Source analyzer should report direct typeof(...).GetField/GetProperty lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("GetEnumeratorCurrent", StringComparison.Ordinal) &&
+                                  !risk.Evidence.Contains("GetProperty(\"Current\")", StringComparison.Ordinal)),
+                "Direct member reflection lookup risk should skip untyped runtime collection/enumerator reflection that cannot produce a backend-neutral game member declaration.");
             Assert(
                 risks.Where(risk => risk.Kind == "DirectMemberReflectionLookup").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
                 "Direct member reflection lookup risk should point developers toward generated S1InteropMember declarations.");
