@@ -56,7 +56,25 @@ Use the backend-neutral build validator for demo projects or new mods that shoul
 
 The script checks expected MelonLoader and Unity reference files before building. It does not launch the game or copy files into `Mods/`.
 
-For runtime smoke tests, keep the mod/project local, deploy only the built DLL being tested, and verify explicit MelonLoader log lines such as backend selection and resolved type/member probes. Do not commit game assemblies, generated IL2CPP wrappers, logs, or copied game installs.
+Use the runtime smoke runner when a backend-neutral mod logs deterministic probe markers:
+
+```powershell
+.\tests\Run-BackendNeutralRuntimeSmoke.ps1 `
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
+  -Runtime Mono `
+  -GamePath "C:\Path\To\Schedule I_alternate" `
+  -GeneratorPackageSource .\artifacts\packages
+
+.\tests\Run-BackendNeutralRuntimeSmoke.ps1 `
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
+  -Runtime Il2Cpp `
+  -GamePath "C:\Path\To\Schedule I_public" `
+  -GeneratorPackageSource .\artifacts\packages
+```
+
+The default expected marker is `S1InteropSmoke|PASS|Backend=<Runtime>`. The runner builds the selected runtime surface, audits the local game path, deploys only the built mod DLL, launches `Schedule I.exe`, polls MelonLoader logs, and then removes the deployed DLL unless `-KeepDeployed` is passed. It refuses dirty `Mods/*.dll` folders unless `-AllowExtraMods` is explicit, and it refuses to launch into an already-running matching game process unless `-AllowExistingProcess` is explicit.
+
+For build-only/audit-only checks, add `-NoLaunch`. Runtime logs are copied under `artifacts/runtime-smoke/`, which is ignored by git. Do not commit game assemblies, generated IL2CPP wrappers, logs, or copied game installs.
 
 ## CI-Equivalent Local Validation
 
