@@ -15,7 +15,7 @@ internal static class MigrationPlanningCommand
 
         plan = command.Name.ToLowerInvariant() switch
         {
-            "sdkgen" => FilterPlanOperations(plan, "generate_sdk_facade"),
+            "sdkgen" => FilterPlanOperations(plan, "install_s1interop_generator_package", "generate_sdk_facade"),
             "build-hook" => FilterPlanOperations(plan, "install_build_validation_hook"),
             _ => plan
         };
@@ -47,13 +47,14 @@ internal static class MigrationPlanningCommand
         return 0;
     }
 
-    private static MigrationPlan FilterPlanOperations(MigrationPlan plan, string ruleId)
+    private static MigrationPlan FilterPlanOperations(MigrationPlan plan, params string[] ruleIds)
     {
+        var includedRuleIds = new HashSet<string>(ruleIds, StringComparer.OrdinalIgnoreCase);
         ProjectMigrationPlan[] projects = plan.Projects
             .Select(project => project with
             {
                 Operations = project.Operations
-                    .Where(operation => operation.RuleId.Equals(ruleId, StringComparison.OrdinalIgnoreCase))
+                    .Where(operation => includedRuleIds.Contains(operation.RuleId))
                     .ToArray()
             })
             .ToArray();

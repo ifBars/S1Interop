@@ -159,7 +159,7 @@ Current supported strategy:
 4. Build and verify in sandboxed copies.
 5. Report unsupported or ambiguous cases instead of guessing.
 
-The generated SDK surface is intentionally usage-driven. `sdkgen` and migration-time facade generation inspect source plus local reference metadata, then emit declarations and type-scoped facades for the types a mod touches. Avoid manual per-game-type wrappers or static catalogs of every Schedule One type; those do not scale and make drift harder to detect.
+The generated SDK surface is intentionally usage-driven. `sdkgen` and migration-time facade generation inspect source plus local reference metadata, then emit declarations and type-scoped facades for the types a mod touches. When generated facade output contains `S1InteropType` attributes, the applied plan must also install `S1Interop.Generators`; the generated SDK source and Roslyn generator package are one compile-time unit. Avoid manual per-game-type wrappers or static catalogs of every Schedule One type; those do not scale and make drift harder to detect.
 
 Future possible strategy:
 
