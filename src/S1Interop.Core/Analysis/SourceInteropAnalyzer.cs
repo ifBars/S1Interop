@@ -340,8 +340,7 @@ public sealed class SourceInteropAnalyzer
                 "Add a MONO/IL2CPP signature branch so IL2CPP uses Il2CppSystem.Collections.Generic.List<T> for game-owned callback parameters."));
         }
 
-        string codeOnlyLine = StripLineComment(trimmed);
-        if (IsIl2CppObjectCastInteropLine(codeOnlyLine))
+        if (CSharpSourceScanner.EnumerateCodeSegments(trimmed).Any(segment => IsIl2CppObjectCastInteropLine(segment.Text)))
         {
             sourceRisks.Add(new SourceRisk(
                 "Il2CppObjectCastInterop",

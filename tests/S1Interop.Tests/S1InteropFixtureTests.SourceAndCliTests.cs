@@ -1652,6 +1652,11 @@ internal sealed partial class S1InteropFixtureTests
                     {
                         return scale is float f ? f : null;
                     }
+
+                    public static string GetErrorMessage()
+                    {
+                        return "Current render pipeline is not a UniversalRenderPipelineAsset.";
+                    }
                 }
 
                 public sealed class Component
@@ -1709,6 +1714,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 migratedSource.Contains("if (undoMaskGo?.GetComponent<Mask>() != null) // remove rounded mask, the button is transparent anyway", StringComparison.Ordinal),
                 "Object cast migration should not report or rewrite harmless GetComponent checks just because comments contain the word 'is'.");
+            Assert(
+                migratedSource.Contains("return \"Current render pipeline is not a UniversalRenderPipelineAsset.\";", StringComparison.Ordinal),
+                "Object cast migration should not report or rewrite string literals that describe runtime types.");
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             Assert(
