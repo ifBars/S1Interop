@@ -380,7 +380,6 @@ public sealed class SourceInteropAnalyzer
         (line.Contains(".Read", StringComparison.Ordinal) ||
          line.Contains(".Receive", StringComparison.Ordinal) ||
          line.Contains(".Recv", StringComparison.Ordinal) ||
-         line.Contains(".Get", StringComparison.Ordinal) ||
          line.Contains(".Fill", StringComparison.Ordinal)) &&
         !line.Contains("File.", StringComparison.Ordinal) &&
         !line.Contains("Encoding.", StringComparison.Ordinal) &&

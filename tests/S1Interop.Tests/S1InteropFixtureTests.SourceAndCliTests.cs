@@ -112,6 +112,7 @@ internal sealed partial class S1InteropFixtureTests
                         SomeEvent = (Action)Delegate.Combine(SomeEvent, new Action(OnClicked));
                         GUI.Window(0, windowRect, DrawWindow, "");
                         SteamNetworking.ReadP2PPacket(data, packetSize, out bytesRead, out remoteId, channel);
+                        string? messageType = MiniMessageSerializer.GetMessageType(data);
                         if (pipelineAsset is UniversalRenderPipelineAsset typedAsset)
                         {
                             _ = typedAsset;
@@ -136,6 +137,11 @@ internal sealed partial class S1InteropFixtureTests
                     private static object pipelineAsset = new();
                     private static void OnClicked() { }
                     private static void DrawWindow(int id) { }
+
+                    private static class MiniMessageSerializer
+                    {
+                        public static string? GetMessageType(byte[] data) => data.Length == 0 ? null : "fuel";
+                    }
                 }
                 """);
 
@@ -157,6 +163,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 source.SourceRisks.Any(risk => risk.Kind == "Il2CppByteBufferInterop"),
                 "Source analyzer should report IL2CPP byte buffer marshalling risk.");
+            Assert(
+                source.SourceRisks.Where(risk => risk.Kind == "Il2CppByteBufferInterop").All(risk => !risk.Evidence.Contains("GetMessageType", StringComparison.Ordinal)),
+                "Source analyzer should not treat byte[] serializer/parser getters as native byte-buffer fill calls.");
             Assert(
                 source.SourceRisks.Any(risk => risk.Kind == "ManagedCollectionSignatureInterop"),
                 "Source analyzer should report managed collection signature interop risk.");

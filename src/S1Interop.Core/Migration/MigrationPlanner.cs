@@ -272,6 +272,11 @@ public sealed class MigrationPlanner
             }
         }
 
+        MemberAccessTarget[] generatedMemberAccessTargets = new MemberAccessTargetCatalog()
+            .Discover(project.ProjectPath)
+            .ToArray();
+        AddGeneratedMemberAccessTargetOperations(project, operations, generatedMemberAccessTargets);
+
         if (options.IncludeSourceRisks && project.SourceInterop is not null && project.SourceInterop.SourceRisks.Count > 0)
         {
             SourceRisk[] automaticUnityEventRisks = project.SourceInterop.SourceRisks
@@ -294,9 +299,6 @@ public sealed class MigrationPlanner
                 .ToArray();
             SourceRisk[] automaticObjectCastRisks = project.SourceInterop.SourceRisks
                 .Where(Il2CppObjectCastRewriter.CanRewrite)
-                .ToArray();
-            MemberAccessTarget[] generatedMemberAccessTargets = new MemberAccessTargetCatalog()
-                .Discover(project.ProjectPath)
                 .ToArray();
             int generatedMemberAccessTargetCount = generatedMemberAccessTargets.Length;
             bool hasGeneratedMemberAccessTargets = generatedMemberAccessTargetCount > 0;
@@ -534,6 +536,50 @@ public sealed class MigrationPlanner
         return operations
             .DistinctBy(operation => (operation.RuleId, operation.FilePath, operation.Configuration, operation.Description))
             .ToArray();
+    }
+
+    private static void AddGeneratedMemberAccessTargetOperations(
+        ProjectAnalysis project,
+        List<MigrationOperation> operations,
+        IReadOnlyList<MemberAccessTarget> targets)
+    {
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+        {
+            operations.Add(new MigrationOperation(
+                "install_s1interop_generator_package",
+                project.ProjectPath,
+                null,
+                "low",
+                true,
+                "Install the S1Interop Roslyn generator package required by generated member access helpers."));
+        }
+
+        operations.Add(new MigrationOperation(
+            "generate_member_access_targets",
+            MemberAccessTargetGenerator.GetSourcePath(project.ProjectPath),
+            null,
+            "low",
+            true,
+            "Generate S1InteropMember declarations for typed field/property reflection targets."));
+
+        foreach (string sourceFile in targets
+                     .Select(target => target.SourceFilePath)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            operations.Add(new MigrationOperation(
+                "rewrite_member_access_fallbacks",
+                sourceFile,
+                null,
+                "low",
+                true,
+                "Rewrite simple typed field/property reflection fallback getters through generated S1InteropMemberRegistry accessors."));
+        }
     }
 
     private static string ToSnakeCase(string value)
