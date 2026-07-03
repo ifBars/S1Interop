@@ -340,7 +340,8 @@ public sealed class SourceInteropAnalyzer
                 "Add a MONO/IL2CPP signature branch so IL2CPP uses Il2CppSystem.Collections.Generic.List<T> for game-owned callback parameters."));
         }
 
-        if (IsIl2CppObjectCastInteropLine(trimmed))
+        string codeOnlyLine = StripLineComment(trimmed);
+        if (IsIl2CppObjectCastInteropLine(codeOnlyLine))
         {
             sourceRisks.Add(new SourceRisk(
                 "Il2CppObjectCastInterop",
@@ -429,6 +430,12 @@ public sealed class SourceInteropAnalyzer
          line.Contains("UnityEngine.Object", StringComparison.Ordinal) ||
          line.Contains("Component", StringComparison.Ordinal) ||
          line.Contains("MonoBehaviour", StringComparison.Ordinal));
+
+    private static string StripLineComment(string line)
+    {
+        int commentIndex = line.IndexOf("//", StringComparison.Ordinal);
+        return commentIndex < 0 ? line : line[..commentIndex].TrimEnd();
+    }
 
     private static bool IsDirectUnityEventListenerLine(string line, IReadOnlySet<string> runtimeSafeUnityListenerNames)
     {

@@ -1602,8 +1602,17 @@ internal sealed partial class S1InteropFixtureTests
                             existingAsset.renderScale = 1.0f;
                         }
 
+                        if (undoMaskGo?.GetComponent<Mask>() != null) // remove rounded mask, the button is transparent anyway
+                        {
+                            return true;
+                        }
+
                         return false;
                     }
+                }
+
+                public sealed class Mask
+                {
                 }
 
                 public sealed class UniversalRenderPipelineAsset
@@ -1643,6 +1652,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 CountOccurrences(migratedSource, "S1Interop.Generated.S1InteropObjectCast.Is<UniversalRenderPipelineAsset>") == 2,
                 "Object cast migration should rewrite the risky cast once without rewriting existing generated-helper usage.");
+            Assert(
+                migratedSource.Contains("if (undoMaskGo?.GetComponent<Mask>() != null) // remove rounded mask, the button is transparent anyway", StringComparison.Ordinal),
+                "Object cast migration should not report or rewrite harmless GetComponent checks just because comments contain the word 'is'.");
 
             WorkspaceAnalysis after = analyzer.Analyze(tempProject);
             Assert(
