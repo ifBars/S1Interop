@@ -1818,6 +1818,7 @@ internal sealed partial class S1InteropFixtureTests
             string corePath = Path.Combine(targetDirectory, "ModCore.cs");
             string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
             string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
+            string localPropsPath = Path.Combine(targetDirectory, "local.build.props");
             string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
 
             ProcessResult dryRun = RunCli("new", targetDirectory);
@@ -1885,8 +1886,22 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
                 localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
+                localPropsExampleSource.Contains("<S1InteropGeneratorPackageSource>", StringComparison.Ordinal) &&
+                localPropsExampleSource.Contains("<RestoreAdditionalProjectSources Condition=\"'$(S1InteropGeneratorPackageSource)'!=''\">$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>", StringComparison.Ordinal) &&
                 gitignoreSource.Contains("local.build.props", StringComparison.Ordinal),
-                "Generated local path scaffolding should show both runtime game paths while keeping local.build.props ignored.");
+                "Generated local path scaffolding should show both runtime game paths and the optional local generator package feed while keeping local.build.props ignored.");
+
+            string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+            File.WriteAllText(
+                localPropsPath,
+                localPropsExampleSource.Replace(
+                    @"C:\Path\To\S1Interop\artifacts\packages",
+                    packageSource,
+                    StringComparison.Ordinal));
+            ProcessResult restore = RunDotNet("restore", solutionPath, "--nologo", "-v:minimal");
+            Assert(
+                restore.ExitCode == 0,
+                $"Generated local.build.props should feed the local generator package source to restore without extra command-line restore sources. Output: {restore.Output}");
 
             string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
             string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
@@ -1894,8 +1909,6 @@ internal sealed partial class S1InteropFixtureTests
             string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
             if (File.Exists(monoMelonLoader) || File.Exists(il2CppMelonLoader))
             {
-                string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
-
                 if (File.Exists(monoMelonLoader))
                 {
                     ProcessResult monoScaffoldBuild = RunDotNet(
