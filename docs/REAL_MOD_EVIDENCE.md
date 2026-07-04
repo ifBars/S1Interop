@@ -22,6 +22,18 @@ Run the full integration lane before release-facing validation:
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 
+## Last Local Verification
+
+On July 4, 2026, the focused backend-neutral real-mod lane passed locally:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
+```
+
+Result: `S1Interop fixture tests passed (9 executed).`
+
+This run proves the focused backend-neutral coverage listed below against the current local workspace and game reference paths. It is not a substitute for the slower build-gate lane or a full release-facing integration pass.
+
 ## Current Real-Mod Coverage
 
 | Mod or fixture | Current evidence |
