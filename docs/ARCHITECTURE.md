@@ -155,7 +155,8 @@ The registry generator is intentionally split by responsibility. Keep `S1Interop
 - `RuntimeBackendResolver.cs`: target-runtime resolution from MSBuild properties and preprocessor symbols.
 - `GeneratorConstants.cs` and `GeneratorDiagnosticDescriptors.cs`: shared metadata names, runtime probes, and diagnostic descriptors.
 - `S1InteropTypeRegistryGenerator.Models.cs`: internal data contracts used between collection, diagnostics, and emission.
-- `*.InputModel.cs`: attribute parsing, bridge requests, explicit member declarations, and public member discovery.
+- `*.InputModel.cs`: attribute parsing, bridge requests, explicit type/member declarations, and merge rules.
+- `*.PublicMemberDiscovery.cs`: metadata-driven discovery of compatible public fields, properties, and unambiguous methods from referenced Mono/IL2CPP surfaces.
 - `*.DeclarationDiagnostics.cs`: `S1InteropType`/`S1InteropMember` declaration validation against available game reference surfaces.
 - `*.RegistryEmission.cs`: generated runtime registry and reflection-cache source emission.
 - `*.TypeFacadeEmission.cs`: generated type-scoped facade API source emission.
