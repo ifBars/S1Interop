@@ -3,7 +3,7 @@
 S1Interop is split into three deliverable assemblies plus a fixture test harness:
 
 - `S1Interop.Cli`: command-line entry point and user-facing output.
-- `S1Interop.Core`: analysis, migration, rewriting, generation, rollback, and verification engine.
+- `S1Interop.Core`: analysis, migration, rewriting, code emission, rollback, and verification engine.
 - `S1Interop.Generators`: Roslyn source-generator package used by migrated or backend-neutral mod projects.
 - `S1Interop.Tests`: executable fixture harness for portable and local integration coverage.
 
@@ -118,11 +118,11 @@ Current examples:
 
 Rewriters should be idempotent. Running migration more than once must not degrade generated declarations or rewrite already migrated code into an invalid state.
 
-### Migration-Time Generators
+### Migration-Time Code Emission
 
-Path: `src/S1Interop.Core/Generators/`
+Path: `src/S1Interop.Core/CodeGeneration/`
 
-These generators write source files into the target mod project during CLI migration. They are allowed to inspect the project on disk and coordinate with source rewrites.
+These emitters write source files into the target mod project during CLI migration. They are allowed to inspect the project on disk and coordinate with source rewrites.
 
 Generated files include:
 
@@ -135,7 +135,7 @@ Generated files include:
 
 Member access target discovery is scoped to backend/game surfaces and runs even when no source-risk report remains. Usage-driven declarations from helpers such as `ReflectionUtils.TryGetFieldOrProperty(vehicle, "vehicleName")` are generated as SDK surface because they make backend-neutral code more native-like. Discovery should not emit S1Interop declarations for MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, or `MelonPreferences`; those are mod loader implementation details, not Schedule One Mono/IL2CPP wrapper drift.
 
-These are not Roslyn source generators. They are part of the CLI migration pipeline.
+These are not Roslyn source generators. They are part of the CLI migration pipeline. Keep this namespace under `S1Interop.Core.CodeGeneration` so it does not blur together with the packaged Roslyn generator assembly.
 
 ## Roslyn Generator Layer
 
@@ -148,6 +148,17 @@ Path: `src/S1Interop.Generators/`
 - bridge generation attributes
 
 It emits generated helper source under `S1Interop.Generated`.
+
+The main registry generator is intentionally split by responsibility:
+
+- `S1InteropTypeRegistryGenerator.cs`: incremental-generator wiring and target-runtime resolution.
+- `*.InputModel.cs`: attribute parsing, type/member discovery, and declaration validation helpers.
+- `*.RegistryEmission.cs`: registry and type-facade source emission.
+- `*.MemberRegistryEmission.cs`: member-registry source emission.
+- `*.RuntimeEmission.cs`: object handles, casts, and delegate bridge runtime helpers.
+- `*.AttributeEmission.cs`: attribute and bridge source templates.
+- `*.Diagnostics.cs`: source-boundary diagnostics.
+- `*.Models.cs` and `*.TypeNameHelpers.cs`: shared internal model types and name normalization.
 
 The target API shape is type-first. `S1InteropType` is enough to request a backend-neutral facade for a game type and now discovers compatible public fields/properties plus unambiguous public methods from referenced Mono and IL2CPP metadata. `S1InteropMember` is the override path for private members, readable aliases, ambiguous overloads, pinned method bindings, or specific migration-inferred reflection bindings. Avoid designing new features that make developers manually enumerate every common public field/property or simple method after they already opted into the type.
 

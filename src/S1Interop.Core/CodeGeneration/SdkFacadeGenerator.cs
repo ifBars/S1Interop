@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 using S1Interop.Core;
 
-namespace S1Interop.Core.Generators;
+namespace S1Interop.Core.CodeGeneration;
 
 public sealed record SdkFacadeGeneratorOptions(bool FullSdk = false)
 {

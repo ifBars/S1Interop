@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace S1Interop.Core.Generators;
+namespace S1Interop.Core.CodeGeneration;
 
 public sealed class BackendNeutralStarterGenerator
 {

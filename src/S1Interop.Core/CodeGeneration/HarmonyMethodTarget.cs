@@ -1,4 +1,4 @@
-namespace S1Interop.Core.Generators;
+namespace S1Interop.Core.CodeGeneration;
 
 public sealed record HarmonyMethodTarget(
     string SourceFilePath,

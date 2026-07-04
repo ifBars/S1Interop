@@ -227,7 +227,7 @@ public sealed class MemberAccessTargetCatalog
     }
 
     private static bool IsGeneratedMemberAccessTargetsFile(string path) =>
-        Path.GetFileName(path).Equals(Generators.MemberAccessTargetGenerator.SourceFileName, StringComparison.OrdinalIgnoreCase) &&
+        Path.GetFileName(path).Equals(MemberAccessTargetGenerator.SourceFileName, StringComparison.OrdinalIgnoreCase) &&
         Path.GetFileName(Path.GetDirectoryName(path) ?? string.Empty).Equals("S1Interop.Generated", StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<string, string> DiscoverScheduleOneUsings(IEnumerable<string> lines)
@@ -328,7 +328,7 @@ public sealed class MemberAccessTargetCatalog
         string generatedPath = Path.Combine(
             projectDirectory,
             "S1Interop.Generated",
-            Generators.MemberAccessTargetGenerator.SourceFileName);
+            MemberAccessTargetGenerator.SourceFileName);
         if (!File.Exists(generatedPath))
         {
             yield break;

@@ -48,7 +48,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 - Keep `S1Interop.Cli` focused on command flow and reporting.
 - Put reusable behavior in `S1Interop.Core`.
-- Keep analysis, migration, rewriting, generation, and verification concerns separate.
+- Keep analysis, migration, rewriting, code emission, Roslyn generation, and verification concerns separate.
 - Prefer explicit models and small focused helpers over broad string manipulation.
 - Use XML APIs for project file edits when practical.
 - Make migrations reversible and idempotent.

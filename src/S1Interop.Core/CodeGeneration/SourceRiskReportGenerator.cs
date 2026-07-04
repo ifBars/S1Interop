@@ -2,7 +2,7 @@ using System.Text;
 
 using S1Interop.Core;
 
-namespace S1Interop.Core.Generators;
+namespace S1Interop.Core.CodeGeneration;
 
 public sealed class SourceRiskReportGenerator
 {

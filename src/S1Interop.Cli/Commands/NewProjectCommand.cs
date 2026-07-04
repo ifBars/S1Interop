@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using S1Interop.Core;
-using S1Interop.Core.Generators;
+using S1Interop.Core.CodeGeneration;
 
 internal static class NewProjectCommand
 {

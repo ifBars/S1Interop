@@ -1,1 +1,1 @@
-global using S1Interop.Core.Generators;
+global using S1Interop.Core.CodeGeneration;

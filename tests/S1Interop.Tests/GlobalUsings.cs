@@ -7,7 +7,7 @@ global using System.Xml.Linq;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;
 global using S1Interop.Core;
-global using S1Interop.Core.Generators;
+global using S1Interop.Core.CodeGeneration;
 global using S1Interop.Generators;
 global using CoreDiagnosticSeverity = S1Interop.Core.DiagnosticSeverity;
 global using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;

@@ -53,11 +53,11 @@ Use the full `--integration` lane only when broad release-facing local validatio
 ## Architecture Rules
 
 - `S1Interop.Cli` owns command parsing, command dispatch, and user-facing reporting.
-- `S1Interop.Core` owns project analysis, migration planning, migration application, rollback, source rewriting, sandbox verification, and migration-time generated files.
+- `S1Interop.Core` owns project analysis, migration planning, migration application, rollback, source rewriting, sandbox verification, and migration-time code emission.
 - `S1Interop.Generators` is the Roslyn source-generator package consumed by mod projects. Keep it additive: it can emit generated source and diagnostics, but it must not assume it can rewrite existing user code.
 - Generator diagnostics that validate game type/member strings must only fail when the relevant Mono/IL2CPP reference surface is available in the current compilation.
 - Keep CLI code thin. Put reusable behavior in Core.
-- Keep Core analysis, migration, rewriting, and generation boundaries separate. A new rule should have an obvious owner.
+- Keep Core analysis, migration, rewriting, and code-emission boundaries separate. Use `S1Interop.Core.CodeGeneration` for CLI-written files and reserve `S1Interop.Generators` for the packaged Roslyn generator/analyzer assembly.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
 - Treat backend-neutral type coverage as generated SDK output from source usage and reference metadata. Do not build or maintain a hand-written wrapper catalog for every Schedule One type.
 - Design SDK work around type-first facades: `S1InteropType` should eventually expose compatible public members for that type, while `S1InteropMember` is an override path for private members, aliases, ambiguous overloads, and migration-inferred reflection seams.
