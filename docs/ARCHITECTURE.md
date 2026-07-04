@@ -223,6 +223,8 @@ The CLI packages as a local/global .NET tool with package id `S1Interop`.
 
 The Roslyn generator package is `S1Interop.Generators` and packages the built generator DLL under `analyzers/dotnet/cs`.
 
+Source code that emits `S1Interop.Generators` package references should use `S1InteropPackageInfo` instead of hardcoding package id, version, or analyzer asset metadata. Portable tests compare that source-side metadata with the CLI and generator package projects so alpha version bumps fail fast when only one side is updated.
+
 CI verifies:
 
 - restore

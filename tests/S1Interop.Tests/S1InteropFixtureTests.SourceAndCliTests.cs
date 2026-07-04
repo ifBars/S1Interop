@@ -7,8 +7,36 @@ internal sealed partial class S1InteropFixtureTests
         Assert(version.ExitCode == 0, $"s1interop --version should succeed. Output: {version.Output}");
         Assert(
             version.Output.Contains("S1Interop", StringComparison.Ordinal) &&
-            version.Output.Contains("0.1.0-alpha.1", StringComparison.Ordinal),
+            version.Output.Contains(S1InteropPackageInfo.CliPackageVersion, StringComparison.Ordinal),
             $"s1interop --version should print the package version. Output: {version.Output}");
+    }
+
+    private void PackageInfoMatchesPackageProjects()
+    {
+        string cliProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
+        string generatorProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Generators", "S1Interop.Generators.csproj");
+        XDocument cliDocument = XDocument.Load(cliProject);
+        XDocument generatorDocument = XDocument.Load(generatorProject);
+        XElement cliPropertyGroup = cliDocument.Root!.Elements().First(element => element.Name.LocalName == "PropertyGroup");
+        XElement generatorPropertyGroup = generatorDocument.Root!.Elements().First(element => element.Name.LocalName == "PropertyGroup");
+
+        Assert(
+            string.Equals(cliPropertyGroup.Element("PackageId")?.Value, S1InteropPackageInfo.CliPackageId, StringComparison.Ordinal),
+            "S1InteropPackageInfo.CliPackageId should match the CLI package project.");
+        Assert(
+            string.Equals(cliPropertyGroup.Element("Version")?.Value, S1InteropPackageInfo.CliPackageVersion, StringComparison.Ordinal),
+            "S1InteropPackageInfo.CliPackageVersion should match the CLI package project.");
+
+        Assert(
+            string.Equals(generatorPropertyGroup.Element("PackageId")?.Value, S1InteropPackageInfo.GeneratorsPackageId, StringComparison.Ordinal),
+            "S1InteropPackageInfo.GeneratorsPackageId should match the generator package project.");
+        Assert(
+            string.Equals(generatorPropertyGroup.Element("Version")?.Value, S1InteropPackageInfo.GeneratorsPackageVersion, StringComparison.Ordinal),
+            "S1InteropPackageInfo.GeneratorsPackageVersion should match the generator package project.");
+        Assert(
+            S1InteropPackageInfo.CreateLocalGeneratorsPackageVersion(new DateTimeOffset(2026, 7, 4, 1, 2, 3, 456, TimeSpan.Zero))
+                .StartsWith($"{S1InteropPackageInfo.GeneratorsPackageVersion}.local.", StringComparison.Ordinal),
+            "Local generator package versions should be derived from the public generator package version.");
     }
 
     private void AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic()
@@ -1855,8 +1883,8 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
                 projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
-                projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
-                projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal) &&
+                projectSource.Contains(S1InteropPackageInfo.GeneratorsPackageId, StringComparison.Ordinal) &&
+                projectSource.Contains($"PrivateAssets=\"{S1InteropPackageInfo.PrivateAssets}\"", StringComparison.Ordinal) &&
                 projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
                 projectSource.Contains("<Configurations>Debug;Release;Debug Il2Cpp;Release Il2Cpp</Configurations>", StringComparison.Ordinal) &&
                 projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'=='' and ('$(Configuration)'=='Debug Il2Cpp' or '$(Configuration)'=='Release Il2Cpp')\">Il2Cpp</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&

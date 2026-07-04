@@ -451,7 +451,7 @@ public sealed class MigrationVerifier
     {
         if (!project.Configurations.Any(configuration =>
                 configuration.PackageReferences.Any(package =>
-                    string.Equals(package.Include, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase))))
+                    string.Equals(package.Include, S1InteropPackageInfo.GeneratorsPackageId, StringComparison.OrdinalIgnoreCase))))
         {
             return null;
         }
@@ -467,7 +467,7 @@ public sealed class MigrationVerifier
             ExternalReferenceStagingDirectoryName,
             "NuGet");
         Directory.CreateDirectory(packageSource);
-        string packageVersion = $"0.1.0-alpha.1.local.{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        string packageVersion = S1InteropPackageInfo.CreateLocalGeneratorsPackageVersion(DateTimeOffset.UtcNow);
         RewriteSandboxGeneratorPackageVersion(sandboxProjectPath, packageVersion);
 
         using var process = new Process();
@@ -502,7 +502,7 @@ public sealed class MigrationVerifier
         }
 
         return process.ExitCode == 0 &&
-               Directory.EnumerateFiles(packageSource, $"S1Interop.Generators.{packageVersion}.nupkg").Any()
+               Directory.EnumerateFiles(packageSource, $"{S1InteropPackageInfo.GeneratorsPackageId}.{packageVersion}.nupkg").Any()
             ? new StagedS1InteropGeneratorPackage(packageSource, packageVersion)
             : null;
     }
@@ -513,7 +513,7 @@ public sealed class MigrationVerifier
         bool changed = false;
         foreach (XElement package in document.Descendants().Where(IsNamed("PackageReference")))
         {
-            if (!string.Equals(package.Attribute("Include")?.Value, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(package.Attribute("Include")?.Value, S1InteropPackageInfo.GeneratorsPackageId, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }

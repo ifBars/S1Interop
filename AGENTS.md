@@ -80,7 +80,7 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - Keep public docs accurate to the current alpha behavior. Do not promise one-command conversion for every mod.
 - Public docs should describe repeatable workflows and generic path placeholders.
 - Put local investigation notes and unreleased planning in ignored internal files.
-- Update `README.md`, `docs/architecture.md`, `docs/CONTRIBUTING.md`, or `docs/TESTING.md` when changing public workflow, repo boundaries, or validation commands.
+- Update `README.md`, `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, or `docs/TESTING.md` when changing public workflow, repo boundaries, or validation commands.
 
 ## Git Workflow
 

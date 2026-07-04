@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using S1Interop.Core;
 using S1Interop.Core.Generators;
 
 internal static class NewProjectCommand
@@ -117,7 +118,7 @@ internal static class NewProjectCommand
           </PropertyGroup>
 
           <ItemGroup>
-            <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.1" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+            <PackageReference Include="{S1InteropPackageInfo.GeneratorsPackageId}" Version="{S1InteropPackageInfo.GeneratorsPackageVersion}" PrivateAssets="{S1InteropPackageInfo.PrivateAssets}" IncludeAssets="{S1InteropPackageInfo.AnalyzerIncludeAssets}" />
           </ItemGroup>
 
           <ItemGroup>

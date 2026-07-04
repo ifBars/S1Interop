@@ -144,14 +144,14 @@ internal sealed partial class S1InteropFixtureTests
             string tempProject = Path.Combine(tempRoot, "GeneratorPackageMod.csproj");
             File.WriteAllText(
                 tempProject,
-                """
+                $$"""
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.1" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+                    <PackageReference Include="{{S1InteropPackageInfo.GeneratorsPackageId}}" Version="{{S1InteropPackageInfo.GeneratorsPackageVersion}}" PrivateAssets="{{S1InteropPackageInfo.PrivateAssets}}" IncludeAssets="{{S1InteropPackageInfo.AnalyzerIncludeAssets}}" />
                   </ItemGroup>
                 </Project>
                 """);

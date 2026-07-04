@@ -409,13 +409,13 @@ public sealed class MigrationApplier
         XElement? existing = document.Descendants()
             .Where(IsNamed("PackageReference"))
             .FirstOrDefault(package =>
-                string.Equals(package.Attribute("Include")?.Value, "S1Interop.Generators", StringComparison.OrdinalIgnoreCase));
+                string.Equals(package.Attribute("Include")?.Value, S1InteropPackageInfo.GeneratorsPackageId, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
             bool changed = false;
-            changed |= SetAttributeIfDifferent(existing, "Version", "0.1.0-alpha.1");
-            changed |= SetAttributeIfDifferent(existing, "PrivateAssets", "all");
-            changed |= SetAttributeIfDifferent(existing, "IncludeAssets", "runtime; build; native; contentfiles; analyzers; buildtransitive");
+            changed |= SetAttributeIfDifferent(existing, "Version", S1InteropPackageInfo.GeneratorsPackageVersion);
+            changed |= SetAttributeIfDifferent(existing, "PrivateAssets", S1InteropPackageInfo.PrivateAssets);
+            changed |= SetAttributeIfDifferent(existing, "IncludeAssets", S1InteropPackageInfo.AnalyzerIncludeAssets);
             return changed;
         }
 
@@ -431,10 +431,10 @@ public sealed class MigrationApplier
         itemGroup.Add(
             new XElement(
                 "PackageReference",
-                new XAttribute("Include", "S1Interop.Generators"),
-                new XAttribute("Version", "0.1.0-alpha.1"),
-                new XAttribute("PrivateAssets", "all"),
-                new XAttribute("IncludeAssets", "runtime; build; native; contentfiles; analyzers; buildtransitive")));
+                new XAttribute("Include", S1InteropPackageInfo.GeneratorsPackageId),
+                new XAttribute("Version", S1InteropPackageInfo.GeneratorsPackageVersion),
+                new XAttribute("PrivateAssets", S1InteropPackageInfo.PrivateAssets),
+                new XAttribute("IncludeAssets", S1InteropPackageInfo.AnalyzerIncludeAssets)));
         return true;
     }
 

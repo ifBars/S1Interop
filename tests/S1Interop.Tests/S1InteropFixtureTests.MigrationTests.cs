@@ -887,7 +887,9 @@ internal sealed partial class S1InteropFixtureTests
 
             string projectText = File.ReadAllText(tempProject);
             Assert(
-                projectText.Contains("<PackageReference Include=\"S1Interop.Generators\" Version=\"0.1.0-alpha.1\" PrivateAssets=\"all\" IncludeAssets=\"runtime; build; native; contentfiles; analyzers; buildtransitive\" />", StringComparison.Ordinal),
+                projectText.Contains(
+                    $"<PackageReference Include=\"{S1InteropPackageInfo.GeneratorsPackageId}\" Version=\"{S1InteropPackageInfo.GeneratorsPackageVersion}\" PrivateAssets=\"{S1InteropPackageInfo.PrivateAssets}\" IncludeAssets=\"{S1InteropPackageInfo.AnalyzerIncludeAssets}\" />",
+                    StringComparison.Ordinal),
                 "Generator-aware migration should install S1Interop.Generators as a private analyzer package.");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
