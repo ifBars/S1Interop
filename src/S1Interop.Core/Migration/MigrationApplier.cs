@@ -823,6 +823,8 @@ public sealed class MigrationApplier
             changed = true;
         }
 
+        changed = EnsureLocalGeneratorPackageSourceProperties(propertyGroup) || changed;
+
         if (!changed)
         {
             return;
@@ -2150,11 +2152,42 @@ public sealed class MigrationApplier
         var document = new XDocument(
             new XElement("Project",
                 new XElement("PropertyGroup",
-                    properties.Select(property =>
-                        new XElement(property.Key, includeValues ? property.Value : string.Empty)))));
+                    properties
+                        .Select(property => new XElement(property.Key, includeValues ? property.Value : string.Empty))
+                        .Concat(CreateLocalGeneratorPackageSourceProperties()))));
         document.Save(path);
         UpdateTrackedFileHash(path, fileChanges);
     }
+
+    private static bool EnsureLocalGeneratorPackageSourceProperties(XElement propertyGroup)
+    {
+        bool changed = false;
+        if (!propertyGroup.Elements().Any(IsNamed(S1InteropPackageInfo.GeneratorsPackageSourceProperty)))
+        {
+            propertyGroup.Add(new XElement(S1InteropPackageInfo.GeneratorsPackageSourceProperty, string.Empty));
+            changed = true;
+        }
+
+        if (!propertyGroup.Elements().Any(IsNamed(S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty)))
+        {
+            propertyGroup.Add(CreateRestoreAdditionalProjectSourcesElement());
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static IEnumerable<XElement> CreateLocalGeneratorPackageSourceProperties()
+    {
+        yield return new XElement(S1InteropPackageInfo.GeneratorsPackageSourceProperty, string.Empty);
+        yield return CreateRestoreAdditionalProjectSourcesElement();
+    }
+
+    private static XElement CreateRestoreAdditionalProjectSourcesElement() =>
+        new(
+            S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty,
+            new XAttribute("Condition", $"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''"),
+            $"$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})");
 
     private static bool EnsureGitIgnoreEntry(
         string path,

@@ -9,6 +9,8 @@ public static class S1InteropPackageInfo
     public const string GeneratorsPackageVersion = AlphaPackageVersion;
     public const string PrivateAssets = "all";
     public const string AnalyzerIncludeAssets = "runtime; build; native; contentfiles; analyzers; buildtransitive";
+    public const string GeneratorsPackageSourceProperty = "S1InteropGeneratorPackageSource";
+    public const string RestoreAdditionalProjectSourcesProperty = "RestoreAdditionalProjectSources";
 
     public static string CreateLocalGeneratorsPackageVersion(DateTimeOffset timestamp) =>
         $"{GeneratorsPackageVersion}.local.{timestamp:yyyyMMddHHmmssfff}";

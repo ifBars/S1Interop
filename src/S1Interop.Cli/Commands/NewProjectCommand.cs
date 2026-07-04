@@ -218,15 +218,15 @@ internal static class NewProjectCommand
         """;
 
     private static string GenerateLocalPropsExample() =>
-        """
+        $"""
         <Project>
           <PropertyGroup>
             <!-- Local-only paths and package feeds. Copy this file to local.build.props and keep that file out of source control. -->
             <MonoGamePath>C:\Path\To\Schedule I_alternate</MonoGamePath>
             <Il2CppGamePath>C:\Path\To\Schedule I_public</Il2CppGamePath>
             <!-- Required only while using unpublished/local S1Interop.Generators packages. -->
-            <S1InteropGeneratorPackageSource>C:\Path\To\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
-            <RestoreAdditionalProjectSources Condition="'$(S1InteropGeneratorPackageSource)'!=''">$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
+            <{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>C:\Path\To\S1Interop\artifacts\packages</{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>
+            <{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition="'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>
           </PropertyGroup>
         </Project>
         """;
@@ -245,7 +245,7 @@ internal static class NewProjectCommand
         Backend-neutral Schedule One mod scaffold created by S1Interop.
 
         Before building locally, copy `local.build.props.example` to `local.build.props` and set your own game paths.
-        If you are using an unpublished/local build of S1Interop, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
+        If you are using an unpublished/local build of S1Interop, set `{S1InteropPackageInfo.GeneratorsPackageSourceProperty}` to the folder containing `{S1InteropPackageInfo.GeneratorsPackageId}.*.nupkg`.
         `local.build.props` is ignored so machine-specific paths do not get committed.
 
         Open `{{projectName}}.sln` in Visual Studio or Rider. `Debug` and `Release` use Mono references.

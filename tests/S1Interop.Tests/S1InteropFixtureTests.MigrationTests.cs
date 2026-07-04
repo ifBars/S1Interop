@@ -159,9 +159,14 @@ internal sealed partial class S1InteropFixtureTests
                 localPropsText.Contains("<Il2CppGamePath>D:\\SteamLibrary\\steamapps\\common\\Schedule I_public</Il2CppGamePath>", StringComparison.Ordinal),
                 "local.build.props should preserve the moved Il2Cpp game path in a clear runtime property.");
             Assert(
+                localPropsText.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal) &&
+                localPropsText.Contains($"<{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition=\"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''\">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>", StringComparison.Ordinal),
+                "local.build.props should include an optional local S1Interop.Generators restore source.");
+            Assert(
                 examplePropsText.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
-                examplePropsText.Contains("<Il2CppGamePath>", StringComparison.Ordinal),
-                "local.build.props.example should show both runtime-specific game path slots.");
+                examplePropsText.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
+                examplePropsText.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal),
+                "local.build.props.example should show both runtime-specific game path slots and the optional generator package source.");
         }
         finally
         {

@@ -1914,8 +1914,8 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
                 localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
-                localPropsExampleSource.Contains("<S1InteropGeneratorPackageSource>", StringComparison.Ordinal) &&
-                localPropsExampleSource.Contains("<RestoreAdditionalProjectSources Condition=\"'$(S1InteropGeneratorPackageSource)'!=''\">$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>", StringComparison.Ordinal) &&
+                localPropsExampleSource.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal) &&
+                localPropsExampleSource.Contains($"<{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition=\"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''\">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>", StringComparison.Ordinal) &&
                 gitignoreSource.Contains("local.build.props", StringComparison.Ordinal),
                 "Generated local path scaffolding should show both runtime game paths and the optional local generator package feed while keeping local.build.props ignored.");
 

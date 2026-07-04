@@ -201,7 +201,7 @@ Every developer has different Schedule One install paths. Pass paths explicitly 
 .\.tools\s1interop verify-migration . --dual-runtime --build --il2cpp-game-path "<your IL2CPP Schedule I install>" --mono-game-path "<your Mono Schedule I install>"
 ```
 
-If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Do not commit that file. Those property names are stable override points for Visual Studio, Rider, and command-line builds, even when the project uses custom configurations such as `MonoStable` or `Il2cppDevelopment`.
+If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. If the project uses generated S1Interop helpers from unpublished local packages, set `S1InteropGeneratorPackageSource` to the folder that contains `S1Interop.Generators.*.nupkg`. Do not commit `local.build.props`. Those property names are stable override points for Visual Studio, Rider, and command-line builds, even when the project uses custom configurations such as `MonoStable` or `Il2cppDevelopment`.
 
 For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, set both game paths, and open the generated `.sln`. If you are using unpublished local packages, also set `S1InteropGeneratorPackageSource` to the folder that contains `S1Interop.Generators.*.nupkg`; this feeds Visual Studio, Rider, and command-line restore through `RestoreAdditionalProjectSources`. `Debug` and `Release` build against Mono references by default; `Debug Il2Cpp` and `Release Il2Cpp` build the same source against IL2CPP references.
 
