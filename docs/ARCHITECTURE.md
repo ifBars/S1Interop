@@ -149,16 +149,21 @@ Path: `src/S1Interop.Generators/`
 
 It emits generated helper source under `S1Interop.Generated`.
 
-The main registry generator is intentionally split by responsibility:
+The registry generator is intentionally split by responsibility. Keep `S1InteropTypeRegistryGenerator.cs` as the Roslyn pipeline wiring layer; move reusable contracts and behavior into focused internal generator-layer types instead of growing the entry-point class.
 
-- `S1InteropTypeRegistryGenerator.cs`: incremental-generator wiring and target-runtime resolution.
-- `*.InputModel.cs`: attribute parsing, type/member discovery, and declaration validation helpers.
-- `*.RegistryEmission.cs`: registry and type-facade source emission.
+- `S1InteropTypeRegistryGenerator.cs`: incremental-generator wiring only.
+- `RuntimeBackendResolver.cs`: target-runtime resolution from MSBuild properties and preprocessor symbols.
+- `GeneratorConstants.cs` and `GeneratorDiagnosticDescriptors.cs`: shared metadata names, runtime probes, and diagnostic descriptors.
+- `S1InteropTypeRegistryGenerator.Models.cs`: internal data contracts used between collection, diagnostics, and emission.
+- `*.InputModel.cs`: attribute parsing, bridge requests, explicit member declarations, and public member discovery.
+- `*.DeclarationDiagnostics.cs`: `S1InteropType`/`S1InteropMember` declaration validation against available game reference surfaces.
+- `*.RegistryEmission.cs`: generated runtime registry and reflection-cache source emission.
+- `*.TypeFacadeEmission.cs`: generated type-scoped facade API source emission.
 - `*.MemberRegistryEmission.cs` and `*.Member*Emission.cs`: member-registry source emission, split between declared accessors, value access, conversion, invocation, and member resolution helper groups.
 - `*.RuntimeEmission.cs`: object handles, casts, and delegate bridge runtime helpers.
 - `*.AttributeEmission.cs`: attribute and bridge source templates.
 - `*.Diagnostics.cs`: source-boundary diagnostics.
-- `*.Models.cs` and `*.TypeNameHelpers.cs`: shared internal model types and name normalization.
+- `*.TypeNameHelpers.cs`: shared name normalization.
 
 The target API shape is type-first. `S1InteropType` is enough to request a backend-neutral facade for a game type and now discovers compatible public fields/properties plus unambiguous public methods from referenced Mono and IL2CPP metadata. `S1InteropMember` is the override path for private members, readable aliases, ambiguous overloads, pinned method bindings, or specific migration-inferred reflection bindings. Avoid designing new features that make developers manually enumerate every common public field/property or simple method after they already opted into the type.
 
