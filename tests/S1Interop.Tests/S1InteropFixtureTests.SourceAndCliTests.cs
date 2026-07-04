@@ -11,6 +11,33 @@ internal sealed partial class S1InteropFixtureTests
             $"s1interop --version should print the package version. Output: {version.Output}");
     }
 
+    private void CliRejectsInvalidOptionsBeforeDispatch()
+    {
+        ProcessResult unknownOption = RunCli("analyze", "--aply");
+        Assert(
+            unknownOption.ExitCode == 2 &&
+            unknownOption.Output.Contains("Unknown option '--aply'", StringComparison.Ordinal),
+            $"Unknown CLI options should fail before analysis or migration runs. Output: {unknownOption.Output}");
+
+        ProcessResult missingValue = RunCli("verify-migration", "--build-timeout-seconds");
+        Assert(
+            missingValue.ExitCode == 2 &&
+            missingValue.Output.Contains("Missing value for --build-timeout-seconds", StringComparison.Ordinal),
+            $"Options that require values should fail when the value is missing. Output: {missingValue.Output}");
+
+        ProcessResult invalidFormat = RunCli("analyze", "--format", "xml");
+        Assert(
+            invalidFormat.ExitCode == 2 &&
+            invalidFormat.Output.Contains("Invalid value for --format", StringComparison.Ordinal),
+            $"Invalid format values should fail before command dispatch. Output: {invalidFormat.Output}");
+
+        ProcessResult dryRun = RunCli("init", "--dry-run", "--path", RepositoryRoot);
+        Assert(
+            dryRun.ExitCode == 0 &&
+            dryRun.Output.Contains("S1Interop migration dry-run", StringComparison.Ordinal),
+            $"The documented --dry-run flag should be accepted as the default non-apply mode. Output: {dryRun.Output}");
+    }
+
     private void PackageInfoMatchesPackageProjects()
     {
         string cliProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Cli", "S1Interop.Cli.csproj");

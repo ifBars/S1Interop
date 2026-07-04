@@ -1,6 +1,7 @@
 # Commands
 
 Most commands default to the current directory when a path is optional.
+Unknown options, missing option values, and invalid option values fail before command dispatch so migration typos do not silently fall back to defaults.
 
 ```text
 s1interop analyze [path=.] [--configuration name] [--format text|json]
@@ -27,4 +28,3 @@ s1interop --version
 | `build-hook` | Add build-time validation hooks where supported. |
 | `migrate` | Plan or apply dual-runtime migration changes. |
 | `verify-migration` | Run migration plans in a disposable sandbox, optionally with builds. |
-

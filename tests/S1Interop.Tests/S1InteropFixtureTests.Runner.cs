@@ -43,6 +43,8 @@ internal sealed partial class S1InteropFixtureTests
         int count = 0;
         CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace();
         count++;
+        CliRejectsInvalidOptionsBeforeDispatch();
+        count++;
         PackageInfoMatchesPackageProjects();
         count++;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
@@ -176,6 +178,8 @@ internal sealed partial class S1InteropFixtureTests
     {
         int count = 0;
         CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace();
+        count++;
+        CliRejectsInvalidOptionsBeforeDispatch();
         count++;
         PackageInfoMatchesPackageProjects();
         count++;

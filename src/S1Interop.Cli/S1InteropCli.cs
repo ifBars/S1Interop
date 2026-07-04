@@ -11,6 +11,17 @@ internal static class S1InteropCli
         }
 
         ParsedCommand command = ParsedCommand.Parse(args);
+        if (command.Errors.Count > 0)
+        {
+            foreach (string error in command.Errors)
+            {
+                Console.Error.WriteLine($"s1interop: {error}");
+            }
+
+            CliHelp.Print();
+            return 2;
+        }
+
         if (command.ShowHelp)
         {
             CliHelp.Print();

@@ -12,18 +12,20 @@ internal sealed record ParsedCommand(
     bool FullSdk,
     string? Il2CppGamePath,
     string? MonoGamePath,
-    string? Configuration)
+    string? Configuration,
+    IReadOnlyList<string> Errors)
 {
     public static ParsedCommand Parse(string[] args)
     {
         if (args.Length == 0)
         {
-            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, null, null, null);
+            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, null, null, null, Array.Empty<string>());
         }
 
         string command = args[0].StartsWith("-", StringComparison.Ordinal) ? "analyze" : args[0];
         string? subcommand = null;
         string path = ".";
+        var errors = new List<string>();
         OutputFormat format = OutputFormat.Text;
         bool showHelp = args.Any(arg =>
             arg.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
@@ -54,9 +56,20 @@ internal sealed record ParsedCommand(
             string arg = args[i];
             if (arg.Equals("--format", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                format = args[++i].Equals("json", StringComparison.OrdinalIgnoreCase)
-                    ? OutputFormat.Json
-                    : OutputFormat.Text;
+                string value = args[++i];
+                if (value.Equals("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = OutputFormat.Json;
+                }
+                else if (value.Equals("text", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = OutputFormat.Text;
+                }
+                else
+                {
+                    errors.Add("Invalid value for --format. Expected 'text' or 'json'.");
+                }
+
                 continue;
             }
 
@@ -68,9 +81,14 @@ internal sealed record ParsedCommand(
 
             if (arg.Equals("--build-timeout-seconds", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                if (int.TryParse(args[++i], out int parsed) && parsed > 0)
+                string value = args[++i];
+                if (int.TryParse(value, out int parsed) && parsed > 0)
                 {
                     buildTimeoutSeconds = parsed;
+                }
+                else
+                {
+                    errors.Add("Invalid value for --build-timeout-seconds. Expected a positive integer.");
                 }
 
                 continue;
@@ -96,12 +114,49 @@ internal sealed record ParsedCommand(
                 continue;
             }
 
+            if (IsKnownValueOption(arg))
+            {
+                errors.Add($"Missing value for {arg}.");
+                continue;
+            }
+
+            if (IsKnownFlag(arg))
+            {
+                continue;
+            }
+
+            if (arg.StartsWith("-", StringComparison.Ordinal))
+            {
+                errors.Add($"Unknown option '{arg}'.");
+                continue;
+            }
+
             if (!arg.StartsWith("-", StringComparison.Ordinal))
             {
                 path = arg;
             }
         }
 
-        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, il2CppGamePath, monoGamePath, configuration);
+        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, il2CppGamePath, monoGamePath, configuration, errors);
     }
+
+    private static bool IsKnownFlag(string arg) =>
+        arg.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--apply", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--dry-run", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--dual-runtime", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--build", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--source-migrations", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsKnownValueOption(string arg) =>
+        arg.Equals("--format", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--path", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--build-timeout-seconds", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--il2cpp-game-path", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--mono-game-path", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--configuration", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("-c", StringComparison.OrdinalIgnoreCase);
 }
