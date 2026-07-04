@@ -80,16 +80,16 @@ Additional project docs:
 - [`docs/REAL_MOD_EVIDENCE.md`](docs/REAL_MOD_EVIDENCE.md) - real-mod migration, build-gate, and backend-neutral coverage.
 - [`docs/TESTING.md`](docs/TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
 
-## Compile-time generators
+## Backend-neutral SDK generation
 
 S1Interop has two generator layers:
 
-- `S1Interop.Core.Generators` is used by the CLI. It writes migration-time files such as SDK facades, bridge helpers, member-target declarations, and source-risk reports.
-- `S1Interop.Generators` is the Roslyn analyzer/source-generator package installed into migrated mod projects. It emits compile-time helpers from attributes.
+- `S1Interop.Core.Generators` is used by the CLI. It writes SDK declarations, facade source, bridge helpers, migration reports, and other files during `new`, `init`, `sdkgen`, and `migrate`.
+- `S1Interop.Generators` is the Roslyn analyzer/source-generator package installed into backend-neutral mod projects. It turns those declarations into cached runtime type resolution, generated facades, diagnostics, and bridge helpers.
 
-The SDK facade belongs to the CLI layer because it is produced during migration from the current project source. The Roslyn package stays focused on compile-time additive code that a mod project can reference privately.
+The CLI decides what a project needs by reading source and local reference metadata. The Roslyn package then keeps the generated code in sync at compile time without shipping game assemblies or decompiled source.
 
-`S1Interop.Generators` is for cases where a mod wants compile-time generated helpers instead of hand-maintained backend strings and reflection caches.
+The normal path is type-first: include a game type once, then work through the generated backend-neutral facade for that type.
 
 Example:
 
@@ -98,24 +98,17 @@ Example:
 [assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
 [assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
 [assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
-[assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
-[assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
-[assembly: S1Interop.S1InteropMember("MoveItemBehaviour", "IsDestinationValid", Alias = "IsDestinationValid", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "TransitRoute", "ItemInstance", "string&" })]
 ```
 
-The generator emits `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName` and a cached `PlayerCamera` resolver. In a Mono build the name resolves to `ScheduleOne.PlayerScripts.PlayerCamera`; in an IL2CPP build it resolves to `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
+The generator emits cached backend-neutral type resolution, such as `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName`, plus facades under the root-preserving SDK namespace. In a Mono build, `PlayerCamera` resolves to `ScheduleOne.PlayerScripts.PlayerCamera`; in an IL2CPP build, it resolves to `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
 
-Member declarations emit helpers such as `S1Interop.Generated.S1InteropMemberRegistry.GetNoticeContainer(...)`, `TrySetNoticeContainer(...)`, and static helpers such as `GetPlayerCameraInstance()`. These helpers intentionally check both properties and fields, which covers a common Schedule One migration case where a value is a field on Mono but a property on IL2CPP.
+When reference metadata is available, `S1InteropType` also drives the generated public member surface. Compatible public fields and properties get handle-level accessors, and unambiguous public methods get generated invokers. That means developers should not need to manually declare every normal public member they want to use.
 
-Method declarations can also include `ParameterTypeNames` for overload-specific binding. Use registered type aliases for game types and `&` for by-ref parameters. The generator emits both an invoker and a `MethodInfo` property, so Harmony patch targets can use the same generated overload binding instead of repeating `AccessTools.Method(...)` parameter arrays.
+`S1InteropMember` is still available, but it is the override path. Use it for private members, clearer aliases, ambiguous overloads, pinned Harmony method targets, or migration-inferred reflection patterns that cannot be represented safely by the generated type facade yet. See [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md).
 
-Generated method and type facades also include typed convenience helpers such as `InvokeIsDestinationValid<bool>(...)` and `InvokePlayerCamera<int>(...)`. These still use the same cached backend-neutral reflection path, but they keep simple mod code from scattering object casts and primitive conversions around call sites.
+When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate a targeted member override and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Simple typed metadata cache assignments such as `targetPlayer.GetType().GetField("teleport", flags)` can also move to generated `FieldInfo` or `PropertyInfo` accessors when the receiver type is known. Property accessor chains such as `.GetProperty("Name").GetMethod` keep the final accessor when rewritten. Untyped runtime reflection such as enumerator `Current` lookups is not reported as a backend migration risk unless S1Interop can tie it to a game/backend member surface. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
-The product direction is type-first SDK generation: adding or generating an `S1InteropType` now produces a backend-neutral facade with compatible public field/property helpers and unambiguous public method invokers when reference metadata is available. `S1InteropMember` remains useful for private members, clearer aliases, ambiguous overloads, pinned method bindings, or migration-inferred reflection patterns, but it should not be the normal way developers list every public field, property, or simple method they want to use. See [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md).
-
-When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Simple typed metadata cache assignments such as `targetPlayer.GetType().GetField("teleport", flags)` can also move to generated `FieldInfo` or `PropertyInfo` accessors when the receiver type is known. Property accessor chains such as `.GetProperty("Name").GetMethod` keep the final accessor when rewritten. Untyped runtime reflection such as enumerator `Current` lookups is not reported as a backend migration risk unless S1Interop can tie it to a game/backend member surface. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
-
-Generated member declarations intentionally skip MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, and `MelonPreferences` helpers. Those can still be valid mod code, but they are not Schedule One backend-neutral SDK surface and should not be converted into S1Interop member targets.
+Generated member overrides intentionally skip MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, and `MelonPreferences` helpers. Those can still be valid mod code, but they are not Schedule One backend-neutral SDK surface and should not be converted into S1Interop member targets.
 
 This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
 
@@ -146,7 +139,7 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet, but the intended SDK direction is that `S1InteropType` coverage can generate the common public member surface automatically.
+Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual declarations remain available for dynamic or reflection-heavy cases the generator cannot infer yet, but the intended SDK direction is that type coverage generates the common public member surface automatically.
 
 Migration can also route simple game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` and `typeof(Il2CppScheduleOne.UI.HUD)` can become generated registry properties, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
 
@@ -154,15 +147,15 @@ For simple command-style patterns, migration can route object construction and c
 
 Simple IL2CPP-backed object pattern casts can move to the generated object-cast helper. For example, `if (value is UniversalRenderPipelineAsset asset)` and `return phone is Component c ? c.gameObject : null;` can route through `S1Interop.Generated.S1InteropObjectCast`, while value-type patterns are left unchanged.
 
-When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type/member strings during compilation. Missing type names report `S1I001`; member declarations with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
+When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type and override strings during compilation. Missing type names report `S1I001`; member overrides with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
 
-IL2CPP builds also get compiler diagnostics for source shapes that usually compile but fail later in-game. Harmony transpilers (`S1I004`), managed collection parameters in IL2CPP-facing callback signatures (`S1I005`), and managed `byte[]` buffers passed to native/game fill APIs such as Steamworks packet reads (`S1I006`) are build errors. Plain C# casts from object/proxy values to Unity object types that should use `S1InteropObjectCast` (`S1I007`) are warnings until the migrator can rewrite them safely. These diagnostics are intentionally focused on boundary code; managed collections and arrays remain fine inside normal mod logic and generated `S1InteropMember` facades can still convert managed values when invoking registered backend-neutral members.
+IL2CPP builds also get compiler diagnostics for source shapes that usually compile but fail later in-game. Harmony transpilers (`S1I004`), managed collection parameters in IL2CPP-facing callback signatures (`S1I005`), and managed `byte[]` buffers passed to native/game fill APIs such as Steamworks packet reads (`S1I006`) are build errors. Plain C# casts from object/proxy values to Unity object types that should use `S1InteropObjectCast` (`S1I007`) are warnings until the migrator can rewrite them safely. These diagnostics are intentionally focused on boundary code; managed collections and arrays remain fine inside normal mod logic, and generated facades can still convert managed values when invoking registered backend-neutral members.
 
 Use `--apply` only after reviewing the dry-run output.
 
-## Backend-neutral member access
+## Backend-neutral SDK access
 
-`S1InteropMember` helpers still use reflection under the hood, but generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
+Generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
 
 ```csharp
 S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle = S1Interop.ScheduleOne.Vehicles.LandVehicle.As(rawVehicle);
@@ -185,7 +178,7 @@ string? name = vehicle.VehicleName?.ToString();
 
 Schedule One facades are generated under `S1Interop.ScheduleOne.*`. Other supported surfaces should follow the same rule, for example `S1Interop.FishNet.Runtime.*`, instead of using shortened aliases. Prefer handle accessors and type-scoped facades over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
 
-The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades now own the first slice of normal public member access through generated handle-level field/property helpers and unambiguous method invokers; explicit `S1InteropMember` declarations remain for overrides, private surfaces, overloads, or migration cases that cannot be discovered safely.
+The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades own normal public member access where metadata is clear enough; explicit `S1InteropMember` declarations remain for overrides, private surfaces, overloads, or migration cases that cannot be discovered safely.
 
 ## Install as a local tool
 

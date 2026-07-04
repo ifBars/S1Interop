@@ -15,12 +15,12 @@ public sealed class BackendNeutralStarterGenerator
     public string GenerateSource()
     {
         var builder = new StringBuilder();
-        builder.AppendLine("// Backend-neutral S1Interop declarations for new mods.");
-        builder.AppendLine("// Keep this file in source control and add S1InteropType/S1InteropMember attributes as your mod touches game APIs.");
+        builder.AppendLine("// Backend-neutral S1Interop declarations for this mod.");
+        builder.AppendLine("// Prefer S1InteropType declarations or generated sdkgen output for game API coverage.");
+        builder.AppendLine("// Use S1InteropMember only for private members, ambiguous overloads, or migration-specific overrides.");
         builder.AppendLine();
         builder.AppendLine("// Examples:");
         builder.AppendLine("// [assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.PlayerCamera\", Alias = \"PlayerCamera\")]");
-        builder.AppendLine("// [assembly: S1Interop.S1InteropMember(\"PlayerCamera\", \"Instance\", Alias = \"PlayerCameraInstance\", IsStatic = true)]");
         builder.AppendLine("// [assembly: S1Interop.S1InteropGenerateUnityEventBridge]");
         builder.AppendLine("// [assembly: S1Interop.S1InteropGenerateDelegateEventBridge]");
         builder.AppendLine();

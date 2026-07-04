@@ -257,6 +257,7 @@ internal static class NewProjectCommand
         ```
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
+        Prefer `S1InteropType` declarations and generated SDK output. Use explicit member declarations only for private members, ambiguous overloads, or migration-specific overrides.
 
         To seed a generated backend-neutral SDK from your local game references instead of writing type declarations by hand, run:
 
@@ -266,10 +267,9 @@ internal static class NewProjectCommand
 
         ```csharp
         [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
-        [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
         ```
 
-        Use generated helpers from `S1Interop.Generated.S1InteropTypeRegistry` and `S1Interop.Generated.S1InteropMemberRegistry` when you want one assembly to resolve Mono or IL2CPP game types at runtime.
+        Use generated facades under `S1Interop.ScheduleOne.*` when you want one assembly to resolve Mono or IL2CPP game types at runtime.
         """;
 
     private static string SanitizeIdentifier(string value)
