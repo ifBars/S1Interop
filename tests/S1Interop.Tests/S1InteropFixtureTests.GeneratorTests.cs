@@ -412,9 +412,9 @@ internal sealed partial class S1InteropFixtureTests
             "IL2CPP");
 
         Assert(
-            generated.Contains("public const string vehicleNameName = \"vehicleName\";", StringComparison.Ordinal) &&
-            generated.Contains("public const string CurrentThrottleName = \"CurrentThrottle\";", StringComparison.Ordinal) &&
-            generated.Contains("public const string InstanceName = \"Instance\";", StringComparison.Ordinal),
+            generated.Contains("public const string LandVehicleVehicleNameName = \"vehicleName\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string LandVehicleCurrentThrottleName = \"CurrentThrottle\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string LandVehicleInstanceName = \"Instance\";", StringComparison.Ordinal),
             $"Declaring an interop type should discover compatible public fields and properties. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public static object? GetVehicleName(Handle instance)", StringComparison.Ordinal) &&
@@ -424,14 +424,14 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static object? AssignDriver(Handle instance, params object?[] args)", StringComparison.Ordinal),
             $"Type facades should expose discovered members and unambiguous public methods without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
         Assert(
-            generated.Contains("public const string AssignDriverName = \"AssignDriver\";", StringComparison.Ordinal) &&
-            generated.Contains("public static System.Reflection.MethodInfo? AssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, AssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
+            generated.Contains("public const string LandVehicleAssignDriverName = \"AssignDriver\";", StringComparison.Ordinal) &&
+            generated.Contains("public static System.Reflection.MethodInfo? LandVehicleAssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, LandVehicleAssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
             $"Discovered methods should preserve parameter-specific lookup and runtime type-name conversion. Generated source:{Environment.NewLine}{generated}");
         Assert(
-            generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(value);", StringComparison.Ordinal) &&
-            generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName<T>(value);", StringComparison.Ordinal) &&
-            generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetCurrentThrottleValue<T>(value);", StringComparison.Ordinal) &&
-            generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetCurrentThrottle(value, memberValue);", StringComparison.Ordinal),
+            generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName(value);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName<T>(value);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleCurrentThrottleValue<T>(value);", StringComparison.Ordinal) &&
+            generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleCurrentThrottle(value, memberValue);", StringComparison.Ordinal),
             $"Type facade handles should expose native-like instance accessors for discovered field/property members. Generated source:{Environment.NewLine}{generated}");
         Assert(
             !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value);", StringComparison.Ordinal),
@@ -445,6 +445,79 @@ internal sealed partial class S1InteropFixtureTests
             !generated.Contains("GenericMethodName", StringComparison.Ordinal) &&
             !generated.Contains("Il2CppOnlyMethodName", StringComparison.Ordinal),
             $"Discovered member facades should skip one-sided, non-public, const, indexer, overloaded, and generic members. Generated source:{Environment.NewLine}{generated}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne.First
+            {
+                public sealed class Thing
+                {
+                    public int Shared;
+                    public void Update()
+                    {
+                    }
+                }
+            }
+
+            namespace ScheduleOne.Second
+            {
+                public sealed class Thing
+                {
+                    public int Shared;
+                    public void Update()
+                    {
+                    }
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne.First
+            {
+                public sealed class Thing
+                {
+                    public int Shared;
+                    public void Update()
+                    {
+                    }
+                }
+            }
+
+            namespace Il2CppScheduleOne.Second
+            {
+                public sealed class Thing
+                {
+                    public int Shared;
+                    public void Update()
+                    {
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.First.Thing", Alias = "FirstThing")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Second.Thing", Alias = "SecondThing")]
+
+            namespace SyntheticMod;
+            """;
+
+        string generated = RunTypeRegistryGenerator(
+            source,
+            [monoGameReference, il2CppGameReference],
+            "IL2CPP");
+
+        Assert(
+            generated.Contains("public const string FirstThingSharedName = \"Shared\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string SecondThingSharedName = \"Shared\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string FirstThingUpdateName = \"Update\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string SecondThingUpdateName = \"Update\";", StringComparison.Ordinal),
+            $"Discovered member aliases should be owner-qualified so common game member names do not collide. Generated source:{Environment.NewLine}{generated}");
     }
 
     private void S1InteropTypeRegistryGeneratorMergesDuplicateAliases()

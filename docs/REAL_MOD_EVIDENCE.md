@@ -28,7 +28,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 | --- | --- |
 | S1FuelMod | Injected-type analysis, source migration for generated member-access facades, sandboxed migration without mutating source, mono-only copy conversion, and backend-neutral generated facade compilation against both Mono and IL2CPP reference surfaces when local game paths are available. |
 | BarsGraphics | Source alias detection, string-held game type discovery, `sdkgen --apply`, generated facade compilation, and build-gated migration across `MonoDevelopment`, `MonoStable`, `Il2cppDevelopment`, and `Il2cppStable` style configurations. |
-| Hoverboard | Sandboxed migration convergence, `sdkgen --apply`, namespace-scoped facade generation, and generated SDK compilation against Mono/IL2CPP reference surfaces in focused integration lanes. |
+| Hoverboard | Sandboxed migration convergence, `sdkgen --apply`, namespace-scoped facade generation, owner-qualified generated member aliases for common game member names, and generated SDK compilation against Mono/IL2CPP reference surfaces in focused integration lanes. |
 | bGUI-style dependencies | Mixed Mono/IL2CPP configuration inference and staged dependency path handling for `bGUI.dll`-style references. |
 | S1-VoiceChat | Build-gated conversion of a mono-only copy when local dependencies and game paths are available. |
 | BotanistFix | Build-gated conversion of a mono-only copy when local dependencies and game paths are available. |

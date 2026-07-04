@@ -584,7 +584,7 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             foreach (DiscoveredMember member in DiscoverCompatiblePublicMembers(monoType, il2CppType))
             {
                 builder.Add(new S1InteropMemberEntry(
-                    SanitizeIdentifier(member.Name),
+                    GetDiscoveredMemberAlias(entry, member),
                     entry.Alias,
                     member.Name,
                     member.Kind,
@@ -595,6 +595,9 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
 
         return builder.ToImmutable();
     }
+
+    private static string GetDiscoveredMemberAlias(S1InteropTypeEntry entry, DiscoveredMember member) =>
+        SanitizeIdentifier(entry.Alias + ToPascalIdentifier(member.Name));
 
     private static ImmutableArray<S1InteropMemberEntry> MergeMemberEntries(
         ImmutableArray<S1InteropMemberEntry> explicitMembers,

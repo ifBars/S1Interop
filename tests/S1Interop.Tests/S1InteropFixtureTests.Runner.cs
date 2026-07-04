@@ -135,6 +135,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
         count++;
+        S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases();
+        count++;
         S1InteropTypeRegistryGeneratorMergesDuplicateAliases();
         count++;
         S1InteropTypeRegistryGeneratorValidatesDeclaredTypesAgainstReferencedGameAssemblies();
@@ -312,6 +314,8 @@ internal sealed partial class S1InteropFixtureTests
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
+        count++;
+        S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases();
         count++;
         S1InteropTypeRegistryGeneratorMergesDuplicateAliases();
         count++;
