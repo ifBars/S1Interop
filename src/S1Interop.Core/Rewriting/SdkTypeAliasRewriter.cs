@@ -200,7 +200,7 @@ public static class SdkTypeAliasRewriter
 
     private static string ReplaceTypeToken(string code, string typeName, string alias)
     {
-        string pattern = $@"(?<![A-Za-z0-9_]){Regex.Escape(typeName)}(?![A-Za-z0-9_])";
+        string pattern = $@"(?<![A-Za-z0-9_\.]){Regex.Escape(typeName)}(?![A-Za-z0-9_])";
         return Regex.Replace(code, pattern, alias);
     }
 

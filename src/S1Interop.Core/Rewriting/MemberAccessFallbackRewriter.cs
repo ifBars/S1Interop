@@ -235,14 +235,6 @@ public sealed class MemberAccessFallbackRewriter
 
         string typeName = parts[^1];
         IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
-        if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
-        {
-            namespaceParts = namespaceParts.Skip(1);
-        }
-        else
-        {
-            namespaceParts = new[] { "Types" }.Concat(namespaceParts);
-        }
 
         string namespaceSuffix = string.Join(".", namespaceParts);
         return string.IsNullOrWhiteSpace(namespaceSuffix)

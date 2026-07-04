@@ -514,9 +514,9 @@ internal sealed partial class S1InteropFixtureTests
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"GameOffenceNotice\", \"container\", Alias = \"container\")]", StringComparison.Ordinal),
                 "Generated member-access targets should include typed owner/member declarations.");
 
-            string migratedSource = File.ReadAllText(tempSource);
-            Assert(
-                migratedSource.Contains("return S1Interop.UI.OffenceNoticeUI.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
+        string migratedSource = File.ReadAllText(tempSource);
+        Assert(
+                migratedSource.Contains("return S1Interop.ScheduleOne.UI.OffenceNoticeUI.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
                 "Simple typed fallback getter should be rewritten through the generated type-scoped facade.");
             Assert(
@@ -588,12 +588,12 @@ internal sealed partial class S1InteropFixtureTests
                 "Member-access discovery should infer typed ReflectionUtils.TrySetFieldOrProperty targets from ScheduleOne method parameters.");
 
             string source = File.ReadAllText(tempSource);
-            string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
-            Assert(
-                rewritten.Contains("return S1Interop.Vehicles.LandVehicle.GetVehicleName(_landVehicle);", StringComparison.Ordinal),
+        string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
+        Assert(
+                rewritten.Contains("return S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(_landVehicle);", StringComparison.Ordinal),
                 "Member-access fallback rewriter should replace typed helper getter calls with type-scoped facade getters.");
-            Assert(
-                rewritten.Contains("S1Interop.Vehicles.LandVehicle.TrySetCurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
+        Assert(
+                rewritten.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.TrySetCurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
                 "Member-access fallback rewriter should replace typed helper setter calls with type-scoped facade setters.");
         }
         finally
@@ -889,7 +889,7 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.Types.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal),
+            rewritten.Contains("return S1Interop.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal),
             $"Simple typed fallback getter should rewrite through the generated type-scoped facade. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
@@ -928,7 +928,7 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.Types.UnityEngine.Rendering.RenderPipelineAsset.GetRenderScaleValue<float>(asset);", StringComparison.Ordinal),
+            rewritten.Contains("return S1Interop.UnityEngine.Rendering.RenderPipelineAsset.GetRenderScaleValue<float>(asset);", StringComparison.Ordinal),
             $"Nullable value fallback getter should rewrite through the generated type-scoped facade value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 

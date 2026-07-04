@@ -1201,7 +1201,7 @@ internal sealed partial class S1InteropFixtureTests
                 "Migration should add exactly one HideFromIl2Cpp attribute to FuelVehicleData.");
             string migratedVehicleFuelSystem = File.ReadAllText(tempVehicleFuelSystem);
             Assert(
-                migratedVehicleFuelSystem.Contains("S1Interop.Vehicles.LandVehicle.GetVehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
+                migratedVehicleFuelSystem.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
                 !migratedVehicleFuelSystem.Contains("ReflectionUtils.TryGetFieldOrProperty(_landVehicle, \"vehicleName\")", StringComparison.Ordinal),
                 "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated type-scoped facade helpers.");
             string generatedMemberTargets = File.ReadAllText(Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.MemberAccessTargets.g.cs"));
@@ -1507,8 +1507,8 @@ internal sealed partial class S1InteropFixtureTests
                 "Fresh backend-neutral scaffold should use real copied S1FuelMod aliases as assembly-level runtime-resolved declarations.");
             Assert(
                 starterSource.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"S1FuelVehicleName\")]", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.Vehicles.LandVehicle.GetVehicleName(vehicle)", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.Vehicles.LandVehicle.Get(vehicle, \"vehicleName\")", StringComparison.Ordinal),
+                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(vehicle)", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.Get(vehicle, \"vehicleName\")", StringComparison.Ordinal),
                 "Fresh backend-neutral scaffold should compile declared and dynamic generated type-scoped facade helpers from real copied S1FuelMod reflection usage.");
         }
         finally
@@ -1567,9 +1567,9 @@ internal sealed partial class S1InteropFixtureTests
                 {
                     public static string Probe(object? vehicle)
                     {
-                        S1Interop.Vehicles.LandVehicle.Handle landVehicle = S1Interop.Vehicles.LandVehicle.As(vehicle);
+                        S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle landVehicle = S1Interop.ScheduleOne.Vehicles.LandVehicle.As(vehicle);
 
-                        return $"{S1Interop.Vehicles.LandVehicle.TypeName}|{landVehicle.HasValue}|{S1Interop.Vehicles.LandVehicle.GetVehicleName(landVehicle)}";
+                        return $"{S1Interop.ScheduleOne.Vehicles.LandVehicle.TypeName}|{landVehicle.HasValue}|{S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(landVehicle)}";
                     }
                 }
                 """,
@@ -1771,10 +1771,10 @@ internal sealed partial class S1InteropFixtureTests
                 {
                     public static string Probe(object? hud, object? camera)
                     {
-                        S1Interop.UI.HUD.Handle gameHud = S1Interop.UI.HUD.As(hud);
-                        S1Interop.PlayerScripts.PlayerCamera.Handle gameCamera = S1Interop.PlayerScripts.PlayerCamera.As(camera);
+                        S1Interop.ScheduleOne.UI.HUD.Handle gameHud = S1Interop.ScheduleOne.UI.HUD.As(hud);
+                        S1Interop.ScheduleOne.PlayerScripts.PlayerCamera.Handle gameCamera = S1Interop.ScheduleOne.PlayerScripts.PlayerCamera.As(camera);
 
-                        return $"{S1Interop.UI.HUD.TypeName}|{S1Interop.PlayerScripts.PlayerCamera.TypeName}|{gameHud.HasValue}|{gameCamera.HasValue}";
+                        return $"{S1Interop.ScheduleOne.UI.HUD.TypeName}|{S1Interop.ScheduleOne.PlayerScripts.PlayerCamera.TypeName}|{gameHud.HasValue}|{gameCamera.HasValue}";
                     }
                 }
                 """,
@@ -2109,10 +2109,10 @@ internal sealed partial class S1InteropFixtureTests
                 {
                     public static string Probe(object? skateboard, object? weather)
                     {
-                        S1Interop.Skating.Skateboard.Handle board = S1Interop.Skating.Skateboard.As(skateboard);
-                        S1Interop.Weather.WeatherConditions.Handle conditions = S1Interop.Weather.WeatherConditions.As(weather);
+                        S1Interop.ScheduleOne.Skating.Skateboard.Handle board = S1Interop.ScheduleOne.Skating.Skateboard.As(skateboard);
+                        S1Interop.ScheduleOne.Weather.WeatherConditions.Handle conditions = S1Interop.ScheduleOne.Weather.WeatherConditions.As(weather);
 
-                        return $"{S1Interop.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
+                        return $"{S1Interop.ScheduleOne.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
                     }
                 }
                 """);
@@ -2220,10 +2220,10 @@ internal sealed partial class S1InteropFixtureTests
                 {
                     public static string Probe(object? skateboard, object? weather)
                     {
-                        S1Interop.Skating.Skateboard.Handle board = S1Interop.Skating.Skateboard.As(skateboard);
-                        S1Interop.Weather.WeatherConditions.Handle conditions = S1Interop.Weather.WeatherConditions.As(weather);
+                        S1Interop.ScheduleOne.Skating.Skateboard.Handle board = S1Interop.ScheduleOne.Skating.Skateboard.As(skateboard);
+                        S1Interop.ScheduleOne.Weather.WeatherConditions.Handle conditions = S1Interop.ScheduleOne.Weather.WeatherConditions.As(weather);
 
-                        return $"{S1Interop.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
+                        return $"{S1Interop.ScheduleOne.Skating.Skateboard.TypeName}|{board.HasValue}|{conditions.HasValue}";
                     }
                 }
                 """,

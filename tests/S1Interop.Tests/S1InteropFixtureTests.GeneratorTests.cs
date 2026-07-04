@@ -126,12 +126,12 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("public const string PhoneName = \"Il2CppScheduleOne.UI.Phone.Phone\";", StringComparison.Ordinal),
             $"IL2CPP generator output should respect explicit Il2CppTypeName overrides. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
-            il2CppGenerated.Contains("private static readonly System.Collections.Generic.Dictionary<string, System.Type?> Cache", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("private static readonly global::System.Collections.Generic.Dictionary<string, global::System.Type?> Cache", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("global::System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
         Assert(
             runtimeGenerated.Contains("ResolveFromKnownGameAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
-            runtimeGenerated.Contains("System.Reflection.Assembly.Load(assemblyName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("global::System.Reflection.Assembly.Load(assemblyName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("ResolveFromAssembly(\"Assembly-CSharp\", runtimeTypeName)", StringComparison.Ordinal),
             $"Backend-neutral type registry should try known game assemblies when a type is not already loaded. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
@@ -150,12 +150,12 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             il2CppGenerated.Contains("ResolveFromLoadedAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("assembly.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("string.Equals(type.Name, runtimeTypeName, System.StringComparison.Ordinal)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("string.Equals(type.Name, runtimeTypeName, global::System.StringComparison.Ordinal)", StringComparison.Ordinal),
             "Generated type registry should fall back to cached loaded-assembly lookup for simple generated migration type names.");
         Assert(
             il2CppGenerated.Contains("public const string NoticeContainerName = \"container\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static System.Reflection.FieldInfo? NoticeContainerFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Field) as System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static System.Reflection.PropertyInfo? NoticeContainerPropertyInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Property) as System.Reflection.PropertyInfo;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Reflection.FieldInfo? NoticeContainerFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Field) as global::System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Reflection.PropertyInfo? NoticeContainerPropertyInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, parameterTypeNames: null, S1InteropMemberKind.Property) as global::System.Reflection.PropertyInfo;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? GetNoticeContainer(object instance) => GetValue(S1InteropTypeRegistry.PlayerCameraName, NoticeContainerName, instance, S1InteropMemberKind.FieldOrProperty);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainer<T>(object instance) where T : class => GetNoticeContainer(instance) as T;", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static T? GetNoticeContainerValue<T>(object instance) where T : struct => GetNoticeContainer(instance) is T value ? value : (T?)null;", StringComparison.Ordinal) &&
@@ -173,12 +173,12 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("public static object? GetDeviceIdProperty() => GetValue(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, null, S1InteropMemberKind.Property);", StringComparison.Ordinal),
             $"Generated member registry should honor exact field/property member kinds. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
-            il2CppGenerated.Contains("public static System.Reflection.FieldInfo? HomeScreenFieldFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, HomeScreenFieldName, parameterTypeNames: null, S1InteropMemberKind.Field) as System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static System.Reflection.PropertyInfo? DeviceIdPropertyPropertyInfo => ResolveMember(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, parameterTypeNames: null, S1InteropMemberKind.Property) as System.Reflection.PropertyInfo;", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static global::System.Reflection.FieldInfo? HomeScreenFieldFieldInfo => ResolveMember(S1InteropTypeRegistry.PlayerCameraName, HomeScreenFieldName, parameterTypeNames: null, S1InteropMemberKind.Field) as global::System.Reflection.FieldInfo;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Reflection.PropertyInfo? DeviceIdPropertyPropertyInfo => ResolveMember(S1InteropTypeRegistry.PhoneName, DeviceIdPropertyName, parameterTypeNames: null, S1InteropMemberKind.Property) as global::System.Reflection.PropertyInfo;", StringComparison.Ordinal),
             $"Generated member registry should expose exact typed member metadata accessors. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string StartUpdateVolumeName = \"StartUpdateVolume\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static System.Reflection.MethodInfo? StartUpdateVolumeMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Reflection.MethodInfo? StartUpdateVolumeMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeStartUpdateVolume(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.PhoneName, StartUpdateVolumeName, null, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
@@ -187,7 +187,7 @@ internal sealed partial class S1InteropFixtureTests
             $"Generated member registry should include static method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public const string MoveItemBehaviourName = \"Il2CppScheduleOne.NPCs.Behaviour.MoveItemBehaviour\";", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeIsDestinationValid(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" }, instance, args);", StringComparison.Ordinal),
             $"Generated member registry should include overload-specific method invoker helpers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
@@ -200,11 +200,11 @@ internal sealed partial class S1InteropFixtureTests
             "Generated member registry should cache property, field, method overload, and by-ref lookup paths.");
         Assert(
             il2CppGenerated.Contains("public static object? GetInstanceValue(object? instance, string memberName)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("System.Reflection.MemberInfo? member = ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("global::System.Reflection.MemberInfo? member = ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static bool TrySetInstanceValue(object? instance, string memberName, object? value, S1InteropMemberKind kind)", StringComparison.Ordinal),
             $"Generated member registry should include cached instance-type helpers for generic reflection code. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
-            il2CppGenerated.Contains("public static bool TryConvertValue(object? value, System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryConvertValue(object? value, global::System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppGuid(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppList(value, conversionType, out converted)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("TryConvertIl2CppHashSet(value, conversionType, out converted)", StringComparison.Ordinal) &&
@@ -218,26 +218,26 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("property.SetValue(instance, converted, null);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("field.SetValue(instance, converted);", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("converted = System.Convert.ChangeType(value, conversionType, System.Globalization.CultureInfo.InvariantCulture)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("System.Enum.Parse(conversionType, text, ignoreCase: true)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("converted = global::System.Convert.ChangeType(value, conversionType, global::System.Globalization.CultureInfo.InvariantCulture)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("global::System.Enum.Parse(conversionType, text, ignoreCase: true)", StringComparison.Ordinal),
             $"Generated member registry should centralize value conversion before field/property writes. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("if (!TryConvertArguments(method.GetParameters(), args, out object?[] converted))", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("object? result = method.Invoke(instance, converted);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("CopyByRefArguments(method.GetParameters(), converted, args);", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is System.Type elementType", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("global::System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is global::System.Type elementType", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("args[index] = ConvertBackValue(args[index], converted[index]);", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static bool TryConvertBackGuid(object converted, out System.Guid guid)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static bool TryConvertBackArray(System.Array original, object converted, out System.Array? managedArray)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static bool TryConvertBackList(System.Collections.IList original, object converted, out System.Collections.IList? managedList)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackGuid(object converted, out global::System.Guid guid)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackArray(global::System.Array original, object converted, out global::System.Array? managedArray)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryConvertBackList(global::System.Collections.IList original, object converted, out global::System.Collections.IList? managedList)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackDictionary(object? original, object converted, out object? managedDictionary)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackHashSet(object? original, object converted, out object? managedHashSet)", StringComparison.Ordinal),
             $"Generated member registry should convert method invocation arguments and copy by-ref values back after reflection Invoke. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, params object?[] args)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, string[]? parameterTypeNames, params object?[] args)", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames, S1InteropMemberKind.Method) as System.Reflection.MethodInfo", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("private static System.Reflection.MemberInfo? ResolveMemberCached(System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames, S1InteropMemberKind.Method) as global::System.Reflection.MethodInfo", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static global::System.Reflection.MemberInfo? ResolveMemberCached(global::System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("string ownerKey = ownerType.AssemblyQualifiedName ?? ownerType.FullName ?? ownerType.Name;", StringComparison.Ordinal),
             $"Generated member registry should include cached dynamic instance method invocation helpers for backend-neutral reflection wrappers. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
@@ -280,23 +280,23 @@ internal sealed partial class S1InteropFixtureTests
             runtimeGenerated.Contains("S1InteropRuntime.Backend == S1InteropRuntimeBackend.Il2Cpp ? il2CppTypeName : monoTypeName", StringComparison.Ordinal),
             $"Backend-neutral generator output should expose runtime type-name selection for method parameter caches. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal),
+            runtimeGenerated.Contains("public static global::System.Reflection.MethodInfo? IsDestinationValidMethod => ResolveMethod(S1InteropTypeRegistry.MoveItemBehaviourName, IsDestinationValidName, new string[] { S1InteropTypeRegistry.TransitRouteName, S1InteropTypeRegistry.ItemInstanceName, \"string&\" });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route alias parameter types through runtime-resolved names. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
             runtimeGenerated.Contains("public static T? InvokeIsDestinationValid<T>(object? instance, params object?[] args) => CastResult<T>(InvokeIsDestinationValid(instance, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static T? CastResult<T>(object? value)", StringComparison.Ordinal),
             $"Backend-neutral member registry should expose typed method invocation helpers for new backend-neutral projects. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetPacketMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetPacketName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"byte[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>\") });", StringComparison.Ordinal),
+            runtimeGenerated.Contains("public static global::System.Reflection.MethodInfo? SetPacketMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetPacketName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"byte[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed array parameter names to IL2CPP array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetLabelsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetLabelsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"string[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<string>\") });", StringComparison.Ordinal),
+            runtimeGenerated.Contains("public static global::System.Reflection.MethodInfo? SetLabelsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetLabelsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"string[]\", \"Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<string>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed reference-array parameter names to IL2CPP reference array wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetScoresMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetScoresName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.Dictionary<string, int>\", \"Il2CppSystem.Collections.Generic.Dictionary<string, int>\") });", StringComparison.Ordinal),
+            runtimeGenerated.Contains("public static global::System.Reflection.MethodInfo? SetScoresMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetScoresName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.Dictionary<string, int>\", \"Il2CppSystem.Collections.Generic.Dictionary<string, int>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed dictionary parameter names to IL2CPP dictionary wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
-            runtimeGenerated.Contains("public static System.Reflection.MethodInfo? SetTagsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetTagsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.HashSet<string>\", \"Il2CppSystem.Collections.Generic.HashSet<string>\") });", StringComparison.Ordinal),
+            runtimeGenerated.Contains("public static global::System.Reflection.MethodInfo? SetTagsMethod => ResolveMethod(S1InteropTypeRegistry.PhoneName, SetTagsName, new string[] { S1InteropTypeRegistry.GetRuntimeTypeName(\"System.Collections.Generic.HashSet<string>\", \"Il2CppSystem.Collections.Generic.HashSet<string>\") });", StringComparison.Ordinal),
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
@@ -397,6 +397,7 @@ internal sealed partial class S1InteropFixtureTests
         const string source =
             """
             [assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle", Alias = "LandVehicle")]
+            [assembly: S1Interop.S1InteropType("FishNet.Runtime.NetworkManager", Alias = "NetworkManager")]
 
             namespace SyntheticMod
             {
@@ -425,11 +426,15 @@ internal sealed partial class S1InteropFixtureTests
             $"Type facades should expose discovered members and unambiguous public methods without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("namespace S1Interop.ScheduleOne.Vehicles", StringComparison.Ordinal) &&
-            generated.Contains("namespace S1Interop.Vehicles", StringComparison.Ordinal),
-            $"ScheduleOne type facades should emit both native-like and compatibility namespaces. Generated source:{Environment.NewLine}{generated}");
+            !generated.Contains("namespace S1Interop.Vehicles", StringComparison.Ordinal),
+            $"ScheduleOne type facades should emit only the canonical root-preserving namespace. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("namespace S1Interop.FishNet.Runtime", StringComparison.Ordinal) &&
+            !generated.Contains("namespace S1Interop.Types.FishNet.Runtime", StringComparison.Ordinal),
+            $"Non-ScheduleOne type facades should also preserve their original root under S1Interop. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public const string LandVehicleAssignDriverName = \"AssignDriver\";", StringComparison.Ordinal) &&
-            generated.Contains("public static System.Reflection.MethodInfo? LandVehicleAssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, LandVehicleAssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
+            generated.Contains("public static global::System.Reflection.MethodInfo? LandVehicleAssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, LandVehicleAssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
             $"Discovered methods should preserve parameter-specific lookup and runtime type-name conversion. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName(value);", StringComparison.Ordinal) &&
@@ -1282,8 +1287,7 @@ internal sealed partial class S1InteropFixtureTests
         Type memberRegistryType = assembly.GetType("S1Interop.Generated.S1InteropMemberRegistry", throwOnError: true)!;
         Type objectCastType = assembly.GetType("S1Interop.Generated.S1InteropObjectCast", throwOnError: true)!;
         Type delegateBridgeType = assembly.GetType("S1Interop.Generated.S1InteropDelegateBridge", throwOnError: true)!;
-        Type hudFacadeType = assembly.GetType("S1Interop.UI.HUD", throwOnError: true)!;
-        Type nativeLikeHudFacadeType = assembly.GetType("S1Interop.ScheduleOne.UI.HUD", throwOnError: true)!;
+        Type hudFacadeType = assembly.GetType("S1Interop.ScheduleOne.UI.HUD", throwOnError: true)!;
         Type memberKindType = assembly.GetTypes().Single(type => type.Name == "S1InteropMemberKind");
 
         object? backend = runtimeType.GetProperty("Backend")?.GetValue(null);
@@ -1310,8 +1314,8 @@ internal sealed partial class S1InteropFixtureTests
             .FirstOrDefault(method => method.Name == "InvokeHud" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object), typeof(string), typeof(string[]), typeof(object[]) }));
         Assert(isHud is not null, "Generated type registry should expose an alias-level IsHud helper.");
         Assert(
-            nativeLikeHudFacadeType.GetProperty("TypeName")?.GetValue(null) as string == hudFacadeType.GetProperty("TypeName")?.GetValue(null) as string,
-            "Native-like and compatibility type facades should route to the same backend-neutral registry alias.");
+            assembly.GetType("S1Interop.UI.HUD", throwOnError: false) is null,
+            "Generated ScheduleOne facades should not emit shortened duplicate namespaces.");
         Assert(getHud is not null, "Generated type registry should expose an alias-level GetHud helper.");
         Assert(trySetHud is not null, "Generated type registry should expose an alias-level TrySetHud helper.");
         Assert(invokeHud is not null, "Generated type registry should expose an alias-level InvokeHud helper.");
@@ -1614,12 +1618,12 @@ internal sealed partial class S1InteropFixtureTests
             "Compile-time UnityEvent bridge should include Mono UnityAction wrapping.");
         Assert(
             il2CppUnityBridge.Contains("#if IL2CPP", StringComparison.Ordinal) &&
-            il2CppUnityBridge.Contains("System.Action wrapped = new System.Action(listener);", StringComparison.Ordinal),
+            il2CppUnityBridge.Contains("global::System.Action wrapped = new global::System.Action(listener);", StringComparison.Ordinal),
             "Compile-time UnityEvent bridge should include IL2CPP System.Action wrapping.");
         Assert(
             monoDelegateBridge.Contains("S1InteropDelegateEventBridge", StringComparison.Ordinal) &&
-            il2CppDelegateBridge.Contains("System.Delegate.Combine", StringComparison.Ordinal) &&
-            il2CppDelegateBridge.Contains("System.Delegate.Remove", StringComparison.Ordinal),
+            il2CppDelegateBridge.Contains("global::System.Delegate.Combine", StringComparison.Ordinal) &&
+            il2CppDelegateBridge.Contains("global::System.Delegate.Remove", StringComparison.Ordinal),
             "Compile-time delegate bridge should include Combine and Remove helpers.");
     }
 
@@ -1819,9 +1823,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 migratedSource.Contains("var commandList = new System.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
                 migratedSource.Contains("Il2CppSystem.Collections.Generic.List<string> nativeList = new Il2CppSystem.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
-                migratedSource.Contains("var command = S1Interop.Console.SetWeather.Create();", StringComparison.Ordinal) &&
-                migratedSource.Contains("S1Interop.Console.SetWeather.Invoke(command, \"Execute\", commandList);", StringComparison.Ordinal) &&
-                migratedSource.Contains("S1Interop.Console.ClearTrash.Invoke(S1Interop.Console.ClearTrash.Create(), \"Execute\", (object?)null);", StringComparison.Ordinal),
+                migratedSource.Contains("var command = S1Interop.ScheduleOne.Console.SetWeather.Create();", StringComparison.Ordinal) &&
+                migratedSource.Contains("S1Interop.ScheduleOne.Console.SetWeather.Invoke(command, \"Execute\", commandList);", StringComparison.Ordinal) &&
+                migratedSource.Contains("S1Interop.ScheduleOne.Console.ClearTrash.Invoke(S1Interop.ScheduleOne.Console.ClearTrash.Create(), \"Execute\", (object?)null);", StringComparison.Ordinal),
                 $"Migration should route simple ScheduleOne command construction and invocation through generated type facades. Migrated source:{Environment.NewLine}{migratedSource}");
             Assert(
                 !migratedSource.Contains("typeof(ScheduleOne.Product.WeedDefinition)", StringComparison.Ordinal) &&

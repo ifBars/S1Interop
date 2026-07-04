@@ -150,7 +150,7 @@ Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path exa
 
 Migration can also route simple game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` and `typeof(Il2CppScheduleOne.UI.HUD)` can become generated registry properties, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
 
-For simple command-style patterns, migration can route object construction and calls through generated type facades. A shape like `var command = new Il2CppScheduleOne.Console.SetWeather(); command.Execute(args);` can become `S1Interop.Console.SetWeather.Create()` plus `S1Interop.Console.SetWeather.Invoke(command, "Execute", args)`. Simple `Il2CppSystem.Collections.Generic.List<T>` construction is rewritten to managed `System.Collections.Generic.List<T>` so generated invocation helpers can convert it to the active backend parameter type.
+For simple command-style patterns, migration can route object construction and calls through generated type facades. A shape like `var command = new Il2CppScheduleOne.Console.SetWeather(); command.Execute(args);` can become `S1Interop.ScheduleOne.Console.SetWeather.Create()` plus `S1Interop.ScheduleOne.Console.SetWeather.Invoke(command, "Execute", args)`. Simple `Il2CppSystem.Collections.Generic.List<T>` construction is rewritten to managed `System.Collections.Generic.List<T>` so generated invocation helpers can convert it to the active backend parameter type.
 
 Simple IL2CPP-backed object pattern casts can move to the generated object-cast helper. For example, `if (value is UniversalRenderPipelineAsset asset)` and `return phone is Component c ? c.gameObject : null;` can route through `S1Interop.Generated.S1InteropObjectCast`, while value-type patterns are left unchanged.
 
@@ -165,7 +165,7 @@ Use `--apply` only after reviewing the dry-run output.
 `S1InteropMember` helpers still use reflection under the hood, but generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
 
 ```csharp
-S1Interop.Vehicles.LandVehicle.Handle vehicle = S1Interop.Vehicles.LandVehicle.As(rawVehicle);
+S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle = S1Interop.ScheduleOne.Vehicles.LandVehicle.As(rawVehicle);
 
 if (vehicle.HasValue)
 {
@@ -174,7 +174,7 @@ if (vehicle.HasValue)
 }
 ```
 
-Generated Schedule One type facades are also emitted under a native-like namespace shape:
+Generated type facades preserve the original runtime namespace root under `S1Interop`:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
@@ -183,7 +183,7 @@ LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
 string? name = vehicle.VehicleName?.ToString();
 ```
 
-Prefer handle accessors and type-scoped facades such as `S1Interop.ScheduleOne.Vehicles.LandVehicle` or the shorter compatibility namespace `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
+Schedule One facades are generated under `S1Interop.ScheduleOne.*`. Other supported surfaces should follow the same rule, for example `S1Interop.FishNet.Runtime.*`, instead of using shortened aliases. Prefer handle accessors and type-scoped facades over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
 
 The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades now own the first slice of normal public member access through generated handle-level field/property helpers and unambiguous method invokers; explicit `S1InteropMember` declarations remain for overrides, private surfaces, overloads, or migration cases that cannot be discovered safely.
 

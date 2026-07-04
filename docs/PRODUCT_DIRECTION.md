@@ -17,14 +17,14 @@ The core product promise is:
 Today, backend-neutral code can use generated type handles:
 
 ```csharp
-S1Interop.Vehicles.LandVehicle.Handle vehicle =
-    S1Interop.Vehicles.LandVehicle.As(rawVehicle);
+S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle =
+    S1Interop.ScheduleOne.Vehicles.LandVehicle.As(rawVehicle);
 
 string? name = vehicle.VehicleName?.ToString();
 float? throttle = vehicle.GetCurrentThrottleValue<float>();
 ```
 
-The generated SDK now also emits a native-like namespace shape:
+The generated SDK should preserve the original runtime namespace root under `S1Interop`:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
@@ -38,7 +38,7 @@ float throttle = vehicle.CurrentThrottle;
 or, when a static facade is the safer shape:
 
 ```csharp
-using S1Interop.Vehicles;
+using S1Interop.ScheduleOne.Vehicles;
 
 var vehicle = LandVehicle.As(rawVehicle);
 
@@ -46,7 +46,7 @@ string? name = LandVehicle.GetVehicleName(vehicle);
 float throttle = LandVehicle.GetCurrentThrottle<float>(vehicle);
 ```
 
-`S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API.
+`S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API. Do not emit both shortened and root-preserving namespaces for the same game type. Schedule One facades belong under `S1Interop.ScheduleOne.*`; future supported surfaces should preserve their own roots, such as `S1Interop.FishNet.Runtime.*`.
 
 ## Type-First SDK Generation
 
@@ -71,6 +71,7 @@ It should continue toward:
 - Constructor helpers and broader method coverage where overload and conversion rules are explicit enough.
 - Backend-specific conversions for common wrapper differences such as arrays, `Il2CppSystem.Guid`, and IL2CPP collection types.
 - Diagnostics for missing, ambiguous, or incompatible members across Mono and IL2CPP.
+- Extending the same root-preserving facade rule to additional supported surfaces when needed, such as FishNet, Unity, or other common modding dependencies.
 - Treating lower-level registry names as generated implementation details in more migration rewrites and examples.
 
 The generated member surface should come from local reference metadata. Do not commit game assemblies, generated IL2CPP wrappers, decompiled source, or a static hand-maintained catalog of Schedule One APIs.

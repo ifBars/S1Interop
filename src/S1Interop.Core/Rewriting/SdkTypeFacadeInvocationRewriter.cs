@@ -51,8 +51,17 @@ public static class SdkTypeFacadeInvocationRewriter
             return source;
         }
 
+        Dictionary<string, string> canonicalMonoTypesByAlias = aliases
+            .Where(alias => alias.MonoType.Contains('.', StringComparison.Ordinal))
+            .GroupBy(alias => alias.Alias, StringComparer.Ordinal)
+            .Where(group => group.Select(alias => alias.MonoType).Distinct(StringComparer.Ordinal).Count() == 1)
+            .ToDictionary(group => group.Key, group => group.First().MonoType, StringComparer.Ordinal);
         Dictionary<string, TypeFacadeTarget> targetsByRuntimeType = aliases
-            .Select(alias => new TypeFacadeTarget(alias.MonoType, alias.Il2CppType, GetFacadeName(alias.MonoType)))
+            .Select(alias =>
+            {
+                string facadeMonoType = GetCanonicalFacadeMonoType(alias, canonicalMonoTypesByAlias);
+                return new TypeFacadeTarget(alias.MonoType, alias.Il2CppType, GetFacadeName(facadeMonoType));
+            })
             .SelectMany(target => new[]
             {
                 new KeyValuePair<string, TypeFacadeTarget>(target.MonoType, target),
@@ -322,6 +331,25 @@ public static class SdkTypeFacadeInvocationRewriter
     private static bool CanRewriteSource(string source, IReadOnlyList<SdkTypeAlias> aliases) =>
         !string.Equals(source, RewriteSource(source, aliases), StringComparison.Ordinal);
 
+    private static string GetCanonicalFacadeMonoType(
+        SdkTypeAlias alias,
+        IReadOnlyDictionary<string, string> canonicalMonoTypesByAlias)
+    {
+        if (alias.MonoType.Contains('.', StringComparison.Ordinal))
+        {
+            return alias.MonoType;
+        }
+
+        if (alias.Il2CppType.Contains('.', StringComparison.Ordinal))
+        {
+            return ToMonoTypeName(alias.Il2CppType);
+        }
+
+        return canonicalMonoTypesByAlias.TryGetValue(alias.Alias, out string? canonicalMonoType)
+            ? canonicalMonoType
+            : alias.MonoType;
+    }
+
     private static string GetFacadeName(string monoTypeName)
     {
         string[] parts = monoTypeName
@@ -335,14 +363,6 @@ public static class SdkTypeFacadeInvocationRewriter
 
         string typeName = parts[^1];
         IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
-        if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
-        {
-            namespaceParts = namespaceParts.Skip(1);
-        }
-        else
-        {
-            namespaceParts = new[] { "Types" }.Concat(namespaceParts);
-        }
 
         string namespaceSuffix = string.Join(".", namespaceParts);
         return string.IsNullOrWhiteSpace(namespaceSuffix)
