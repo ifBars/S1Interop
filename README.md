@@ -1,251 +1,95 @@
 # S1Interop
 
-S1Interop helps Schedule One mod developers move Mono mods toward IL2CPP and dual-runtime builds without hand-editing every project file, reference path, and obvious source compatibility case.
+S1Interop is an alpha toolchain for Schedule One mod developers who want to move Mono mods toward IL2CPP, dual-runtime builds, or a backend-neutral single-assembly shape without hand-editing every project file and wrapper difference.
 
-It is an alpha tool. It can already inspect real mod projects, scaffold dual-runtime build configurations, generate compatibility helpers, and verify migrations in a temporary sandbox. It is not a promise that every Mono mod can become IL2CPP-compatible with one command.
+The main product direction is a generated backend-neutral SDK:
 
-## What works today
+- `s1interop new` starts a backend-neutral mod project.
+- `s1interop sdkgen` generates facades from local game reference metadata.
+- `s1interop migrate --dual-runtime` helps existing Mono mods move toward dual-runtime support.
+- `s1interop analyze`, `lint`, and `verify-migration` report unsafe IL2CPP boundary cases before they become runtime failures.
 
-- Discover Schedule One mod `.csproj` files from a project folder or workspace.
-- Infer Mono, IL2CPP, and CrossCompat configurations from project metadata, references, packages, and source defines.
-- Report common IL2CPP migration blockers, including target framework drift, stale publicized assemblies, wrong reference surfaces, missing runtime defines, injected type issues, and source patterns that need review.
-- Add IL2CPP configurations for Mono-only projects when `migrate --dual-runtime` can infer the source Mono configuration.
-- Update a sibling `.sln` so generated configurations appear in Visual Studio.
-- Move machine-specific game paths into ignored `local.build.props` scaffolding.
-- Rewrite simple ScheduleOne using directives, generated type facades, string-based game type lookups, type-facade object creation/invocation, UnityEvent listener calls, Harmony overload bindings, and other handled source patterns.
-- Generate opt-in Roslyn compile-time helpers for backend-specific type-name/reflection caches.
-- Generate a source-risk report for cases that still need deliberate review, such as Harmony transpilers or unsafe delegate surfaces.
-- Run the migration in a throwaway sandbox with `verify-migration` before touching the real project.
+It is not a finished "convert every mod with one command" tool yet. The current alpha already handles real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification, but unsupported or ambiguous cases are reported instead of guessed.
 
-## Safety model
+## Documentation
 
-S1Interop works on your mod source and project files. It should not commit, package, or redistribute Schedule One assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or AssetRipper exports.
+The full docs site lives under [`docs/docfx`](docs/docfx):
 
-Applied migrations write a manifest and backups under `s1interop-runs/<run-id>/`, so you can roll back a generated change set:
+- [Introduction](docs/docfx/articles/introduction.md)
+- [Getting started](docs/docfx/articles/getting-started.md)
+- [Backend-neutral SDK](docs/docfx/articles/backend-neutral-sdk.md)
+- [Migrating Mono mods](docs/docfx/articles/migrating-mono-mods.md)
+- [Diagnostics](docs/docfx/articles/diagnostics.md)
+- [Testing](docs/docfx/articles/testing.md)
+
+Build the DocFX site locally:
 
 ```powershell
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate rollback .\s1interop-runs\<run-id>\manifest.json
+dotnet build .\S1Interop.sln -c Release
+docfx .\docs\docfx\docfx.json
 ```
 
-Machine-local and internal files are ignored by default:
+The generated site is written to `docs/docfx/_site`. The GitHub Pages workflow in [`.github/workflows/docs.yml`](.github/workflows/docs.yml) builds and publishes the same site from `main`.
 
-```text
-local.build.props
-Directory.Build.user.props
-s1interop-runs/
-s1interop-cache/
-.internal/
-docs/internal/
-*.internal.md
-*.local.md
-```
+## Quick start
 
-Keep local validation notes, private workspace findings, demo recordings, and machine-specific paths in those ignored locations. Public docs should describe repeatable user workflows, not one developer's local setup.
-
-## Build from source
+Build from source:
 
 ```powershell
 dotnet restore .\S1Interop.sln
 dotnet build .\S1Interop.sln
 ```
 
-## Repository layout
-
-```text
-src/S1Interop.Cli/
-  CommandLine/   argument parsing and supported command metadata
-  Commands/      command execution paths
-  Reporting/     text output and help
-
-src/S1Interop.Core/
-  Analysis/      project discovery, MSBuild inspection, and source-risk analysis
-  Generators/    migration-time generated source and report writers
-  Migration/     migration planning, application, rollback, and sandbox verification
-  Rewriting/     source rewrite helpers
-  Utilities/     shared low-level helpers
-
-src/S1Interop.Generators/
-  Roslyn source generators for opt-in compile-time compatibility helpers
-
-tests/S1Interop.Tests/
-  Portable and local integration coverage
-```
-
-Additional project docs:
-
-- [`AGENTS.md`](AGENTS.md) - repository instructions for coding agents and automation.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - module boundaries and migration flow.
-- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) - local development and contribution workflow.
-- [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md) - target backend-neutral SDK authoring experience.
-- [`docs/REAL_MOD_EVIDENCE.md`](docs/REAL_MOD_EVIDENCE.md) - real-mod migration, build-gate, and backend-neutral coverage.
-- [`docs/TESTING.md`](docs/TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
-
-## Backend-neutral SDK generation
-
-S1Interop has two generator layers:
-
-- `S1Interop.Core.Generators` is used by the CLI. It writes SDK declarations, facade source, bridge helpers, migration reports, and other files during `new`, `init`, `sdkgen`, and `migrate`.
-- `S1Interop.Generators` is the Roslyn analyzer/source-generator package installed into backend-neutral mod projects. It turns those declarations into cached runtime type resolution, generated facades, diagnostics, and bridge helpers.
-
-The CLI decides what a project needs by reading source and local reference metadata. The Roslyn package then keeps the generated code in sync at compile time without shipping game assemblies or decompiled source.
-
-The normal path is type-first: include a game type once, then work through the generated backend-neutral facade for that type.
-
-Example:
-
-```csharp
-[assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
-[assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
-[assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
-[assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
-```
-
-The generator emits cached backend-neutral type resolution, such as `S1Interop.Generated.S1InteropTypeRegistry.PlayerCameraName`, plus facades under the root-preserving SDK namespace. In a Mono build, `PlayerCamera` resolves to `ScheduleOne.PlayerScripts.PlayerCamera`; in an IL2CPP build, it resolves to `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
-
-When reference metadata is available, `S1InteropType` also drives the generated public member surface. Compatible public fields and properties get handle-level accessors, and unambiguous public methods get generated invokers. That means developers should not need to manually declare every normal public member they want to use.
-
-`S1InteropMember` is still available, but it is the override path. Use it for private members, clearer aliases, ambiguous overloads, pinned Harmony method targets, or migration-inferred reflection patterns that cannot be represented safely by the generated type facade yet. See [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md).
-
-When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate a targeted member override and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Simple typed metadata cache assignments such as `targetPlayer.GetType().GetField("teleport", flags)` can also move to generated `FieldInfo` or `PropertyInfo` accessors when the receiver type is known. Property accessor chains such as `.GetProperty("Name").GetMethod` keep the final accessor when rewritten. Untyped runtime reflection such as enumerator `Current` lookups is not reported as a backend migration risk unless S1Interop can tie it to a game/backend member surface. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
-
-Generated member overrides intentionally skip MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, and `MelonPreferences` helpers. Those can still be valid mod code, but they are not Schedule One backend-neutral SDK surface and should not be converted into S1Interop member targets.
-
-This does not reverse IL2CPP or remove every runtime difference. It gives S1Interop a compile-time surface for backend-specific adapters, with the goal of replacing repeated string-based reflection and manual conditionals over time.
-
-Roslyn source generators are additive: they can emit new C# and diagnostics, but they cannot rewrite existing source calls or modify IL. A single-DLL compatibility path is still possible, but it needs one of these shapes:
-
-- source migration rewrites known call sites to generated backend-routing helpers before build;
-- mod code calls generated facades directly;
-- a future IL-weaving step rewrites compiled call sites after Roslyn compilation.
-
-The current project deliberately uses the first two paths. IL weaving is a separate future layer because it changes the compiled assembly and needs stronger verification than source generation.
-
-Until `S1Interop.Generators` is published, projects that opt into generator attributes need a local package source:
-
-```powershell
-dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
-dotnet restore .\YourMod.csproj --source .\artifacts\packages --source https://api.nuget.org/v3/index.json
-```
-
-## Run from source
+Run the CLI from source:
 
 ```powershell
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- new .\MyBackendNeutralMod --apply
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- init . --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- sdkgen . --full-sdk --apply
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- lint .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dual-runtime --dry-run
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual declarations remain available for dynamic or reflection-heavy cases the generator cannot infer yet, but the intended SDK direction is that type coverage generates the common public member surface automatically.
-
-Migration can also route simple game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` and `typeof(Il2CppScheduleOne.UI.HUD)` can become generated registry properties, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
-
-For simple command-style patterns, migration can route object construction and calls through generated type facades. A shape like `var command = new Il2CppScheduleOne.Console.SetWeather(); command.Execute(args);` can become `S1Interop.ScheduleOne.Console.SetWeather.Create()` plus `S1Interop.ScheduleOne.Console.SetWeather.Invoke(command, "Execute", args)`. Simple `Il2CppSystem.Collections.Generic.List<T>` construction is rewritten to managed `System.Collections.Generic.List<T>` so generated invocation helpers can convert it to the active backend parameter type.
-
-Simple IL2CPP-backed object pattern casts can move to the generated object-cast helper. For example, `if (value is UniversalRenderPipelineAsset asset)` and `return phone is Component c ? c.gameObject : null;` can route through `S1Interop.Generated.S1InteropObjectCast`, while value-type patterns are left unchanged.
-
-When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type and override strings during compilation. Missing type names report `S1I001`; member overrides with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
-
-IL2CPP builds also get compiler diagnostics for source shapes that usually compile but fail later in-game. Harmony transpilers (`S1I004`), managed collection parameters in IL2CPP-facing callback signatures (`S1I005`), and managed `byte[]` buffers passed to native/game fill APIs such as Steamworks packet reads (`S1I006`) are build errors. Plain C# casts from object/proxy values to Unity object types that should use `S1InteropObjectCast` (`S1I007`) are warnings until the migrator can rewrite them safely. These diagnostics are intentionally focused on boundary code; managed collections and arrays remain fine inside normal mod logic, and generated facades can still convert managed values when invoking registered backend-neutral members.
-
-Use `--apply` only after reviewing the dry-run output.
-
-## Backend-neutral SDK access
-
-Generated type handles reduce the chance of passing the wrong object into a member getter, setter, or invoker:
-
-```csharp
-S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle = S1Interop.ScheduleOne.Vehicles.LandVehicle.As(rawVehicle);
-
-if (vehicle.HasValue)
-{
-    float? throttle = vehicle.GetCurrentThrottleValue<float>();
-    string? name = vehicle.VehicleName?.ToString();
-}
-```
-
-Generated type facades preserve the original runtime namespace root under `S1Interop`:
-
-```csharp
-using S1Interop.ScheduleOne.Vehicles;
-
-LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
-string? name = vehicle.VehicleName?.ToString();
-```
-
-Schedule One facades are generated under `S1Interop.ScheduleOne.*`. Other supported surfaces should follow the same rule, for example `S1Interop.FishNet.Runtime.*`, instead of using shortened aliases. Prefer handle accessors and type-scoped facades over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
-
-The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades own normal public member access where metadata is clear enough; explicit `S1InteropMember` declarations remain for overrides, private surfaces, overloads, or migration cases that cannot be discovered safely.
-
-## Install as a local tool
-
-Until packages are published, pack and install from a local source:
+Pack and install the local tool:
 
 ```powershell
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
 dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
 .\.tools\s1interop --help
-.\.tools\s1interop --version
-```
-
-Then run:
-
-```powershell
-.\.tools\s1interop analyze .
-.\.tools\s1interop new .\MyBackendNeutralMod --apply
-.\.tools\s1interop init . --apply
-.\.tools\s1interop migrate . --dual-runtime --dry-run
-.\.tools\s1interop verify-migration . --dual-runtime
 ```
 
 ## Local game paths
 
-Every developer has different Schedule One install paths. Pass paths explicitly when build verification needs them:
+Every developer has different Schedule One install paths. Keep those paths out of source control.
 
-```powershell
-.\.tools\s1interop verify-migration . --dual-runtime --build --il2cpp-game-path "<your IL2CPP Schedule I install>" --mono-game-path "<your Mono Schedule I install>"
+If S1Interop creates `local.build.props`, copy or edit the generated file and set:
+
+```xml
+<MonoGamePath>...</MonoGamePath>
+<Il2CppGamePath>...</Il2CppGamePath>
 ```
 
-If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. If the project uses generated S1Interop helpers from unpublished local packages, set `S1InteropGeneratorPackageSource` to the folder that contains `S1Interop.Generators.*.nupkg`. Do not commit `local.build.props`. Those property names are stable override points for Visual Studio, Rider, and command-line builds, even when the project uses custom configurations such as `MonoStable` or `Il2cppDevelopment`.
+For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, fill in both game paths, and open the generated `.sln` in Visual Studio or Rider.
 
-For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, set both game paths, and open the generated `.sln`. If you are using unpublished local packages, also set `S1InteropGeneratorPackageSource` to the folder that contains `S1Interop.Generators.*.nupkg`; this feeds Visual Studio, Rider, and command-line restore through `RestoreAdditionalProjectSources`. `Debug` and `Release` build against Mono references by default; `Debug Il2Cpp` and `Release Il2Cpp` build the same source against IL2CPP references.
-
-## Commands
+## Repository layout
 
 ```text
-s1interop analyze [path=.] [--configuration name] [--format text|json]
-s1interop new <path> [--dry-run|--apply] [--format text|json]
-s1interop init [path=.] [--dry-run|--apply] [--format text|json]
-s1interop lint [path=.] [--configuration name] [--format text|json]
-s1interop sdkgen [path=.] [--dry-run|--apply] [--format text|json]
-s1interop build-hook [path=.] [--dry-run|--apply] [--format text|json]
-s1interop migrate [path=.] [--dry-run|--apply] [--dual-runtime] [--format text|json]
-s1interop verify-migration [path=.] [--dual-runtime] [--include-source-migrations] [--build] [--il2cpp-game-path path] [--mono-game-path path] [--build-timeout-seconds n] [--format text|json]
-s1interop migrate rollback <manifest.json> [--format text|json]
-s1interop --version
+src/S1Interop.Cli/          CLI commands and reporting
+src/S1Interop.Core/         analysis, migration, generation, rewriting, verification
+src/S1Interop.Generators/   Roslyn source generator and diagnostics package
+tests/S1Interop.Tests/      portable and local integration coverage
+docs/docfx/                 public documentation site
+docs/                       maintainer notes and project direction
 ```
 
-## Tests
+## Safety model
 
-Quick tests skip MSBuild/package/build-gate fixtures so analyzer, rewriter, migration-planning, and generator changes can be checked faster:
+S1Interop works on your mod source and project files. It should not commit, package, or redistribute Schedule One assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or AssetRipper exports.
+
+Applied migrations write a manifest and backups under `s1interop-runs/<run-id>/`, so generated changes can be rolled back:
 
 ```powershell
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --quick
+s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 
-Portable tests run without private local fixtures:
-
-```powershell
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --portable
-```
-
-Maintainers can run integration tests when the expected local mod workspace and game installs are available:
-
-```powershell
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -- --integration
-```
-
-Integration tests may use local open-source mod checkouts and local game paths. Keep those assumptions out of committed project files and public docs.
+Machine-local files such as `local.build.props`, `Directory.Build.user.props`, `s1interop-runs/`, and `s1interop-cache/` are ignored by default.

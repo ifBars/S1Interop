@@ -1,0 +1,1 @@
+[!INCLUDE [Architecture](../../ARCHITECTURE.md)]

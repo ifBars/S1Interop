@@ -1,0 +1,30 @@
+- name: Get started
+  items:
+    - name: Introduction
+      href: introduction.md
+    - name: Installation
+      href: getting-started.md
+    - name: Local game paths
+      href: local-paths.md
+- name: Backend-neutral development
+  items:
+    - name: New projects
+      href: new-projects.md
+    - name: Backend-neutral SDK
+      href: backend-neutral-sdk.md
+    - name: SDK generation
+      href: sdk-generation.md
+- name: Migration
+  items:
+    - name: Migrating Mono mods
+      href: migrating-mono-mods.md
+    - name: Diagnostics
+      href: diagnostics.md
+    - name: Commands
+      href: commands.md
+- name: Maintainers
+  items:
+    - name: Testing
+      href: testing.md
+    - name: Publishing docs
+      href: publishing-docs.md

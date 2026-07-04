@@ -9,6 +9,8 @@ Directory.Build.user.props
 s1interop-runs/
 s1interop-cache/
 artifacts/
+docs/docfx/_site/
+docs/docfx/api/
 demo
 demo-projects
 demo-real

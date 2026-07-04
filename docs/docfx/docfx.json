@@ -1,0 +1,64 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../..",
+          "files": [
+            "src/S1Interop.Core/S1Interop.Core.csproj",
+            "src/S1Interop.Cli/S1Interop.Cli.csproj",
+            "src/S1Interop.Generators/S1Interop.Generators.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "namespaceLayout": "Nested",
+      "disableGitFeatures": false,
+      "disableDefaultFilter": false,
+      "shouldSkipMarkup": false,
+      "force": true,
+      "repo": {
+        "remote": "https://github.com/ifBars/S1Interop.git",
+        "branch": "main",
+        "path": "/"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "**/*.{md,yml}"
+        ],
+        "exclude": [
+          "_site/**",
+          "api/**",
+          "templates/**"
+        ]
+      },
+      {
+        "files": [
+          "api/**/*.yml"
+        ]
+      }
+    ],
+    "output": "_site",
+    "template": [
+      "default",
+      "modern",
+      "templates/s1interop"
+    ],
+    "globalMetadata": {
+      "_appName": "S1Interop",
+      "_appTitle": "S1Interop Documentation",
+      "_enableSearch": true,
+      "_navbarTitle": "S1Interop",
+      "_repo": "https://github.com/ifBars/S1Interop",
+      "_gitContribute": {
+        "repo": "https://github.com/ifBars/S1Interop",
+        "branch": "main"
+      }
+    }
+  }
+}
