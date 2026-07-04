@@ -587,9 +587,9 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
                     SanitizeIdentifier(member.Name),
                     entry.Alias,
                     member.Name,
-                    S1InteropMemberKind.FieldOrProperty,
+                    member.Kind,
                     member.IsStatic,
-                    ImmutableArray<string>.Empty));
+                    member.ParameterTypeNames));
             }
         }
 
@@ -643,13 +643,29 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
     {
         IReadOnlyDictionary<string, DiscoveredMember> monoMembers = DiscoverPublicFieldPropertyMembers(monoType);
         IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers = DiscoverPublicFieldPropertyMembers(il2CppType);
+        foreach (DiscoveredMember member in SelectCompatibleMembers(monoMembers, il2CppMembers))
+        {
+            yield return member;
+        }
 
+        IReadOnlyDictionary<string, DiscoveredMember> monoMethods = DiscoverPublicMethods(monoType);
+        IReadOnlyDictionary<string, DiscoveredMember> il2CppMethods = DiscoverPublicMethods(il2CppType);
+        foreach (DiscoveredMember method in SelectCompatibleMembers(monoMethods, il2CppMethods))
+        {
+            yield return method;
+        }
+    }
+
+    private static IEnumerable<DiscoveredMember> SelectCompatibleMembers(
+        IReadOnlyDictionary<string, DiscoveredMember> monoMembers,
+        IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers)
+    {
         if (monoMembers.Count > 0 && il2CppMembers.Count > 0)
         {
             foreach (DiscoveredMember monoMember in monoMembers.Values.OrderBy(member => member.Name, StringComparer.Ordinal))
             {
                 if (il2CppMembers.TryGetValue(monoMember.Name, out DiscoveredMember il2CppMember) &&
-                    monoMember.IsStatic == il2CppMember.IsStatic)
+                    AreDiscoveredMembersCompatible(monoMember, il2CppMember))
                 {
                     yield return monoMember;
                 }
@@ -663,6 +679,44 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         {
             yield return member;
         }
+    }
+
+    private static bool AreDiscoveredMembersCompatible(DiscoveredMember monoMember, DiscoveredMember il2CppMember) =>
+        monoMember.Kind == il2CppMember.Kind &&
+        monoMember.IsStatic == il2CppMember.IsStatic &&
+        AreParameterTypeNamesCompatible(monoMember.ParameterTypeNames, il2CppMember.ParameterTypeNames);
+
+    private static bool AreParameterTypeNamesCompatible(
+        ImmutableArray<string> monoParameterTypeNames,
+        ImmutableArray<string> il2CppParameterTypeNames)
+    {
+        if (monoParameterTypeNames.Length != il2CppParameterTypeNames.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < monoParameterTypeNames.Length; index++)
+        {
+            if (!string.Equals(
+                NormalizeBackendNeutralParameterTypeName(monoParameterTypeNames[index]),
+                NormalizeBackendNeutralParameterTypeName(il2CppParameterTypeNames[index]),
+                StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string NormalizeBackendNeutralParameterTypeName(string typeName)
+    {
+        bool byRef = typeName.EndsWith("&", StringComparison.Ordinal);
+        string normalized = byRef ? typeName.Substring(0, typeName.Length - 1) : typeName;
+        normalized = normalized
+            .Replace("Il2CppScheduleOne.", "ScheduleOne.")
+            .Replace("Il2CppSystem.", "System.");
+        return byRef ? normalized + "&" : normalized;
     }
 
     private static IReadOnlyDictionary<string, DiscoveredMember> DiscoverPublicFieldPropertyMembers(INamedTypeSymbol? type)
@@ -689,6 +743,72 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         return members;
     }
 
+    private static IReadOnlyDictionary<string, DiscoveredMember> DiscoverPublicMethods(INamedTypeSymbol? type)
+    {
+        var methodsByName = new Dictionary<string, List<IMethodSymbol>>(StringComparer.Ordinal);
+        if (type is null)
+        {
+            return new Dictionary<string, DiscoveredMember>(StringComparer.Ordinal);
+        }
+
+        foreach (IMethodSymbol method in type.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (!IsPublicMethodCandidate(method))
+            {
+                continue;
+            }
+
+            if (!methodsByName.TryGetValue(method.Name, out List<IMethodSymbol>? overloads))
+            {
+                overloads = new List<IMethodSymbol>();
+                methodsByName.Add(method.Name, overloads);
+            }
+
+            overloads.Add(method);
+        }
+
+        var members = new Dictionary<string, DiscoveredMember>(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, List<IMethodSymbol>> pair in methodsByName)
+        {
+            if (pair.Value.Count != 1)
+            {
+                continue;
+            }
+
+            IMethodSymbol method = pair.Value[0];
+            members.Add(
+                pair.Key,
+                new DiscoveredMember(
+                    method.Name,
+                    S1InteropMemberKind.Method,
+                    method.IsStatic,
+                    method.Parameters.Select(GetParameterTypeName).ToImmutableArray()));
+        }
+
+        return members;
+    }
+
+    private static bool IsPublicMethodCandidate(IMethodSymbol method) =>
+        method.DeclaredAccessibility == Accessibility.Public &&
+        method.MethodKind == MethodKind.Ordinary &&
+        !method.IsImplicitlyDeclared &&
+        !method.IsGenericMethod &&
+        !method.IsExtensionMethod &&
+        IsInteropSafeMemberName(method.Name) &&
+        !IsCommonObjectMethodName(method.Name);
+
+    private static bool IsCommonObjectMethodName(string name) =>
+        name == "ToString" ||
+        name == "Equals" ||
+        name == "GetHashCode" ||
+        name == "GetType";
+
+    private static string GetParameterTypeName(IParameterSymbol parameter)
+    {
+        string typeName = NormalizeComparableTypeName(parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        return parameter.RefKind == RefKind.None ? typeName : typeName + "&";
+    }
+
     private static bool TryCreateDiscoveredMember(ISymbol symbol, out DiscoveredMember member)
     {
         member = default;
@@ -702,10 +822,10 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         switch (symbol)
         {
             case IFieldSymbol field when !field.IsConst:
-                member = new DiscoveredMember(field.Name, field.IsStatic);
+                member = new DiscoveredMember(field.Name, S1InteropMemberKind.FieldOrProperty, field.IsStatic, ImmutableArray<string>.Empty);
                 return true;
             case IPropertySymbol property when property.Parameters.Length == 0:
-                member = new DiscoveredMember(property.Name, property.IsStatic);
+                member = new DiscoveredMember(property.Name, S1InteropMemberKind.FieldOrProperty, property.IsStatic, ImmutableArray<string>.Empty);
                 return true;
             default:
                 return false;
@@ -3480,15 +3600,25 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
 
     private readonly struct DiscoveredMember
     {
-        public DiscoveredMember(string name, bool isStatic)
+        public DiscoveredMember(
+            string name,
+            S1InteropMemberKind kind,
+            bool isStatic,
+            ImmutableArray<string> parameterTypeNames)
         {
             Name = name;
+            Kind = kind;
             IsStatic = isStatic;
+            ParameterTypeNames = parameterTypeNames;
         }
 
         public string Name { get; }
 
+        public S1InteropMemberKind Kind { get; }
+
         public bool IsStatic { get; }
+
+        public ImmutableArray<string> ParameterTypeNames { get; }
     }
 
     private readonly struct S1InteropTypeDiagnosticTarget

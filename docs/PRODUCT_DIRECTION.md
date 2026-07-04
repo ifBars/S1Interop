@@ -57,9 +57,13 @@ now starts generating:
 - `As`, `TryAs`, and `Is` helpers for object/proxy conversion.
 - Accessors for compatible public fields and properties.
 
+It now starts generating:
+
+- Invokers for unambiguous compatible public methods.
+
 It should continue toward:
 
-- Invokers for compatible public methods and constructors.
+- Constructor helpers and broader method coverage where overload and conversion rules are explicit enough.
 - Backend-specific conversions for common wrapper differences such as arrays, `Il2CppSystem.Guid`, and IL2CPP collection types.
 - Diagnostics for missing, ambiguous, or incompatible members across Mono and IL2CPP.
 
@@ -77,7 +81,7 @@ Use explicit member declarations when:
 - Mono and IL2CPP surfaces disagree and the developer wants to pin a specific binding.
 - Migration inferred a reflection pattern that cannot be represented by the automatic type facade yet.
 
-Normal public fields and properties should come from the generated type facade after a type is included. Normal public methods and constructors are still moving in that direction, but explicit declarations remain the safer alpha path until overload and conversion rules are strong enough.
+Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. Overloaded methods and constructors are still moving in that direction, but explicit declarations remain the safer alpha path until overload and conversion rules are strong enough.
 
 ## CLI Shape
 

@@ -315,9 +315,35 @@ internal sealed partial class S1InteropFixtureTests
                     internal string InternalName = "";
                     public string this[int index] => index.ToString();
                     public const string StableKind = "vehicle";
-                    public void StartEngine()
+                    public string StartEngine()
+                    {
+                        return "started";
+                    }
+
+                    public string AssignDriver(ScheduleOne.PlayerScripts.Player player)
+                    {
+                        return player.Name;
+                    }
+
+                    public void Overloaded()
                     {
                     }
+
+                    public void Overloaded(int value)
+                    {
+                    }
+
+                    public void GenericMethod<T>()
+                    {
+                    }
+                }
+            }
+
+            namespace ScheduleOne.PlayerScripts
+            {
+                public sealed class Player
+                {
+                    public string Name = "";
                 }
             }
             """);
@@ -332,9 +358,39 @@ internal sealed partial class S1InteropFixtureTests
                     public float CurrentThrottle;
                     public static LandVehicle? Instance { get; set; }
                     public string Il2CppOnly { get; set; } = "";
-                    public void StartEngine()
+                    public string StartEngine()
+                    {
+                        return "started";
+                    }
+
+                    public string AssignDriver(Il2CppScheduleOne.PlayerScripts.Player player)
+                    {
+                        return player.Name;
+                    }
+
+                    public void Overloaded()
                     {
                     }
+
+                    public void Overloaded(int value)
+                    {
+                    }
+
+                    public void GenericMethod<T>()
+                    {
+                    }
+
+                    public void Il2CppOnlyMethod()
+                    {
+                    }
+                }
+            }
+
+            namespace Il2CppScheduleOne.PlayerScripts
+            {
+                public sealed class Player
+                {
+                    public string Name = "";
                 }
             }
             """);
@@ -363,8 +419,14 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             generated.Contains("public static object? GetVehicleName(Handle instance)", StringComparison.Ordinal) &&
             generated.Contains("public static object? GetCurrentThrottle(Handle instance)", StringComparison.Ordinal) &&
-            generated.Contains("public static object? GetInstance()", StringComparison.Ordinal),
-            $"Type facades should expose discovered members without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
+            generated.Contains("public static object? GetInstance()", StringComparison.Ordinal) &&
+            generated.Contains("public static object? StartEngine(Handle instance, params object?[] args)", StringComparison.Ordinal) &&
+            generated.Contains("public static object? AssignDriver(Handle instance, params object?[] args)", StringComparison.Ordinal),
+            $"Type facades should expose discovered members and unambiguous public methods without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public const string AssignDriverName = \"AssignDriver\";", StringComparison.Ordinal) &&
+            generated.Contains("public static System.Reflection.MethodInfo? AssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, AssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
+            $"Discovered methods should preserve parameter-specific lookup and runtime type-name conversion. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(value);", StringComparison.Ordinal) &&
             generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName<T>(value);", StringComparison.Ordinal) &&
@@ -379,8 +441,10 @@ internal sealed partial class S1InteropFixtureTests
             !generated.Contains("InternalNameName", StringComparison.Ordinal) &&
             !generated.Contains("StableKindName", StringComparison.Ordinal) &&
             !generated.Contains("ItemName", StringComparison.Ordinal) &&
-            !generated.Contains("StartEngineName", StringComparison.Ordinal),
-            $"Discovered member facades should skip one-sided, non-public, const, indexer, and method members. Generated source:{Environment.NewLine}{generated}");
+            !generated.Contains("OverloadedName", StringComparison.Ordinal) &&
+            !generated.Contains("GenericMethodName", StringComparison.Ordinal) &&
+            !generated.Contains("Il2CppOnlyMethodName", StringComparison.Ordinal),
+            $"Discovered member facades should skip one-sided, non-public, const, indexer, overloaded, and generic members. Generated source:{Environment.NewLine}{generated}");
     }
 
     private void S1InteropTypeRegistryGeneratorMergesDuplicateAliases()
