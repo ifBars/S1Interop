@@ -1813,6 +1813,7 @@ internal sealed partial class S1InteropFixtureTests
         {
             string targetDirectory = Path.Combine(tempRoot, "Fresh Neutral Mod");
             string projectName = "FreshNeutralMod";
+            string solutionPath = Path.Combine(targetDirectory, $"{projectName}.sln");
             string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
             string corePath = Path.Combine(targetDirectory, "ModCore.cs");
             string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
@@ -1830,23 +1831,34 @@ internal sealed partial class S1InteropFixtureTests
 
             ProcessResult apply = RunCli("new", targetDirectory, "--apply");
             Assert(apply.ExitCode == 0, $"s1interop new --apply should succeed. Output: {apply.Output}");
+            Assert(File.Exists(solutionPath), "s1interop new should create a solution file for IDE builds.");
             Assert(File.Exists(projectPath), "s1interop new should create the project file.");
             Assert(File.Exists(corePath), "s1interop new should create the core source file.");
             Assert(File.Exists(starterPath), "s1interop new should create the backend-neutral starter file.");
             Assert(File.Exists(localPropsExamplePath), "s1interop new should create a local build props example.");
             Assert(File.Exists(gitignorePath), "s1interop new should create a gitignore for local machine paths and build output.");
 
+            string solutionSource = File.ReadAllText(solutionPath);
             string projectSource = File.ReadAllText(projectPath);
             string coreSource = File.ReadAllText(corePath);
             string starterSource = File.ReadAllText(starterPath);
             string localPropsExampleSource = File.ReadAllText(localPropsExamplePath);
             string gitignoreSource = File.ReadAllText(gitignorePath);
             Assert(
+                solutionSource.Contains("Debug|Any CPU = Debug|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Release|Any CPU = Release|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Debug Il2Cpp|Any CPU = Debug Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Release Il2Cpp|Any CPU = Release Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains($"{projectName}.csproj", StringComparison.Ordinal),
+                "Generated solution should expose Mono-default and IL2CPP reference configurations for Visual Studio and Rider.");
+            Assert(
                 projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
                 projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
                 projectSource.Contains("S1Interop.Generators", StringComparison.Ordinal) &&
                 projectSource.Contains("PrivateAssets=\"all\"", StringComparison.Ordinal) &&
                 projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
+                projectSource.Contains("<Configurations>Debug;Release;Debug Il2Cpp;Release Il2Cpp</Configurations>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'=='' and ('$(Configuration)'=='Debug Il2Cpp' or '$(Configuration)'=='Release Il2Cpp')\">Il2Cpp</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
                 projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'==''\">Mono</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
                 projectSource.Contains("<GamePath Condition=\"'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'\">$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<ManagedPath Condition=\"'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''\">$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal) &&

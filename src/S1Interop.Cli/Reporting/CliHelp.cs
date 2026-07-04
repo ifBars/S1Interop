@@ -20,7 +20,7 @@ internal static class CliHelp
 
             What it does:
               analyze/lint inspect .csproj files and infer Mono, IL2CPP, and CrossCompat configurations.
-              new creates a backend-neutral project scaffold with S1Interop generator attributes ready to edit.
+              new creates a backend-neutral project scaffold with a solution, local path example, and generator attributes ready to edit.
               init opts a project into backend-neutral attributes and generated helpers from the start.
               sdkgen emits usage-driven facades by default; --full-sdk emits declarations for all discoverable ScheduleOne reference types.
               migrate can scaffold dual-runtime build settings, generated source helpers, and source-risk reports.

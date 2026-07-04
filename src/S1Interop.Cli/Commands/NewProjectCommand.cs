@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using S1Interop.Core.Generators;
@@ -20,13 +21,14 @@ internal static class NewProjectCommand
             return 2;
         }
 
+        string solutionPath = Path.Combine(targetDirectory, $"{projectName}.sln");
         string projectPath = Path.Combine(targetDirectory, $"{projectName}.csproj");
         string corePath = Path.Combine(targetDirectory, "ModCore.cs");
         string starterPath = Path.Combine(targetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
         string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
         string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
         string readmePath = Path.Combine(targetDirectory, "README.md");
-        string[] plannedFiles = [projectPath, corePath, starterPath, localPropsExamplePath, gitignorePath, readmePath];
+        string[] plannedFiles = [solutionPath, projectPath, corePath, starterPath, localPropsExamplePath, gitignorePath, readmePath];
 
         if (!command.Apply)
         {
@@ -36,6 +38,7 @@ internal static class NewProjectCommand
 
         Directory.CreateDirectory(targetDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(starterPath)!);
+        File.WriteAllText(solutionPath, GenerateSolution(projectName), Encoding.UTF8);
         File.WriteAllText(projectPath, GenerateProject(projectName), Encoding.UTF8);
         File.WriteAllText(corePath, GenerateCore(projectName), Encoding.UTF8);
         File.WriteAllText(starterPath, new BackendNeutralStarterGenerator().GenerateSource(), Encoding.UTF8);
@@ -99,9 +102,11 @@ internal static class NewProjectCommand
             <LangVersion>10.0</LangVersion>
             <Nullable>enable</Nullable>
             <ImplicitUsings>enable</ImplicitUsings>
+            <Configurations>Debug;Release;Debug Il2Cpp;Release Il2Cpp</Configurations>
             <RootNamespace>{projectName}</RootNamespace>
             <AssemblyName>{projectName}</AssemblyName>
             <Version>0.1.0</Version>
+            <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'=='' and ('$(Configuration)'=='Debug Il2Cpp' or '$(Configuration)'=='Release Il2Cpp')">Il2Cpp</S1InteropReferenceRuntime>
             <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'==''">Mono</S1InteropReferenceRuntime>
             <GamePath Condition="'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(Il2CppGamePath)</GamePath>
             <GamePath Condition="'$(GamePath)'==''">$(MonoGamePath)</GamePath>
@@ -153,6 +158,44 @@ internal static class NewProjectCommand
         </Project>
         """;
 
+    private static string GenerateSolution(string projectName)
+    {
+        string projectGuid = CreateStableGuid($"{projectName}.csproj").ToString("B").ToUpperInvariant();
+        const string projectTypeGuid = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
+        string[] configurations =
+        [
+            "Debug",
+            "Release",
+            "Debug Il2Cpp",
+            "Release Il2Cpp"
+        ];
+        var builder = new StringBuilder();
+        builder.AppendLine("Microsoft Visual Studio Solution File, Format Version 12.00");
+        builder.AppendLine("# Visual Studio Version 17");
+        builder.AppendLine("VisualStudioVersion = 17.0.31903.59");
+        builder.AppendLine("MinimumVisualStudioVersion = 10.0.40219.1");
+        builder.AppendLine($"Project(\"{projectTypeGuid}\") = \"{projectName}\", \"{projectName}.csproj\", \"{projectGuid}\"");
+        builder.AppendLine("EndProject");
+        builder.AppendLine("Global");
+        builder.AppendLine("\tGlobalSection(SolutionConfigurationPlatforms) = preSolution");
+        foreach (string configuration in configurations)
+        {
+            builder.AppendLine($"\t\t{configuration}|Any CPU = {configuration}|Any CPU");
+        }
+
+        builder.AppendLine("\tEndGlobalSection");
+        builder.AppendLine("\tGlobalSection(ProjectConfigurationPlatforms) = postSolution");
+        foreach (string configuration in configurations)
+        {
+            builder.AppendLine($"\t\t{projectGuid}.{configuration}|Any CPU.ActiveCfg = {configuration}|Any CPU");
+            builder.AppendLine($"\t\t{projectGuid}.{configuration}|Any CPU.Build.0 = {configuration}|Any CPU");
+        }
+
+        builder.AppendLine("\tEndGlobalSection");
+        builder.AppendLine("EndGlobal");
+        return builder.ToString();
+    }
+
     private static string GenerateCore(string projectName) =>
         $$"""
         using MelonLoader;
@@ -200,11 +243,12 @@ internal static class NewProjectCommand
         Before building locally, copy `local.build.props.example` to `local.build.props` and set your own game paths.
         `local.build.props` is ignored so machine-specific paths do not get committed.
 
-        The default build uses Mono reference assemblies and keeps generated S1Interop helpers runtime-detecting.
-        To sanity-check the same source against IL2CPP references, build with:
+        Open `{{projectName}}.sln` in Visual Studio or Rider. `Debug` and `Release` use Mono references.
+        `Debug Il2Cpp` and `Release Il2Cpp` use IL2CPP references while keeping the same source and output assembly logic.
 
         ```powershell
-        dotnet build -p:S1InteropReferenceRuntime=Il2Cpp
+        dotnet build .\{{projectName}}.sln -c Debug
+        dotnet build .\{{projectName}}.sln -c "Debug Il2Cpp"
         ```
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
@@ -245,5 +289,12 @@ internal static class NewProjectCommand
         }
 
         return builder.ToString();
+    }
+
+    private static Guid CreateStableGuid(string value)
+    {
+        using SHA256 sha256 = SHA256.Create();
+        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(value));
+        return new Guid(hash.AsSpan(0, 16));
     }
 }

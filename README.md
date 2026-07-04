@@ -142,7 +142,7 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
+Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
 
 Migration can also route simple game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` and `typeof(Il2CppScheduleOne.UI.HUD)` can become generated registry properties, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
 
@@ -201,6 +201,8 @@ Every developer has different Schedule One install paths. Pass paths explicitly 
 ```
 
 If migration creates `local.build.props`, fill in the generated `MonoGamePath` and `Il2CppGamePath` values for your machine. Do not commit that file. Those property names are stable override points for Visual Studio, Rider, and command-line builds, even when the project uses custom configurations such as `MonoStable` or `Il2cppDevelopment`.
+
+For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, set both game paths, and open the generated `.sln`. `Debug` and `Release` build against Mono references by default; `Debug Il2Cpp` and `Release Il2Cpp` build the same source against IL2CPP references.
 
 ## Commands
 
