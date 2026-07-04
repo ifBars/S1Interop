@@ -74,8 +74,9 @@ tests/S1Interop.Tests/
 Additional project docs:
 
 - [`AGENTS.md`](AGENTS.md) - repository instructions for coding agents and automation.
-- [`docs/architecture.md`](docs/architecture.md) - module boundaries and migration flow.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - module boundaries and migration flow.
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) - local development and contribution workflow.
+- [`docs/REAL_MOD_EVIDENCE.md`](docs/REAL_MOD_EVIDENCE.md) - real-mod migration, build-gate, and backend-neutral coverage.
 - [`docs/TESTING.md`](docs/TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
 
 ## Compile-time generators
