@@ -154,7 +154,7 @@ The main registry generator is intentionally split by responsibility:
 - `S1InteropTypeRegistryGenerator.cs`: incremental-generator wiring and target-runtime resolution.
 - `*.InputModel.cs`: attribute parsing, type/member discovery, and declaration validation helpers.
 - `*.RegistryEmission.cs`: registry and type-facade source emission.
-- `*.MemberRegistryEmission.cs`: member-registry source emission.
+- `*.MemberRegistryEmission.cs` and `*.Member*Emission.cs`: member-registry source emission, split between declared accessors, value access, conversion, invocation, and member resolution helper groups.
 - `*.RuntimeEmission.cs`: object handles, casts, and delegate bridge runtime helpers.
 - `*.AttributeEmission.cs`: attribute and bridge source templates.
 - `*.Diagnostics.cs`: source-boundary diagnostics.
