@@ -57,6 +57,7 @@ Recent local scans across the broader ScheduleOne workspace found these recurrin
 - Selected mono-only real-mod copies can be migrated far enough for build-gated verification when their unrelated dependencies are available.
 - Backend-neutral SDK generation can be seeded from real source aliases, string-held game type names, and local reference metadata.
 - Generated backend-neutral helper source is compiled against both Mono and IL2CPP reference surfaces in focused cases.
+- Generated Schedule One type facades expose both short compatibility namespaces and native-like `S1Interop.ScheduleOne.*` namespaces over the same backend-neutral registry binding.
 
 ## What This Does Not Prove Yet
 

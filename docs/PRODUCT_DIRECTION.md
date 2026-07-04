@@ -24,7 +24,7 @@ string? name = vehicle.VehicleName?.ToString();
 float? throttle = vehicle.GetCurrentThrottleValue<float>();
 ```
 
-The longer-term product target is closer to native mod code:
+The generated SDK now also emits a native-like namespace shape:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
@@ -71,7 +71,7 @@ It should continue toward:
 - Constructor helpers and broader method coverage where overload and conversion rules are explicit enough.
 - Backend-specific conversions for common wrapper differences such as arrays, `Il2CppSystem.Guid`, and IL2CPP collection types.
 - Diagnostics for missing, ambiguous, or incompatible members across Mono and IL2CPP.
-- A native-like namespace layout such as `S1Interop.ScheduleOne.Vehicles.LandVehicle`, with lower-level registry names treated as generated implementation details.
+- Treating lower-level registry names as generated implementation details in more migration rewrites and examples.
 
 The generated member surface should come from local reference metadata. Do not commit game assemblies, generated IL2CPP wrappers, decompiled source, or a static hand-maintained catalog of Schedule One APIs.
 

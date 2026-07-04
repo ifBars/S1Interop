@@ -424,6 +424,10 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static object? AssignDriver(Handle instance, params object?[] args)", StringComparison.Ordinal),
             $"Type facades should expose discovered members and unambiguous public methods without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
         Assert(
+            generated.Contains("namespace S1Interop.ScheduleOne.Vehicles", StringComparison.Ordinal) &&
+            generated.Contains("namespace S1Interop.Vehicles", StringComparison.Ordinal),
+            $"ScheduleOne type facades should emit both native-like and compatibility namespaces. Generated source:{Environment.NewLine}{generated}");
+        Assert(
             generated.Contains("public const string LandVehicleAssignDriverName = \"AssignDriver\";", StringComparison.Ordinal) &&
             generated.Contains("public static System.Reflection.MethodInfo? LandVehicleAssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, LandVehicleAssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
             $"Discovered methods should preserve parameter-specific lookup and runtime type-name conversion. Generated source:{Environment.NewLine}{generated}");
@@ -1279,6 +1283,7 @@ internal sealed partial class S1InteropFixtureTests
         Type objectCastType = assembly.GetType("S1Interop.Generated.S1InteropObjectCast", throwOnError: true)!;
         Type delegateBridgeType = assembly.GetType("S1Interop.Generated.S1InteropDelegateBridge", throwOnError: true)!;
         Type hudFacadeType = assembly.GetType("S1Interop.UI.HUD", throwOnError: true)!;
+        Type nativeLikeHudFacadeType = assembly.GetType("S1Interop.ScheduleOne.UI.HUD", throwOnError: true)!;
         Type memberKindType = assembly.GetTypes().Single(type => type.Name == "S1InteropMemberKind");
 
         object? backend = runtimeType.GetProperty("Backend")?.GetValue(null);
@@ -1304,6 +1309,9 @@ internal sealed partial class S1InteropFixtureTests
         MethodInfo? invokeHudOverload = typeRegistryType.GetMethods()
             .FirstOrDefault(method => method.Name == "InvokeHud" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object), typeof(string), typeof(string[]), typeof(object[]) }));
         Assert(isHud is not null, "Generated type registry should expose an alias-level IsHud helper.");
+        Assert(
+            nativeLikeHudFacadeType.GetProperty("TypeName")?.GetValue(null) as string == hudFacadeType.GetProperty("TypeName")?.GetValue(null) as string,
+            "Native-like and compatibility type facades should route to the same backend-neutral registry alias.");
         Assert(getHud is not null, "Generated type registry should expose an alias-level GetHud helper.");
         Assert(trySetHud is not null, "Generated type registry should expose an alias-level TrySetHud helper.");
         Assert(invokeHud is not null, "Generated type registry should expose an alias-level InvokeHud helper.");

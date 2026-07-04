@@ -1346,84 +1346,92 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         ImmutableArray<S1InteropTypeEntry> entries,
         ImmutableArray<S1InteropMemberEntry> members)
     {
-        Dictionary<string, S1InteropTypeEntry> entriesByAlias = entries
-            .GroupBy(entry => entry.Alias, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         ILookup<string, S1InteropMemberEntry> membersByOwnerAlias = members.ToLookup(member => member.OwnerAlias, StringComparer.Ordinal);
 
         foreach (S1InteropTypeEntry entry in entries.OrderBy(entry => entry.MonoTypeName, StringComparer.Ordinal))
         {
-            TypeFacadeName facadeName = GetTypeFacadeName(entry);
-            string handleType = GetHandleTypeName(entry);
-            builder.AppendLine();
-            builder.AppendLine($"namespace {facadeName.NamespaceName}");
-            builder.AppendLine("{");
-            builder.AppendLine($"    internal static class {facadeName.TypeName}");
-            builder.AppendLine("    {");
-            builder.AppendLine("        public readonly struct Handle");
-            builder.AppendLine("        {");
-            builder.AppendLine($"            private readonly {handleType} value;");
-            builder.AppendLine();
-            builder.AppendLine($"            internal Handle({handleType} value)");
-            builder.AppendLine("            {");
-            builder.AppendLine("                this.value = value;");
-            builder.AppendLine("            }");
-            builder.AppendLine();
-            builder.AppendLine($"            internal {handleType} Value => value;");
-            builder.AppendLine("            public object? Instance => value.Instance;");
-            builder.AppendLine("            public bool HasValue => value.HasValue;");
-
-            var emittedHandleMembers = CreateReservedHandleMemberNames();
-            foreach (S1InteropMemberEntry member in membersByOwnerAlias[entry.Alias].OrderBy(member => member.MemberName, StringComparer.Ordinal))
+            foreach (TypeFacadeName facadeName in GetTypeFacadeNames(entry))
             {
-                if (ShouldGenerateHandleMember(member) &&
-                    TryReserveHandleMemberNames(member, emittedHandleMembers))
-                {
-                    GenerateTypeHandleMember(builder, member);
-                }
+                GenerateTypeFacade(builder, entry, membersByOwnerAlias[entry.Alias], facadeName);
             }
-
-            builder.AppendLine("            public override string ToString() => value.ToString();");
-            builder.AppendLine($"            public static implicit operator {handleType}(Handle handle) => handle.value;");
-            builder.AppendLine("        }");
-            builder.AppendLine();
-            builder.AppendLine($"        public static global::System.Type? Type => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias};");
-            builder.AppendLine($"        public static string TypeName => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias}Name;");
-            builder.AppendLine($"        public static object? Create(params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}(args);");
-            builder.AppendLine($"        public static T? Create<T>(params object?[] args) where T : class => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}<T>(args);");
-            builder.AppendLine($"        public static bool Is(object? instance) => S1Interop.Generated.S1InteropTypeRegistry.Is{entry.Alias}(instance);");
-            builder.AppendLine("        public static bool TryAs(object? instance, out Handle value)");
-            builder.AppendLine("        {");
-            builder.AppendLine($"            if (!S1Interop.Generated.S1InteropTypeRegistry.TryAs{entry.Alias}(instance, out {handleType} generatedValue))");
-            builder.AppendLine("            {");
-            builder.AppendLine("                value = default;");
-            builder.AppendLine("                return false;");
-            builder.AppendLine("            }");
-            builder.AppendLine();
-            builder.AppendLine("            value = new Handle(generatedValue);");
-            builder.AppendLine("            return true;");
-            builder.AppendLine("        }");
-            builder.AppendLine();
-            builder.AppendLine($"        public static Handle As(object? instance) => new Handle(S1Interop.Generated.S1InteropTypeRegistry.As{entry.Alias}(instance));");
-            builder.AppendLine($"        public static object? Get(Handle instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance.Value, memberName);");
-            builder.AppendLine($"        public static object? Get(object? instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance, memberName);");
-            builder.AppendLine($"        public static bool TrySet(Handle instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance.Value, memberName, value);");
-            builder.AppendLine($"        public static bool TrySet(object? instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance, memberName, value);");
-            builder.AppendLine($"        public static object? Invoke(Handle instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance.Value, methodName, args);");
-            builder.AppendLine($"        public static object? Invoke(object? instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance, methodName, args);");
-
-            var emittedFacadeMembers = new HashSet<string>(StringComparer.Ordinal);
-            foreach (S1InteropMemberEntry member in membersByOwnerAlias[entry.Alias].OrderBy(member => member.MemberName, StringComparer.Ordinal))
-            {
-                if (emittedFacadeMembers.Add(GetFacadeMemberKey(member)))
-                {
-                    GenerateTypeFacadeMember(builder, member);
-                }
-            }
-
-            builder.AppendLine("    }");
-            builder.AppendLine("}");
         }
+    }
+
+    private static void GenerateTypeFacade(
+        StringBuilder builder,
+        S1InteropTypeEntry entry,
+        IEnumerable<S1InteropMemberEntry> members,
+        TypeFacadeName facadeName)
+    {
+        string handleType = GetHandleTypeName(entry);
+        builder.AppendLine();
+        builder.AppendLine($"namespace {facadeName.NamespaceName}");
+        builder.AppendLine("{");
+        builder.AppendLine($"    internal static class {facadeName.TypeName}");
+        builder.AppendLine("    {");
+        builder.AppendLine("        public readonly struct Handle");
+        builder.AppendLine("        {");
+        builder.AppendLine($"            private readonly {handleType} value;");
+        builder.AppendLine();
+        builder.AppendLine($"            internal Handle({handleType} value)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                this.value = value;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine($"            internal {handleType} Value => value;");
+        builder.AppendLine("            public object? Instance => value.Instance;");
+        builder.AppendLine("            public bool HasValue => value.HasValue;");
+
+        var emittedHandleMembers = CreateReservedHandleMemberNames();
+        foreach (S1InteropMemberEntry member in members.OrderBy(member => member.MemberName, StringComparer.Ordinal))
+        {
+            if (ShouldGenerateHandleMember(member) &&
+                TryReserveHandleMemberNames(member, emittedHandleMembers))
+            {
+                GenerateTypeHandleMember(builder, member);
+            }
+        }
+
+        builder.AppendLine("            public override string ToString() => value.ToString();");
+        builder.AppendLine($"            public static implicit operator {handleType}(Handle handle) => handle.value;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine($"        public static global::System.Type? Type => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias};");
+        builder.AppendLine($"        public static string TypeName => S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias}Name;");
+        builder.AppendLine($"        public static object? Create(params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}(args);");
+        builder.AppendLine($"        public static T? Create<T>(params object?[] args) where T : class => S1Interop.Generated.S1InteropTypeRegistry.Create{entry.Alias}<T>(args);");
+        builder.AppendLine($"        public static bool Is(object? instance) => S1Interop.Generated.S1InteropTypeRegistry.Is{entry.Alias}(instance);");
+        builder.AppendLine("        public static bool TryAs(object? instance, out Handle value)");
+        builder.AppendLine("        {");
+        builder.AppendLine($"            if (!S1Interop.Generated.S1InteropTypeRegistry.TryAs{entry.Alias}(instance, out {handleType} generatedValue))");
+        builder.AppendLine("            {");
+        builder.AppendLine("                value = default;");
+        builder.AppendLine("                return false;");
+        builder.AppendLine("            }");
+        builder.AppendLine();
+        builder.AppendLine("            value = new Handle(generatedValue);");
+        builder.AppendLine("            return true;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine($"        public static Handle As(object? instance) => new Handle(S1Interop.Generated.S1InteropTypeRegistry.As{entry.Alias}(instance));");
+        builder.AppendLine($"        public static object? Get(Handle instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance.Value, memberName);");
+        builder.AppendLine($"        public static object? Get(object? instance, string memberName) => S1Interop.Generated.S1InteropTypeRegistry.Get{entry.Alias}(instance, memberName);");
+        builder.AppendLine($"        public static bool TrySet(Handle instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance.Value, memberName, value);");
+        builder.AppendLine($"        public static bool TrySet(object? instance, string memberName, object? value) => S1Interop.Generated.S1InteropTypeRegistry.TrySet{entry.Alias}(instance, memberName, value);");
+        builder.AppendLine($"        public static object? Invoke(Handle instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance.Value, methodName, args);");
+        builder.AppendLine($"        public static object? Invoke(object? instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance, methodName, args);");
+
+        var emittedFacadeMembers = new HashSet<string>(StringComparer.Ordinal);
+        foreach (S1InteropMemberEntry member in members.OrderBy(member => member.MemberName, StringComparer.Ordinal))
+        {
+            if (emittedFacadeMembers.Add(GetFacadeMemberKey(member)))
+            {
+                GenerateTypeFacadeMember(builder, member);
+            }
+        }
+
+        builder.AppendLine("    }");
+        builder.AppendLine("}");
     }
 
     private static HashSet<string> CreateReservedHandleMemberNames() =>
@@ -3436,7 +3444,7 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         return separator < 0 ? typeName : typeName.Substring(separator + 1);
     }
 
-    private static TypeFacadeName GetTypeFacadeName(S1InteropTypeEntry entry)
+    private static IReadOnlyList<TypeFacadeName> GetTypeFacadeNames(S1InteropTypeEntry entry)
     {
         string[] parts = entry.MonoTypeName
             .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
@@ -3444,13 +3452,16 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .ToArray();
         if (parts.Length == 0)
         {
-            return new TypeFacadeName("S1Interop", entry.Alias);
+            return new[] { new TypeFacadeName("S1Interop", entry.Alias) };
         }
 
         string typeName = parts[parts.Length - 1];
         IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
+        var facadeNames = new List<TypeFacadeName>();
         if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
         {
+            string nativeNamespace = BuildTypeFacadeNamespace(namespaceParts);
+            facadeNames.Add(new TypeFacadeName(nativeNamespace, typeName));
             namespaceParts = namespaceParts.Skip(1);
         }
         else
@@ -3458,11 +3469,16 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             namespaceParts = new[] { "Types" }.Concat(namespaceParts);
         }
 
+        facadeNames.Add(new TypeFacadeName(BuildTypeFacadeNamespace(namespaceParts), typeName));
+        return facadeNames;
+    }
+
+    private static string BuildTypeFacadeNamespace(IEnumerable<string> namespaceParts)
+    {
         string namespaceSuffix = string.Join(".", namespaceParts);
-        string namespaceName = string.IsNullOrWhiteSpace(namespaceSuffix)
+        return string.IsNullOrWhiteSpace(namespaceSuffix)
             ? "S1Interop"
             : "S1Interop." + namespaceSuffix;
-        return new TypeFacadeName(namespaceName, typeName);
     }
 
     private static string GetHandleTypeName(S1InteropTypeEntry entry) =>
