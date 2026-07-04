@@ -16,6 +16,7 @@ internal static class CliHelp
               s1interop migrate [path=.] [--dry-run|--apply] [--dual-runtime] [--format text|json]
               s1interop verify-migration [path=.] [--dual-runtime] [--include-source-migrations] [--build] [--il2cpp-game-path path] [--mono-game-path path] [--build-timeout-seconds n] [--format text|json]
               s1interop migrate rollback <manifest.json> [--format text|json]
+              s1interop --version
 
             What it does:
               analyze/lint inspect .csproj files and infer Mono, IL2CPP, and CrossCompat configurations.

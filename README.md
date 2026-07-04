@@ -179,6 +179,7 @@ Until packages are published, pack and install from a local source:
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
 dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
 .\.tools\s1interop --help
+.\.tools\s1interop --version
 ```
 
 Then run:
@@ -213,6 +214,7 @@ s1interop build-hook [path=.] [--dry-run|--apply] [--format text|json]
 s1interop migrate [path=.] [--dry-run|--apply] [--dual-runtime] [--format text|json]
 s1interop verify-migration [path=.] [--dual-runtime] [--include-source-migrations] [--build] [--il2cpp-game-path path] [--mono-game-path path] [--build-timeout-seconds n] [--format text|json]
 s1interop migrate rollback <manifest.json> [--format text|json]
+s1interop --version
 ```
 
 ## Tests

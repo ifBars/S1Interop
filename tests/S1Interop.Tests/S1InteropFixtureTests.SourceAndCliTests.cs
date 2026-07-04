@@ -1,5 +1,16 @@
 internal sealed partial class S1InteropFixtureTests
 {
+    private void CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace()
+    {
+        ProcessResult version = RunCli("--version");
+
+        Assert(version.ExitCode == 0, $"s1interop --version should succeed. Output: {version.Output}");
+        Assert(
+            version.Output.Contains("S1Interop", StringComparison.Ordinal) &&
+            version.Output.Contains("0.1.0-alpha.1", StringComparison.Ordinal),
+            $"s1interop --version should print the package version. Output: {version.Output}");
+    }
+
     private void AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic()
     {
         ProjectAnalysis project = AnalyzeProject(@"AlwaysJackpot\AlwaysJackpot.csproj");

@@ -104,6 +104,7 @@ dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj --no-build --configuration 
 dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output .\artifacts\packages
 dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
 .\.tools\s1interop --help
+.\.tools\s1interop --version
 ```
 
 Run the Release build and portable test steps locally before pushing changes that affect CLI packaging, source generators, build verification, or public command behavior.

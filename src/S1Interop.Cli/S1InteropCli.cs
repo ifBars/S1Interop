@@ -1,7 +1,15 @@
+using System.Reflection;
+
 internal static class S1InteropCli
 {
     public static int Run(string[] args)
     {
+        if (IsVersionRequest(args))
+        {
+            Console.WriteLine(GetVersionText());
+            return 0;
+        }
+
         ParsedCommand command = ParsedCommand.Parse(args);
         if (command.ShowHelp)
         {
@@ -17,5 +25,19 @@ internal static class S1InteropCli
         }
 
         return CliCommandDispatcher.Run(command);
+    }
+
+    private static bool IsVersionRequest(string[] args) =>
+        args.Length == 1 &&
+        (args[0].Equals("version", StringComparison.OrdinalIgnoreCase) ||
+         args[0].Equals("--version", StringComparison.OrdinalIgnoreCase));
+
+    private static string GetVersionText()
+    {
+        Assembly assembly = typeof(S1InteropCli).Assembly;
+        string version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                         ?? assembly.GetName().Version?.ToString()
+                         ?? "unknown";
+        return $"S1Interop {version}";
     }
 }

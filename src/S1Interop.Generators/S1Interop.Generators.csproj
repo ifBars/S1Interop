@@ -15,6 +15,7 @@
     <PackageTags>schedule-one;il2cpp;melonloader;modding;roslyn;source-generator</PackageTags>
     <RepositoryUrl>https://github.com/ifBars/S1Interop</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ifBars/S1Interop</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
 
   <ItemGroup>
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

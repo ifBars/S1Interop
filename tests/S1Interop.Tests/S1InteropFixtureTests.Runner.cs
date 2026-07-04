@@ -41,6 +41,8 @@ internal sealed partial class S1InteropFixtureTests
     public int RunQuick()
     {
         int count = 0;
+        CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace();
+        count++;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
         count++;
         SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
@@ -165,6 +167,8 @@ internal sealed partial class S1InteropFixtureTests
     public int RunPortable()
     {
         int count = 0;
+        CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace();
+        count++;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
         count++;
         SourceInteropAnalyzerReportsHarmonyOverloadBindingRisk();
