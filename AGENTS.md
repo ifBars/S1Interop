@@ -60,6 +60,7 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - Keep Core analysis, migration, rewriting, and generation boundaries separate. A new rule should have an obvious owner.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
 - Treat backend-neutral type coverage as generated SDK output from source usage and reference metadata. Do not build or maintain a hand-written wrapper catalog for every Schedule One type.
+- Design SDK work around type-first facades: `S1InteropType` should eventually expose compatible public members for that type, while `S1InteropMember` is an override path for private members, aliases, ambiguous overloads, and migration-inferred reflection seams.
 - Keep `sdkgen --full-sdk` metadata-driven and opt-in. It is the blank-project seeding path, not a committed catalog of game APIs.
 - Migration changes must be reversible through manifest and backup behavior.
 - Build verification must run against sandbox copies, never directly against user projects.

@@ -76,6 +76,7 @@ Additional project docs:
 - [`AGENTS.md`](AGENTS.md) - repository instructions for coding agents and automation.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - module boundaries and migration flow.
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) - local development and contribution workflow.
+- [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md) - target backend-neutral SDK authoring experience.
 - [`docs/REAL_MOD_EVIDENCE.md`](docs/REAL_MOD_EVIDENCE.md) - real-mod migration, build-gate, and backend-neutral coverage.
 - [`docs/TESTING.md`](docs/TESTING.md) - test modes, CI-equivalent commands, and fixture rules.
 
@@ -110,6 +111,8 @@ Method declarations can also include `ParameterTypeNames` for overload-specific 
 
 Generated method and type facades also include typed convenience helpers such as `InvokeIsDestinationValid<bool>(...)` and `InvokePlayerCamera<int>(...)`. These still use the same cached backend-neutral reflection path, but they keep simple mod code from scattering object casts and primitive conversions around call sites.
 
+The product direction is type-first SDK generation: adding or generating an `S1InteropType` should eventually produce a backend-neutral facade for that type's compatible public members. `S1InteropMember` remains useful for private members, clearer aliases, ambiguous overloads, or migration-inferred reflection patterns, but it should not be the normal way developers list every public field, property, or method they want to call. See [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md).
+
 When `migrate --apply` finds a simple `AccessTools.Method(...)` overload binding that it can parse safely, it can generate these member declarations and rewrite the local method variable to `S1Interop.Generated.S1InteropMemberRegistry.<Alias>Method`. Simple typed metadata cache assignments such as `targetPlayer.GetType().GetField("teleport", flags)` can also move to generated `FieldInfo` or `PropertyInfo` accessors when the receiver type is known. Property accessor chains such as `.GetProperty("Name").GetMethod` keep the final accessor when rewritten. Untyped runtime reflection such as enumerator `Current` lookups is not reported as a backend migration risk unless S1Interop can tie it to a game/backend member surface. Ambiguous or unsupported reflection shapes stay in the source-risk report instead of being rewritten.
 
 Generated member declarations intentionally skip MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, and `MelonPreferences` helpers. Those can still be valid mod code, but they are not Schedule One backend-neutral SDK surface and should not be converted into S1Interop member targets.
@@ -143,7 +146,7 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet.
+Use `new` to create a backend-neutral mod scaffold with a `.sln`, local path example, and Visual Studio/Rider configurations for `Debug`, `Release`, `Debug Il2Cpp`, and `Release Il2Cpp`. Use `init` when you already have a project and want to opt into backend-neutral attributes and generated helpers. Use `sdkgen --apply` to generate facade declarations from the game types your source already uses; use `sdkgen --full-sdk --apply` after configuring local game paths when a blank backend-neutral project needs a broad generated SDK to build against. Both SDK modes are generated from local reference metadata and do not bundle game assemblies or decompiled code. When generated declarations need `S1InteropType` attributes, `sdkgen --apply` also installs the `S1Interop.Generators` package reference required to compile them. Manual `S1InteropType` and `S1InteropMember` declarations are still available for dynamic or reflection-heavy cases the generator cannot infer yet, but the intended SDK direction is that `S1InteropType` coverage can generate the common public member surface automatically.
 
 Migration can also route simple game type lookups through the generated registry. For example, `AccessTools.TypeByName("Il2CppScheduleOne.NPCs.NPCInventory")` and `typeof(Il2CppScheduleOne.UI.HUD)` can become generated registry properties, letting the generated backend cache select the Mono or IL2CPP type name at runtime. Arbitrary string constants are not rewritten.
 
@@ -172,7 +175,7 @@ if (vehicle.HasValue)
 
 Prefer type-scoped facades such as `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
 
-The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches.
+The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. As the SDK generator matures, type facades should own normal public member access; explicit `S1InteropMember` declarations should be reserved for overrides, private surfaces, ambiguous overloads, or migration cases that cannot be discovered safely.
 
 ## Install as a local tool
 
