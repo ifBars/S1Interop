@@ -57,6 +57,7 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - `S1Interop.Generators` is the Roslyn source-generator package consumed by mod projects. Keep it additive: it can emit generated source and diagnostics, but it must not assume it can rewrite existing user code.
 - Generator diagnostics that validate game type/member strings must only fail when the relevant Mono/IL2CPP reference surface is available in the current compilation.
 - Keep CLI code thin. Put reusable behavior in Core.
+- Keep generated project templates and backend-neutral `new` project shape in Core scaffolding, not inside CLI command handlers.
 - Keep Core analysis, migration, rewriting, and code-emission boundaries separate. Use `S1Interop.Core.CodeGeneration` for CLI-written files and reserve `S1Interop.Generators` for the packaged Roslyn generator/analyzer assembly.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
 - Keep Roslyn generator entry points thin. `S1InteropTypeRegistryGenerator.cs` should wire incremental providers and source outputs; runtime selection, model contracts, diagnostics, and source rendering belong in focused internal files.

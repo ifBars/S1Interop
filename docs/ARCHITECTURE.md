@@ -50,7 +50,7 @@ Important areas:
 - `Reporting/`: help text and result formatting.
 - `S1InteropCli.cs`: top-level CLI orchestration.
 
-The CLI should stay thin. If a behavior is useful outside command-line output, put it in `S1Interop.Core`.
+The CLI should stay thin. If a behavior is useful outside command-line output, put it in `S1Interop.Core`. Project templates, generated file contents, migration planning, and verification logic should not live in command handlers.
 
 ## Core Layer
 
@@ -136,6 +136,19 @@ Generated files include:
 Member access target discovery is scoped to backend/game surfaces and runs even when no source-risk report remains. Usage-driven declarations from helpers such as `ReflectionUtils.TryGetFieldOrProperty(vehicle, "vehicleName")` are generated as SDK surface because they make backend-neutral code more native-like. Discovery should not emit S1Interop declarations for MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, or `MelonPreferences`; those are mod loader implementation details, not Schedule One Mono/IL2CPP wrapper drift.
 
 These are not Roslyn source generators. They are part of the CLI migration pipeline. Keep this namespace under `S1Interop.Core.CodeGeneration` so it does not blur together with the packaged Roslyn generator assembly.
+
+### Project Scaffolding
+
+Path: `src/S1Interop.Core/Scaffolding/`
+
+Scaffolding owns the generated shape for new backend-neutral projects. The CLI `new` command should only create a plan, reject unsafe targets, apply the plan when requested, and print text or JSON results.
+
+Current scaffolding types:
+
+- `BackendNeutralProjectScaffolder`: creates and applies the backend-neutral project plan.
+- `NewProjectPlan`: names the generated project and every planned file path.
+
+Keep file templates here rather than in `S1Interop.Cli`. A generated backend-neutral project is part of the product surface, not merely console output.
 
 ## Roslyn Generator Layer
 
