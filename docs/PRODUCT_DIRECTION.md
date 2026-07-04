@@ -9,13 +9,14 @@ The ideal authoring experience is not a hand-written registry of every member a 
 Today, backend-neutral code can use generated registries and member helpers:
 
 ```csharp
-S1InteropObject<S1InteropTypeRegistry.LandVehicleTag> vehicle =
+S1Interop.Vehicles.LandVehicle.Handle vehicle =
     S1Interop.Vehicles.LandVehicle.As(rawVehicle);
 
-string? name = S1Interop.Vehicles.LandVehicle.GetVehicleName(vehicle)?.ToString();
+string? name = vehicle.VehicleName?.ToString();
+float? throttle = vehicle.GetCurrentThrottleValue<float>();
 ```
 
-The product target is closer to native mod code:
+The longer-term product target is closer to native mod code:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;

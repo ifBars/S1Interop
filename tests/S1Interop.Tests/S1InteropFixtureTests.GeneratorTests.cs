@@ -366,6 +366,15 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static object? GetInstance()", StringComparison.Ordinal),
             $"Type facades should expose discovered members without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
         Assert(
+            generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName(value);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetvehicleName<T>(value);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetCurrentThrottleValue<T>(value);", StringComparison.Ordinal) &&
+            generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetCurrentThrottle(value, memberValue);", StringComparison.Ordinal),
+            $"Type facade handles should expose native-like instance accessors for discovered field/property members. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value);", StringComparison.Ordinal),
+            $"Type facade handles should not generate accessors that collide with built-in handle members. Generated source:{Environment.NewLine}{generated}");
+        Assert(
             !generated.Contains("Il2CppOnlyName", StringComparison.Ordinal) &&
             !generated.Contains("InternalNameName", StringComparison.Ordinal) &&
             !generated.Contains("StableKindName", StringComparison.Ordinal) &&
@@ -1212,9 +1221,16 @@ internal sealed partial class S1InteropFixtureTests
         MethodInfo? facadeTrySetScale = hudFacadeType.GetMethod("TrySetScale", [facadeHandleType, typeof(object)]);
         MethodInfo? facadeSetLevel = hudFacadeType.GetMethods()
             .FirstOrDefault(method => method.Name == "SetLevel" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { facadeHandleType, typeof(object[]) }));
+        PropertyInfo? facadeHandleScale = facadeHandleType.GetProperty("Scale");
+        MethodInfo? facadeHandleGetScaleValue = facadeHandleType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Length == 0);
+        MethodInfo? facadeHandleTrySetScale = facadeHandleType.GetMethod("TrySetScale", [typeof(object)]);
         Assert(facadeAs is not null, "Generated type-scoped facade should expose As.");
         Assert(facadeHandleType.GetProperty("HasValue") is not null, "Generated type-scoped facade Handle should expose HasValue.");
         Assert(facadeHandleType.GetProperty("Instance") is not null, "Generated type-scoped facade Handle should expose Instance.");
+        Assert(facadeHandleScale is not null, "Generated type-scoped facade Handle should expose native-like member properties.");
+        Assert(facadeHandleGetScaleValue is not null, "Generated type-scoped facade Handle should expose typed value getter methods.");
+        Assert(facadeHandleTrySetScale is not null, "Generated type-scoped facade Handle should expose instance setter helpers.");
         Assert(facadeGetScale is not null, "Generated type-scoped facade should expose member-name getter methods.");
         Assert(facadeGetScaleValue is not null, "Generated type-scoped facade should expose typed value getters.");
         Assert(facadeTrySetScale is not null, "Generated type-scoped facade should expose member-name setters.");
@@ -1226,6 +1242,9 @@ internal sealed partial class S1InteropFixtureTests
         Assert(facadeTrySetScale!.Invoke(null, [facadeHandle, "55"]) is true, "Generated type-scoped facade setter should write values.");
         Assert(facadeGetScale!.Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade getter should read values.");
         Assert(facadeGetScaleValue!.MakeGenericMethod(typeof(int)).Invoke(null, [facadeHandle]) is 55, "Generated type-scoped facade value getter should preserve typed convenience.");
+        Assert(facadeHandleTrySetScale!.Invoke(facadeHandle, ["57"]) is true, "Generated type-scoped facade Handle setter should write values.");
+        Assert(facadeHandleScale!.GetValue(facadeHandle) is 57, "Generated type-scoped facade Handle property should read values.");
+        Assert(facadeHandleGetScaleValue!.MakeGenericMethod(typeof(int)).Invoke(facadeHandle, []) is 57, "Generated type-scoped facade Handle typed value getter should preserve typed convenience.");
         object?[] facadeTypeArgs = ["56", "typed-facade-class"];
         Assert(string.Equals(facadeSetLevel!.Invoke(null, [facadeHandle, facadeTypeArgs]) as string, "done", StringComparison.Ordinal), "Generated type-scoped facade method should route through member registry.");
         Assert(facadeTypeArgs[1] is "il2cpp:typed-facade-class", "Generated type-scoped facade method should preserve by-ref copy-back behavior.");

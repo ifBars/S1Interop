@@ -169,13 +169,14 @@ S1Interop.Vehicles.LandVehicle.Handle vehicle = S1Interop.Vehicles.LandVehicle.A
 
 if (vehicle.HasValue)
 {
-    float? throttle = S1Interop.Vehicles.LandVehicle.GetCurrentThrottleValue<float>(vehicle);
+    float? throttle = vehicle.GetCurrentThrottleValue<float>();
+    string? name = vehicle.VehicleName?.ToString();
 }
 ```
 
-Prefer type-scoped facades such as `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
+Prefer handle accessors and type-scoped facades such as `S1Interop.Vehicles.LandVehicle` over calling `S1InteropMemberRegistry` directly. The registry remains available as the generated low-level layer, and raw `object` overloads remain available for dynamic cases, but the tagged handle path keeps backend-neutral code closer to native Mono/IL2CPP usage and catches wrong receiver types earlier.
 
-The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades now own the first slice of normal public member access through generated field/property helpers; explicit `S1InteropMember` declarations remain for overrides, private surfaces, method overloads, or migration cases that cannot be discovered safely.
+The goal is a generated SDK surface, not a hand-maintained wrapper for every Schedule One type. S1Interop infers declarations from source usage and local reference metadata, then emits the facade code needed for the types the mod actually touches. Type facades now own the first slice of normal public member access through generated handle-level field/property helpers; explicit `S1InteropMember` declarations remain for overrides, private surfaces, method overloads, or migration cases that cannot be discovered safely.
 
 ## Install as a local tool
 

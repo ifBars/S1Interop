@@ -1249,6 +1249,17 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             builder.AppendLine($"            internal {handleType} Value => value;");
             builder.AppendLine("            public object? Instance => value.Instance;");
             builder.AppendLine("            public bool HasValue => value.HasValue;");
+
+            var emittedHandleMembers = CreateReservedHandleMemberNames();
+            foreach (S1InteropMemberEntry member in membersByOwnerAlias[entry.Alias].OrderBy(member => member.MemberName, StringComparer.Ordinal))
+            {
+                if (ShouldGenerateHandleMember(member) &&
+                    TryReserveHandleMemberNames(member, emittedHandleMembers))
+                {
+                    GenerateTypeHandleMember(builder, member);
+                }
+            }
+
             builder.AppendLine("            public override string ToString() => value.ToString();");
             builder.AppendLine($"            public static implicit operator {handleType}(Handle handle) => handle.value;");
             builder.AppendLine("        }");
@@ -1290,6 +1301,55 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             builder.AppendLine("    }");
             builder.AppendLine("}");
         }
+    }
+
+    private static HashSet<string> CreateReservedHandleMemberNames() =>
+        new(StringComparer.Ordinal)
+        {
+            "Value",
+            "Instance",
+            "HasValue",
+            "ToString",
+            "Equals",
+            "GetHashCode",
+            "GetType"
+        };
+
+    private static bool ShouldGenerateHandleMember(S1InteropMemberEntry member) =>
+        !member.IsStatic && member.Kind != S1InteropMemberKind.Method;
+
+    private static bool TryReserveHandleMemberNames(S1InteropMemberEntry member, HashSet<string> reservedNames)
+    {
+        string memberName = ToPascalIdentifier(member.MemberName);
+        string[] generatedNames =
+        [
+            memberName,
+            $"Get{memberName}",
+            $"Get{memberName}Value",
+            $"TrySet{memberName}"
+        ];
+
+        if (generatedNames.Any(name => reservedNames.Contains(name)))
+        {
+            return false;
+        }
+
+        foreach (string generatedName in generatedNames)
+        {
+            reservedNames.Add(generatedName);
+        }
+
+        return true;
+    }
+
+    private static void GenerateTypeHandleMember(StringBuilder builder, S1InteropMemberEntry member)
+    {
+        string memberName = ToPascalIdentifier(member.MemberName);
+        builder.AppendLine();
+        builder.AppendLine($"            public object? {memberName} => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}(value);");
+        builder.AppendLine($"            public T? Get{memberName}<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(value);");
+        builder.AppendLine($"            public T? Get{memberName}Value<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(value);");
+        builder.AppendLine($"            public bool TrySet{memberName}(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(value, memberValue);");
     }
 
     private static void GenerateTypeFacadeMember(StringBuilder builder, S1InteropMemberEntry member)
