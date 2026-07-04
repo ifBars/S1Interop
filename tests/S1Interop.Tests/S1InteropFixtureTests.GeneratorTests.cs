@@ -300,6 +300,80 @@ internal sealed partial class S1InteropFixtureTests
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
+    private void S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne.Vehicles
+            {
+                public sealed class LandVehicle
+                {
+                    public string vehicleName = "";
+                    public float CurrentThrottle { get; set; }
+                    public static LandVehicle? Instance { get; set; }
+                    internal string InternalName = "";
+                    public string this[int index] => index.ToString();
+                    public const string StableKind = "vehicle";
+                    public void StartEngine()
+                    {
+                    }
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne.Vehicles
+            {
+                public sealed class LandVehicle
+                {
+                    public string vehicleName { get; set; } = "";
+                    public float CurrentThrottle;
+                    public static LandVehicle? Instance { get; set; }
+                    public string Il2CppOnly { get; set; } = "";
+                    public void StartEngine()
+                    {
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle", Alias = "LandVehicle")]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+            """;
+
+        string generated = RunTypeRegistryGenerator(
+            source,
+            [monoGameReference, il2CppGameReference],
+            "IL2CPP");
+
+        Assert(
+            generated.Contains("public const string vehicleNameName = \"vehicleName\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string CurrentThrottleName = \"CurrentThrottle\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string InstanceName = \"Instance\";", StringComparison.Ordinal),
+            $"Declaring an interop type should discover compatible public fields and properties. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public static object? GetVehicleName(Handle instance)", StringComparison.Ordinal) &&
+            generated.Contains("public static object? GetCurrentThrottle(Handle instance)", StringComparison.Ordinal) &&
+            generated.Contains("public static object? GetInstance()", StringComparison.Ordinal),
+            $"Type facades should expose discovered members without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            !generated.Contains("Il2CppOnlyName", StringComparison.Ordinal) &&
+            !generated.Contains("InternalNameName", StringComparison.Ordinal) &&
+            !generated.Contains("StableKindName", StringComparison.Ordinal) &&
+            !generated.Contains("ItemName", StringComparison.Ordinal) &&
+            !generated.Contains("StartEngineName", StringComparison.Ordinal),
+            $"Discovered member facades should skip one-sided, non-public, const, indexer, and method members. Generated source:{Environment.NewLine}{generated}");
+    }
+
     private void S1InteropTypeRegistryGeneratorMergesDuplicateAliases()
     {
         const string source =

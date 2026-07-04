@@ -109,7 +109,14 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Combine(attributedTypeEntries.Collect())
             .Select(static (input, _) => MergeTypeEntries(input.Left.AddRange(input.Right)));
 
-        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(memberEntries), static (sourceContext, input) =>
+        IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> allMemberEntries = context.CompilationProvider
+            .Combine(allEntries)
+            .Combine(memberEntries)
+            .Select(static (input, _) => MergeMemberEntries(
+                input.Right,
+                DiscoverPublicMemberEntries(input.Left.Left, input.Left.Right)));
+
+        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries), static (sourceContext, input) =>
         {
             sourceContext.AddSource(
                 "S1Interop.TypeRegistry.g.cs",
@@ -558,6 +565,163 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Distinct(S1InteropMemberEntryComparer.Instance)
             .ToImmutableArray();
     }
+
+    private static ImmutableArray<S1InteropMemberEntry> DiscoverPublicMemberEntries(
+        Compilation compilation,
+        ImmutableArray<S1InteropTypeEntry> entries)
+    {
+        if (entries.IsDefaultOrEmpty)
+        {
+            return ImmutableArray<S1InteropMemberEntry>.Empty;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<S1InteropMemberEntry>();
+        foreach (S1InteropTypeEntry entry in entries)
+        {
+            INamedTypeSymbol? monoType = compilation.GetTypeByMetadataName(entry.MonoTypeName);
+            INamedTypeSymbol? il2CppType = compilation.GetTypeByMetadataName(entry.Il2CppTypeName);
+
+            foreach (DiscoveredMember member in DiscoverCompatiblePublicMembers(monoType, il2CppType))
+            {
+                builder.Add(new S1InteropMemberEntry(
+                    SanitizeIdentifier(member.Name),
+                    entry.Alias,
+                    member.Name,
+                    S1InteropMemberKind.FieldOrProperty,
+                    member.IsStatic,
+                    ImmutableArray<string>.Empty));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableArray<S1InteropMemberEntry> MergeMemberEntries(
+        ImmutableArray<S1InteropMemberEntry> explicitMembers,
+        ImmutableArray<S1InteropMemberEntry> discoveredMembers)
+    {
+        var merged = new Dictionary<string, S1InteropMemberEntry>(StringComparer.Ordinal);
+        var explicitFacadeKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (S1InteropMemberEntry member in explicitMembers)
+        {
+            explicitFacadeKeys.Add(GetFacadeMemberKey(member));
+        }
+
+        foreach (S1InteropMemberEntry member in discoveredMembers)
+        {
+            if (!explicitFacadeKeys.Contains(GetFacadeMemberKey(member)))
+            {
+                merged[GetMemberDeclarationKey(member)] = member;
+            }
+        }
+
+        foreach (S1InteropMemberEntry member in explicitMembers)
+        {
+            merged[GetMemberDeclarationKey(member)] = member;
+        }
+
+        return merged.Values
+            .OrderBy(member => member.OwnerAlias, StringComparer.Ordinal)
+            .ThenBy(member => member.Alias, StringComparer.Ordinal)
+            .ThenBy(member => member.MemberName, StringComparer.Ordinal)
+            .Distinct(S1InteropMemberEntryComparer.Instance)
+            .ToImmutableArray();
+    }
+
+    private static string GetMemberDeclarationKey(S1InteropMemberEntry member) =>
+        $"{member.OwnerAlias}.{member.Alias}";
+
+    private static string GetFacadeMemberKey(S1InteropMemberEntry member) =>
+        $"{member.OwnerAlias}.{GetFacadeMemberCategory(member)}.{member.IsStatic}.{ToPascalIdentifier(member.MemberName)}";
+
+    private static string GetFacadeMemberCategory(S1InteropMemberEntry member) =>
+        member.Kind == S1InteropMemberKind.Method ? "Method" : "Value";
+
+    private static IEnumerable<DiscoveredMember> DiscoverCompatiblePublicMembers(
+        INamedTypeSymbol? monoType,
+        INamedTypeSymbol? il2CppType)
+    {
+        IReadOnlyDictionary<string, DiscoveredMember> monoMembers = DiscoverPublicFieldPropertyMembers(monoType);
+        IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers = DiscoverPublicFieldPropertyMembers(il2CppType);
+
+        if (monoMembers.Count > 0 && il2CppMembers.Count > 0)
+        {
+            foreach (DiscoveredMember monoMember in monoMembers.Values.OrderBy(member => member.Name, StringComparer.Ordinal))
+            {
+                if (il2CppMembers.TryGetValue(monoMember.Name, out DiscoveredMember il2CppMember) &&
+                    monoMember.IsStatic == il2CppMember.IsStatic)
+                {
+                    yield return monoMember;
+                }
+            }
+
+            yield break;
+        }
+
+        IReadOnlyDictionary<string, DiscoveredMember> availableMembers = monoMembers.Count > 0 ? monoMembers : il2CppMembers;
+        foreach (DiscoveredMember member in availableMembers.Values.OrderBy(member => member.Name, StringComparer.Ordinal))
+        {
+            yield return member;
+        }
+    }
+
+    private static IReadOnlyDictionary<string, DiscoveredMember> DiscoverPublicFieldPropertyMembers(INamedTypeSymbol? type)
+    {
+        var members = new Dictionary<string, DiscoveredMember>(StringComparer.Ordinal);
+        if (type is null)
+        {
+            return members;
+        }
+
+        foreach (ISymbol symbol in type.GetMembers())
+        {
+            if (!TryCreateDiscoveredMember(symbol, out DiscoveredMember member))
+            {
+                continue;
+            }
+
+            if (!members.ContainsKey(member.Name))
+            {
+                members.Add(member.Name, member);
+            }
+        }
+
+        return members;
+    }
+
+    private static bool TryCreateDiscoveredMember(ISymbol symbol, out DiscoveredMember member)
+    {
+        member = default;
+        if (symbol.DeclaredAccessibility != Accessibility.Public ||
+            symbol.IsImplicitlyDeclared ||
+            !IsInteropSafeMemberName(symbol.Name))
+        {
+            return false;
+        }
+
+        switch (symbol)
+        {
+            case IFieldSymbol field when !field.IsConst:
+                member = new DiscoveredMember(field.Name, field.IsStatic);
+                return true;
+            case IPropertySymbol property when property.Parameters.Length == 0:
+                member = new DiscoveredMember(property.Name, property.IsStatic);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsInteropSafeMemberName(string name) =>
+        !string.IsNullOrWhiteSpace(name) &&
+        !name.StartsWith("<", StringComparison.Ordinal) &&
+        !name.StartsWith("get_", StringComparison.Ordinal) &&
+        !name.StartsWith("set_", StringComparison.Ordinal) &&
+        !name.StartsWith("add_", StringComparison.Ordinal) &&
+        !name.StartsWith("remove_", StringComparison.Ordinal) &&
+        !name.StartsWith("op_", StringComparison.Ordinal) &&
+        name != ".ctor" &&
+        name != ".cctor";
 
     private static S1InteropBridgeRequests GetBridgeRequests(Compilation compilation) =>
         new(
@@ -1114,9 +1278,13 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             builder.AppendLine($"        public static object? Invoke(Handle instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance.Value, methodName, args);");
             builder.AppendLine($"        public static object? Invoke(object? instance, string methodName, params object?[] args) => S1Interop.Generated.S1InteropTypeRegistry.Invoke{entry.Alias}(instance, methodName, args);");
 
+            var emittedFacadeMembers = new HashSet<string>(StringComparer.Ordinal);
             foreach (S1InteropMemberEntry member in membersByOwnerAlias[entry.Alias].OrderBy(member => member.MemberName, StringComparer.Ordinal))
             {
-                GenerateTypeFacadeMember(builder, member);
+                if (emittedFacadeMembers.Add(GetFacadeMemberKey(member)))
+                {
+                    GenerateTypeFacadeMember(builder, member);
+                }
             }
 
             builder.AppendLine("    }");
@@ -3248,6 +3416,19 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         public bool IsStatic { get; }
 
         public ImmutableArray<string> ParameterTypeNames { get; }
+    }
+
+    private readonly struct DiscoveredMember
+    {
+        public DiscoveredMember(string name, bool isStatic)
+        {
+            Name = name;
+            IsStatic = isStatic;
+        }
+
+        public string Name { get; }
+
+        public bool IsStatic { get; }
     }
 
     private readonly struct S1InteropTypeDiagnosticTarget

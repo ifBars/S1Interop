@@ -77,6 +77,22 @@ internal sealed partial class S1InteropFixtureTests
         return generatedSources.Single(pair => pair.Key.Contains("S1Interop.TypeRegistry.g.cs", StringComparison.Ordinal)).Value;
     }
 
+    private static string RunTypeRegistryGenerator(
+        string source,
+        IReadOnlyList<MetadataReference> additionalReferences,
+        params string[] symbols)
+    {
+        Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols, assemblyName: null, additionalReferences);
+        return outputCompilation.SyntaxTrees
+            .Where(tree => (tree.FilePath ?? string.Empty).Contains("S1Interop.Generators", StringComparison.Ordinal))
+            .ToDictionary(
+                tree => Path.GetFileName(tree.FilePath),
+                tree => tree.GetText().ToString(),
+                StringComparer.Ordinal)
+            .Single(pair => pair.Key.Contains("S1Interop.TypeRegistry.g.cs", StringComparison.Ordinal))
+            .Value;
+    }
+
     private static IReadOnlyDictionary<string, string> RunS1InteropGenerator(string source, params string[] symbols)
     {
         Compilation outputCompilation = RunS1InteropGeneratorCompilation(source, symbols);
@@ -169,13 +185,22 @@ internal sealed partial class S1InteropFixtureTests
 
     private static Compilation RunS1InteropGeneratorCompilation(string source, IReadOnlyList<string> symbols, string? assemblyName)
     {
+        return RunS1InteropGeneratorCompilation(source, symbols, assemblyName, additionalReferences: []);
+    }
+
+    private static Compilation RunS1InteropGeneratorCompilation(
+        string source,
+        IReadOnlyList<string> symbols,
+        string? assemblyName,
+        IReadOnlyList<MetadataReference> additionalReferences)
+    {
         CSharpParseOptions parseOptions = CSharpParseOptions.Default
             .WithLanguageVersion(LanguageVersion.Latest)
             .WithPreprocessorSymbols(symbols);
         CSharpCompilation compilation = CSharpCompilation.Create(
             assemblyName ?? "SyntheticMod." + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source, parseOptions)],
-            GetTrustedPlatformReferences(),
+            GetTrustedPlatformReferences().Concat(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
