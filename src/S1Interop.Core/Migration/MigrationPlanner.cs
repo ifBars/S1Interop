@@ -300,6 +300,9 @@ public sealed class MigrationPlanner
             SourceRisk[] automaticObjectCastRisks = project.SourceInterop.SourceRisks
                 .Where(Il2CppObjectCastRewriter.CanRewrite)
                 .ToArray();
+            SourceRisk[] automaticIl2CppListNullCoalesceRisks = project.SourceInterop.SourceRisks
+                .Where(risk => risk.Kind == "Il2CppListNullCoalesce")
+                .ToArray();
             int generatedMemberAccessTargetCount = generatedMemberAccessTargets.Length;
             bool hasGeneratedMemberAccessTargets = generatedMemberAccessTargetCount > 0;
             bool hasAutomaticMemberAccessRewrites = automaticMemberAccessRisks.Length > 0 || automaticDirectMemberLookupRisks.Length > 0;
@@ -311,6 +314,7 @@ public sealed class MigrationPlanner
                 .Except(automaticMemberAccessRisks)
                 .Except(automaticDirectMemberLookupRisks)
                 .Except(automaticObjectCastRisks)
+                .Except(automaticIl2CppListNullCoalesceRisks)
                 .ToArray();
 
             if (automaticUnityEventRisks.Length > 0)
@@ -506,6 +510,23 @@ public sealed class MigrationPlanner
                         "low",
                         true,
                         "Rewrite simple IL2CPP-prone C# pattern casts through the generated S1InteropObjectCast helper."));
+                }
+            }
+
+            if (automaticIl2CppListNullCoalesceRisks.Length > 0)
+            {
+                foreach (string sourceFile in automaticIl2CppListNullCoalesceRisks
+                             .Select(risk => risk.FilePath)
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    operations.Add(new MigrationOperation(
+                        "rewrite_il2cpp_list_null_coalescing",
+                        sourceFile,
+                        null,
+                        "low",
+                        true,
+                        "Rewrite IL2CPP list null-coalescing fallbacks to explicit ReferenceEquals checks."));
                 }
             }
 

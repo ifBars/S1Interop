@@ -187,6 +187,62 @@ internal sealed partial class S1InteropFixtureTests
         }
     }
 
+    private void VerifyMigrationBuildGateDoesNotForwardUnexpandedLocalProperties()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string tempProject = Path.Combine(tempRoot, "LocalPropsExpressionMod.csproj");
+            File.WriteAllText(
+                tempProject,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Import Project="local.build.props" Condition="Exists('local.build.props')" />
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "local.build.props"),
+                $"""
+                <Project>
+                  <PropertyGroup>
+                    <S1InteropGeneratorPackageSource>{Path.Combine(tempRoot, "feed")}</S1InteropGeneratorPackageSource>
+                    <RestoreAdditionalProjectSources>$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(
+                Path.Combine(tempRoot, "Core.cs"),
+                """
+                namespace LocalPropsExpressionMod;
+
+                internal static class Core
+                {
+                    internal static int Value => 1;
+                }
+                """);
+
+            MigrationVerificationResult result = new MigrationVerifier().Verify(
+                tempProject,
+                new MigrationVerifierOptions(DualRuntime: false, Build: true, BuildTimeoutSeconds: 60));
+
+            Assert(result.Success, $"Local props expression fixture should build. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(
+                result.BuildResults!.All(build =>
+                    !build.Command.Contains("$(S1InteropGeneratorPackageSource)", StringComparison.Ordinal) &&
+                    !build.Command.Contains("$(RestoreAdditionalProjectSources)", StringComparison.Ordinal)),
+                $"Build command should not forward unexpanded MSBuild property expressions from local.build.props. Build output: {FormatBuildResults(result.BuildResults)}");
+            Assert(result.SandboxDeleted, "Local props expression verification should delete its sandbox.");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
     private void VerifyMigrationBuildGatePreservesAncestorNuGetConfig()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));

@@ -1967,6 +1967,11 @@ public sealed class MigrationVerifier
                 continue;
             }
 
+            if (value.Contains("$(", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             yield return new KeyValuePair<string, string>(name, value);
         }
     }

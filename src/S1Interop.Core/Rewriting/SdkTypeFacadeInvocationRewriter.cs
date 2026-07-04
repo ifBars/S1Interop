@@ -220,8 +220,22 @@ public static class SdkTypeFacadeInvocationRewriter
         return line[previous] == '$' && previous - 1 >= 0 && line[previous - 1] == '@';
     }
 
-    private static string RewriteIl2CppListCreation(string line) =>
-        Il2CppListCreationRegex.Replace(line, match => $"new System.Collections.Generic.List<{match.Groups["type"].Value}>(");
+    private static string RewriteIl2CppListCreation(string line)
+    {
+        return Il2CppListCreationRegex.Replace(
+            line,
+            match => IsExplicitIl2CppListDeclaration(line, match.Index)
+                ? match.Value
+                : $"new System.Collections.Generic.List<{match.Groups["type"].Value}>(");
+    }
+
+    private static bool IsExplicitIl2CppListDeclaration(string line, int creationIndex)
+    {
+        int statementStart = Math.Max(line.LastIndexOf(';', Math.Max(0, creationIndex - 1)), line.LastIndexOf('{', Math.Max(0, creationIndex - 1))) + 1;
+        ReadOnlySpan<char> prefix = line.AsSpan(statementStart, creationIndex - statementStart);
+        return prefix.Contains("Il2CppSystem.Collections.Generic.List".AsSpan(), StringComparison.Ordinal) &&
+               prefix.Contains("=".AsSpan(), StringComparison.Ordinal);
+    }
 
     private static string RewriteChainedInvocations(
         string line,

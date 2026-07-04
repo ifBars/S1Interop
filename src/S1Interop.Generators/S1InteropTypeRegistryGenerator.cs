@@ -12,7 +12,7 @@ using Microsoft.CodeAnalysis.Text;
 namespace S1Interop.Generators;
 
 [Generator]
-public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
+public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 {
     private static readonly string[] DefaultIl2CppRuntimeProbeTypeNames =
     [
@@ -194,6 +194,8 @@ public sealed class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 
     private static void ReportDeclarationDiagnostics(SourceProductionContext context, Compilation compilation)
     {
+        ReportIl2CppSourceDiagnostics(context, compilation);
+
         ImmutableArray<S1InteropTypeDiagnosticTarget> typeTargets = GetDeclaredTypeDiagnosticTargets(compilation);
         ImmutableArray<S1InteropMemberDiagnosticTarget> memberTargets = GetDeclaredMemberDiagnosticTargets(compilation);
         if (typeTargets.IsDefaultOrEmpty && memberTargets.IsDefaultOrEmpty)

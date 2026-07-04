@@ -153,6 +153,8 @@ Simple IL2CPP-backed object pattern casts can move to the generated object-cast 
 
 When the current build references the Mono or IL2CPP game assemblies, `S1Interop.Generators` validates declared type/member strings during compilation. Missing type names report `S1I001`; member declarations with an unknown owner alias report `S1I002`; member names or method overload signatures that are absent from the referenced owner type report `S1I003`. Method checks resolve `ParameterTypeNames` aliases before comparing the referenced signature. The checks stay quiet when no game reference surface is available, so package restore or docs-only builds do not fail just because local game paths are not configured.
 
+IL2CPP builds also get compiler diagnostics for source shapes that usually compile but fail later in-game. Harmony transpilers (`S1I004`), managed collection parameters in IL2CPP-facing callback signatures (`S1I005`), and managed `byte[]` buffers passed to native/game fill APIs such as Steamworks packet reads (`S1I006`) are build errors. Plain C# casts from object/proxy values to Unity object types that should use `S1InteropObjectCast` (`S1I007`) are warnings until the migrator can rewrite them safely. These diagnostics are intentionally focused on boundary code; managed collections and arrays remain fine inside normal mod logic and generated `S1InteropMember` facades can still convert managed values when invoking registered backend-neutral members.
+
 Use `--apply` only after reviewing the dry-run output.
 
 ## Backend-neutral member access

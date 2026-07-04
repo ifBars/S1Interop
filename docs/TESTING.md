@@ -14,7 +14,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Use this during normal iteration. It avoids MSBuild/package/build-gate fixtures and should be much faster than full portable coverage.
 
-Generator diagnostics that validate `S1InteropType` and `S1InteropMember` strings use synthetic game assemblies here, so the compile-time safety checks stay portable while still proving the game-reference path, including method overload parameter checks. The quick lane also covers the blank-project flow by creating a backend-neutral scaffold, pointing it at a synthetic local game reference, and applying `sdkgen --full-sdk`.
+Generator diagnostics that validate `S1InteropType` and `S1InteropMember` strings use synthetic game assemblies here, so the compile-time safety checks stay portable while still proving the game-reference path, including method overload parameter checks. The quick lane also covers IL2CPP source-boundary diagnostics for transpilers, managed collection callback signatures, managed byte-buffer fill calls, and object/proxy casts. It also covers the blank-project flow by creating a backend-neutral scaffold, pointing it at a synthetic local game reference, and applying `sdkgen --full-sdk`.
 
 ### Portable
 

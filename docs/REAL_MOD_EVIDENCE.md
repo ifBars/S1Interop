@@ -40,6 +40,16 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 | CasinoDirectDeposit | Game-root `Mods` dependency hint-path migration. |
 | NPCPack | Absolute sibling DLL hint-path migration. |
 
+## IL2CPP Boundary Case Inventory
+
+Recent local scans across the broader ScheduleOne workspace found these recurring IL2CPP-only shapes:
+
+- BetterJukebox, S1FuelMod, and SteamNetworkLib use `Il2CppStructArray<byte>` around Steamworks packet reads. These are the real-world basis for the managed `byte[]` boundary diagnostic and migration analysis.
+- BarsGraphics contains direct object/proxy casts such as `pipelineAsset is UniversalRenderPipelineAsset` and `target is UnityEngine.Object`, alongside handwritten `TryCast<T>()` fallbacks. `S1I007` warns on the risky plain-cast shape until migration has a safe object-cast rewrite for all common forms.
+- OTC-S1-Mod and DedicatedServerMod use many `TryCast<T>()`, `Il2CppReferenceArray<T>`, `Il2CppSystem.Guid`, and `Il2CppSystem.Collections.Generic.List<T>` branches. These are useful references for future general rules around reference-array construction, Guid conversion, and game callback/list signatures.
+- OTC-S1-Mod still has Harmony transpiler usage in at least one IL2CPP-aware project area. The compiler diagnostic intentionally keeps transpilers as hard IL2CPP build errors because there is no safe automatic IL rewrite fallback.
+- Some older demo or generated folders can contain stale migrated output. Treat current temp-copy migration and build-gate results as the source of truth, not old checked-out demo artifacts.
+
 ## What This Proves
 
 - The analyzer can read real project shapes, imported props/targets, custom configuration names, package references, and common local path patterns.

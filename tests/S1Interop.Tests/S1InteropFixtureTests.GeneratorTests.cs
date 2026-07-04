@@ -633,6 +633,95 @@ internal sealed partial class S1InteropFixtureTests
             $"S1InteropMember method declarations should report S1I003 when the named overload has the right arity but wrong parameter types. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
+    private void S1InteropTypeRegistryGeneratorReportsIl2CppSourceBoundaryDiagnostics()
+    {
+        const string source =
+            """
+            using System;
+            using System.Collections.Generic;
+            using HarmonyLib;
+
+            namespace SyntheticMod;
+
+            public static class RiskyPatch
+            {
+                [HarmonyTranspiler]
+                public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) => instructions;
+
+                public static void BindInternalPostfix(object __instance, List<EntityConfiguration> configs)
+                {
+                }
+
+                public static void Receive()
+                {
+                    byte[] data = new byte[1024];
+                    Steamworks.SteamNetworking.ReadP2PPacket(data, 1024, out uint bytesRead, out object remoteId, 0);
+                }
+
+                public static int Inspect(object pipelineAsset)
+                {
+                    return pipelineAsset is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset typedAsset
+                        ? typedAsset.GetHashCode()
+                        : 0;
+                }
+            }
+
+            public sealed class EntityConfiguration
+            {
+            }
+
+            namespace HarmonyLib
+            {
+                [AttributeUsage(AttributeTargets.Method)]
+                public sealed class HarmonyTranspilerAttribute : Attribute
+                {
+                }
+
+                public sealed class CodeInstruction
+                {
+                }
+            }
+
+            namespace Steamworks
+            {
+                public static class SteamNetworking
+                {
+                    public static bool ReadP2PPacket(byte[] data, uint dataSize, out uint bytesRead, out object remoteId, int channel)
+                    {
+                        bytesRead = 0;
+                        remoteId = new object();
+                        return true;
+                    }
+                }
+            }
+
+            namespace UnityEngine.Rendering.Universal
+            {
+                public sealed class UniversalRenderPipelineAsset
+                {
+                }
+            }
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [], "IL2CPP");
+
+        Assert(
+            diagnostics.Any(diagnostic => diagnostic.Id == "S1I004" && diagnostic.GetMessage().Contains("Transpiler", StringComparison.Ordinal)),
+            $"IL2CPP compiler diagnostics should reject Harmony transpilers. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+        Assert(
+            diagnostics.Any(diagnostic => diagnostic.Id == "S1I005" && diagnostic.GetMessage().Contains("configs", StringComparison.Ordinal)),
+            $"IL2CPP compiler diagnostics should reject managed collection parameters in game-facing signatures. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+        Assert(
+            diagnostics.Any(diagnostic => diagnostic.Id == "S1I006" && diagnostic.GetMessage().Contains("data", StringComparison.Ordinal)),
+            $"IL2CPP compiler diagnostics should reject managed byte[] at native/game buffer boundaries. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I007" &&
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Warning &&
+                diagnostic.GetMessage().Contains("pipelineAsset", StringComparison.Ordinal)),
+            $"IL2CPP compiler diagnostics should warn on plain object/proxy casts to Unity object types. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
     private void BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases()
     {
         const string il2CppSource =
@@ -1436,6 +1525,8 @@ internal sealed partial class S1InteropFixtureTests
                         {
                             var commandList = new Il2CppSystem.Collections.Generic.List<string>();
                             commandList.Add("rain");
+                            Il2CppSystem.Collections.Generic.List<string> nativeList = new Il2CppSystem.Collections.Generic.List<string>();
+                            nativeList.Add("storm");
 
                             var command = new Il2CppScheduleOne.Console.SetWeather();
                             command.Execute(commandList);
@@ -1489,6 +1580,7 @@ internal sealed partial class S1InteropFixtureTests
                 "Migration should rewrite obvious string-based game type lookups to generated backend-neutral registry properties.");
             Assert(
                 migratedSource.Contains("var commandList = new System.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
+                migratedSource.Contains("Il2CppSystem.Collections.Generic.List<string> nativeList = new Il2CppSystem.Collections.Generic.List<string>();", StringComparison.Ordinal) &&
                 migratedSource.Contains("var command = S1Interop.Console.SetWeather.Create();", StringComparison.Ordinal) &&
                 migratedSource.Contains("S1Interop.Console.SetWeather.Invoke(command, \"Execute\", commandList);", StringComparison.Ordinal) &&
                 migratedSource.Contains("S1Interop.Console.ClearTrash.Invoke(S1Interop.Console.ClearTrash.Create(), \"Execute\", (object?)null);", StringComparison.Ordinal),

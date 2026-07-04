@@ -152,6 +152,7 @@ internal sealed partial class S1InteropFixtureTests
                         GUI.Window(0, windowRect, DrawWindow, "");
                         SteamNetworking.ReadP2PPacket(data, packetSize, out bytesRead, out remoteId, channel);
                         string? messageType = MiniMessageSerializer.GetMessageType(data);
+                        var nativeNames = vehicleData.Names ?? new Il2CppSystem.Collections.Generic.List<string>();
                         if (pipelineAsset is UniversalRenderPipelineAsset typedAsset)
                         {
                             _ = typedAsset;
@@ -172,6 +173,7 @@ internal sealed partial class S1InteropFixtureTests
                     private static uint bytesRead;
                     private static object remoteId = new();
                     private static int channel;
+                    private static VehicleData vehicleData = new();
                     private static object windowRect = new();
                     private static object pipelineAsset = new();
                     private static void OnClicked() { }
@@ -180,6 +182,18 @@ internal sealed partial class S1InteropFixtureTests
                     private static class MiniMessageSerializer
                     {
                         public static string? GetMessageType(byte[] data) => data.Length == 0 ? null : "fuel";
+                    }
+
+                    private sealed class VehicleData
+                    {
+                        public Il2CppSystem.Collections.Generic.List<string>? Names { get; set; }
+                    }
+                }
+
+                namespace Il2CppSystem.Collections.Generic
+                {
+                    public sealed class List<T>
+                    {
                     }
                 }
                 """);
@@ -208,6 +222,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 source.SourceRisks.Any(risk => risk.Kind == "ManagedCollectionSignatureInterop"),
                 "Source analyzer should report managed collection signature interop risk.");
+            Assert(
+                source.SourceRisks.Any(risk => risk.Kind == "Il2CppListNullCoalesce"),
+                "Source analyzer should report IL2CPP list null-coalescing risk.");
             Assert(
                 source.SourceRisks.Any(risk => risk.Kind == "Il2CppObjectCastInterop"),
                 "Source analyzer should report IL2CPP object cast risk.");
@@ -243,6 +260,11 @@ internal sealed partial class S1InteropFixtureTests
                     operation.RuleId == "source_risk_managed_collection_signature_interop" &&
                     !operation.Automatic),
                 "Migration plan should surface managed collection signature risks as non-automatic guidance.");
+            Assert(
+                plan.Projects.Single().Operations.Any(operation =>
+                    operation.RuleId == "rewrite_il2cpp_list_null_coalescing" &&
+                    operation.Automatic),
+                "Migration plan should rewrite IL2CPP list null-coalescing risks automatically.");
             Assert(
                 plan.Projects.Single().Operations.Any(operation =>
                     operation.RuleId == "rewrite_il2cpp_object_casts" &&
@@ -1173,6 +1195,28 @@ internal sealed partial class S1InteropFixtureTests
                     {
                     }
 
+                    public static void BadIl2CppPostfix(object __instance,
+                #if IL2CPP
+                        System.Collections.Generic.List<EntityConfiguration> badConfigs)
+                #else
+                        System.Collections.Generic.List<EntityConfiguration> monoConfigs)
+                #endif
+                    {
+                    }
+
+                    public static void BadIl2CppBuffers(uint packetSize, out uint bytesRead, out object remoteId, int channel, VehicleData vehicleData)
+                    {
+                #if IL2CPP
+                        byte[] managedBuffer = new byte[packetSize];
+                        SteamNetworking.ReadP2PPacket(managedBuffer, packetSize, out bytesRead, out remoteId, channel);
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new Il2CppSystem.Collections.Generic.List<SpraySurfaceData>();
+                #else
+                        byte[] managedBuffer = new byte[packetSize];
+                        bytesRead = 0;
+                        remoteId = new object();
+                #endif
+                    }
+
                     public static void BindSafe(Button button, UnityAction callback)
                     {
                         button.onClick.AddListener(callback);
@@ -1206,14 +1250,23 @@ internal sealed partial class S1InteropFixtureTests
                 risks.All(risk => !risk.Evidence.Contains("Utils.ToUnityAction", StringComparison.Ordinal)),
                 "Explicit ToUnityAction helper calls should not be reported as unhandled migration risk.");
             Assert(
-                risks.All(risk => risk.Kind != "Il2CppByteBufferInterop"),
-                "Runtime-guarded IL2CPP packet buffers should not be reported.");
+                risks.All(risk => !risk.Evidence.Contains("il2CppBuffer", StringComparison.Ordinal)),
+                "Runtime-guarded IL2CPP packet buffers that already use wrapper buffers should not be reported.");
             Assert(
-                risks.All(risk => risk.Kind != "ManagedCollectionSignatureInterop"),
-                "Runtime-guarded managed collection signatures should not be reported.");
+                risks.All(risk => !risk.Evidence.Contains("Il2CppSystem.Collections.Generic.List<EntityConfiguration> configs", StringComparison.Ordinal)),
+                "Runtime-guarded collection signatures that already use IL2CPP wrapper lists should not be reported.");
             Assert(
                 risks.All(risk => risk.Kind != "Il2CppObjectCastInterop"),
                 "Runtime-guarded IL2CPP object TryCast branches should not be reported.");
+            Assert(
+                risks.Any(risk => risk.Kind == "Il2CppByteBufferInterop" && risk.Evidence.Contains("managedBuffer", StringComparison.Ordinal)),
+                "Runtime-guarded IL2CPP branches that still pass managed byte[] buffers should be reported.");
+            Assert(
+                risks.Any(risk => risk.Kind == "ManagedCollectionSignatureInterop" && risk.Evidence.Contains("badConfigs", StringComparison.Ordinal)),
+                "Runtime-guarded IL2CPP branches that still expose managed collection signatures should be reported.");
+            Assert(
+                risks.Any(risk => risk.Kind == "Il2CppListNullCoalesce" && risk.Evidence.Contains("SpraySurfaces", StringComparison.Ordinal)),
+                "Runtime-guarded IL2CPP branches that null-coalesce IL2CPP list wrappers should be reported.");
             Assert(
                 risks.Any(risk => risk.Kind == "HarmonyTranspiler"),
                 "Unguarded Harmony transpiler should still be reported.");

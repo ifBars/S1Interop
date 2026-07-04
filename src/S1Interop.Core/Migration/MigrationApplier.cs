@@ -31,6 +31,10 @@ public sealed class MigrationApplier
         @"^(?<indent>\s*)(?:public|internal|private|protected)?\s*(?:(?:sealed|abstract|partial)\s+)*class\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*(?<base>[^{\r\n]+))?",
         RegexOptions.Compiled);
 
+    private static readonly Regex Il2CppListNullCoalesceRegex = new(
+        @"^(?<indent>\s*)(?<prefix>.*=\s*)(?<left>.+?)\s*\?\?\s*new\s+Il2CppSystem\.Collections\.Generic\.List<(?<type>[^>]+)>\(\);(?<suffix>\s*)$",
+        RegexOptions.Compiled);
+
     public MigrationApplyResult Apply(MigrationPlan plan)
     {
         string runId = $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..30];
@@ -96,6 +100,7 @@ public sealed class MigrationApplier
                 !operation.RuleId.Equals("rewrite_member_access_fallbacks", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_direct_member_reflection_lookups", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("rewrite_il2cpp_object_casts", StringComparison.OrdinalIgnoreCase) &&
+                !operation.RuleId.Equals("rewrite_il2cpp_list_null_coalescing", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_registertype", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_type_missing_intptr_constructor", StringComparison.OrdinalIgnoreCase) &&
                 !operation.RuleId.Equals("injected_member_requires_hidefromil2cpp", StringComparison.OrdinalIgnoreCase) &&
@@ -145,6 +150,7 @@ public sealed class MigrationApplier
                 "rewrite_member_access_fallbacks" => ApplyMemberAccessFallbackRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_direct_member_reflection_lookups" => ApplyDirectMemberReflectionLookupRewrite(projectPlan.ProjectPath, operation.FilePath, backupRoot, fileChanges),
                 "rewrite_il2cpp_object_casts" => ApplyIl2CppObjectCastRewrite(operation.FilePath, backupRoot, fileChanges),
+                "rewrite_il2cpp_list_null_coalescing" => ApplyIl2CppListNullCoalescingRewrite(operation.FilePath, backupRoot, fileChanges),
                 "install_build_validation_hook" => ApplyBuildValidationHook(projectPath, document, backupRoot, fileChanges),
                 _ => false
             };
@@ -340,6 +346,7 @@ public sealed class MigrationApplier
             "rewrite_delegate_arguments" => 20,
             "rewrite_member_access_fallbacks" => 20,
             "rewrite_il2cpp_object_casts" => 20,
+            "rewrite_il2cpp_list_null_coalescing" => 20,
             "injected_type_missing_registertype" => 20,
             "injected_type_missing_intptr_constructor" => 21,
             "injected_member_requires_hidefromil2cpp" => 22,
@@ -1644,6 +1651,28 @@ public sealed class MigrationApplier
         return true;
     }
 
+    private static bool ApplyIl2CppListNullCoalescingRewrite(
+        string sourcePath,
+        string backupRoot,
+        List<MigrationFileChange> fileChanges)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return false;
+        }
+
+        List<string> lines = File.ReadAllLines(sourcePath).ToList();
+        if (!RepairIl2CppListNullCoalescing(lines))
+        {
+            return false;
+        }
+
+        TrackFile(sourcePath, backupRoot, fileChanges);
+        File.WriteAllLines(sourcePath, lines, Encoding.UTF8);
+        UpdateTrackedFileHash(sourcePath, fileChanges);
+        return true;
+    }
+
     private static ProjectAnalysis AnalyzeProject(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -2609,7 +2638,7 @@ public sealed class MigrationApplier
 
     private static bool ConditionalizeGameConstructorFactoryHelpers(List<string> lines)
     {
-        bool changed = false;
+        bool changed = RepairIl2CppListNullCoalescing(lines);
         for (int index = 0; index < lines.Count; index++)
         {
             string line = lines[index];
@@ -2617,17 +2646,15 @@ public sealed class MigrationApplier
                 !IsAlreadyRuntimeGuarded(lines, index))
             {
                 string indent = GetIndent(line);
+                string[] il2CppLines = ConvertIl2CppListNullCoalesceLines(
+                    line.Replace("new List<", "new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal));
                 lines.RemoveAt(index);
-                lines.InsertRange(index,
-                [
-                    $"{indent}#if IL2CPP",
-                    line.Replace("new List<", "new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal),
-                    $"{indent}#else",
-                    line,
-                    $"{indent}#endif"
-                ]);
+                var replacement = new List<string> { $"{indent}#if IL2CPP" };
+                replacement.AddRange(il2CppLines);
+                replacement.AddRange([$"{indent}#else", line, $"{indent}#endif"]);
+                lines.InsertRange(index, replacement);
                 changed = true;
-                index += 4;
+                index += replacement.Count;
                 continue;
             }
 
@@ -2653,9 +2680,81 @@ public sealed class MigrationApplier
         return changed;
     }
 
+    private static bool RepairIl2CppListNullCoalescing(List<string> lines)
+    {
+        bool changed = false;
+        for (int index = 0; index < lines.Count; index++)
+        {
+            string line = lines[index];
+            bool explicitIl2CppList = line.Contains("?? new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal);
+            bool rewrittenSystemList = line.Contains("?? new System.Collections.Generic.List<", StringComparison.Ordinal) &&
+                                       IsInsideIl2CppRuntimeBranch(lines, index);
+            bool unqualifiedIl2CppList = line.Contains("?? new List<", StringComparison.Ordinal) &&
+                                          IsInsideIl2CppRuntimeBranch(lines, index);
+            if (!explicitIl2CppList && !rewrittenSystemList && !unqualifiedIl2CppList)
+            {
+                continue;
+            }
+
+            string il2CppLine = line
+                .Replace("new System.Collections.Generic.List<", "new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal)
+                .Replace("new List<", "new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal);
+            string[] convertedLines = ConvertIl2CppListNullCoalesceLines(il2CppLine);
+            if (convertedLines.Length == 1 && string.Equals(line, convertedLines[0], StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            lines.RemoveAt(index);
+            lines.InsertRange(index, convertedLines);
+            index += convertedLines.Length - 1;
+            changed = true;
+        }
+
+        return changed;
+    }
+
     private static string ReplaceGameConstructorIl2CppSignatureTypes(string line) =>
         line.Replace("Guid ", "Il2CppSystem.Guid ", StringComparison.Ordinal)
             .Replace("List<", "Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal);
+
+    private static string[] ConvertIl2CppListNullCoalesceLines(string line)
+    {
+        Match match = Il2CppListNullCoalesceRegex.Match(line);
+        if (!match.Success)
+        {
+            return [line];
+        }
+
+        string left = match.Groups["left"].Value.Trim();
+        string listType = match.Groups["type"].Value.Trim();
+        string prefix = match.Groups["prefix"].Value;
+        Match variableDeclaration = Regex.Match(
+            prefix,
+            @"^(?<before>\s*)(?:(?:var|(?:Il2CppSystem|System)\.Collections\.Generic\.List<[^>]+>|List<[^>]+>)\s+)?(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*$");
+        if (!variableDeclaration.Success)
+        {
+            return
+            [
+                $"{match.Groups["indent"].Value}{prefix}System.Object.ReferenceEquals({left}, null) ? new Il2CppSystem.Collections.Generic.List<{listType}>() : {left};{match.Groups["suffix"].Value}"
+            ];
+        }
+
+        string indent = match.Groups["indent"].Value;
+        string name = variableDeclaration.Groups["name"].Value;
+        string listTypeName = $"Il2CppSystem.Collections.Generic.List<{listType}>";
+        return
+        [
+            $"{indent}{listTypeName} {name} = new {listTypeName}();",
+            $"{indent}if (!System.Object.ReferenceEquals({left}, null))",
+            $"{indent}{{",
+            $"{indent}    foreach ({listType} item in {left})",
+            $"{indent}    {{",
+            $"{indent}        {name}.Add(item);",
+            $"{indent}    }}",
+            $"{indent}}}{match.Groups["suffix"].Value}"
+        ];
+    }
 
     private static bool IsLikelyGameBackedBase(string baseType) =>
         baseType
@@ -2702,6 +2801,79 @@ public sealed class MigrationApplier
     private static bool IsRuntimeGuardDirective(string directive) =>
         directive.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase) ||
         directive.Contains("MONO", StringComparison.OrdinalIgnoreCase);
+
+    private enum RuntimeBranch
+    {
+        Other,
+        Mono,
+        Il2Cpp
+    }
+
+    private static bool IsInsideIl2CppRuntimeBranch(IReadOnlyList<string> lines, int lineIndex)
+    {
+        var stack = new Stack<RuntimeBranch>();
+        for (int index = 0; index <= lineIndex && index < lines.Count; index++)
+        {
+            string trimmed = lines[index].TrimStart();
+            if (trimmed.StartsWith("#if ", StringComparison.Ordinal))
+            {
+                stack.Push(GetRuntimeBranch(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#elif ", StringComparison.Ordinal))
+            {
+                if (stack.Count > 0)
+                {
+                    stack.Pop();
+                }
+
+                stack.Push(GetRuntimeBranch(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#else", StringComparison.Ordinal))
+            {
+                if (stack.Count > 0)
+                {
+                    stack.Push(InvertRuntimeBranch(stack.Pop()));
+                }
+
+                continue;
+            }
+
+            if (trimmed.StartsWith("#endif", StringComparison.Ordinal) && stack.Count > 0)
+            {
+                stack.Pop();
+            }
+        }
+
+        return stack.Contains(RuntimeBranch.Il2Cpp);
+    }
+
+    private static RuntimeBranch GetRuntimeBranch(string directive)
+    {
+        if (directive.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase) ||
+            directive.Contains("!MONO", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeBranch.Il2Cpp;
+        }
+
+        if (directive.Contains("MONO", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeBranch.Mono;
+        }
+
+        return RuntimeBranch.Other;
+    }
+
+    private static RuntimeBranch InvertRuntimeBranch(RuntimeBranch branch) =>
+        branch switch
+        {
+            RuntimeBranch.Mono => RuntimeBranch.Il2Cpp,
+            RuntimeBranch.Il2Cpp => RuntimeBranch.Mono,
+            _ => RuntimeBranch.Other
+        };
 
     private static string GetIndent(string line) => line[..^line.TrimStart().Length];
 

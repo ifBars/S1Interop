@@ -228,6 +228,11 @@ public sealed class SourceInteropAnalyzer
 
         if (isRuntimeGuarded || isRuntimeSpecificListenerStart)
         {
+            if (!isRuntimeSpecificListenerStart && IsInsideIl2CppRuntimeBranch(lines, index))
+            {
+                AddIl2CppBranchSourceRisks(sourceFile, relativePath, lines, trimmed, index, sourceRisks);
+            }
+
             return;
         }
 
@@ -340,6 +345,87 @@ public sealed class SourceInteropAnalyzer
                 "Add a MONO/IL2CPP signature branch so IL2CPP uses Il2CppSystem.Collections.Generic.List<T> for game-owned callback parameters."));
         }
 
+        if (IsIl2CppListNullCoalesceLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppListNullCoalesce",
+                "high",
+                sourceFile,
+                index + 1,
+                "Il2CppSystem.Collections.Generic.List<T> wrappers can compile differently from normal nullable reference types.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Use an explicit ReferenceEquals null check before allocating the IL2CPP list fallback."));
+        }
+
+        if (CSharpSourceScanner.EnumerateCodeSegments(trimmed).Any(segment => IsIl2CppObjectCastInteropLine(segment.Text)))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppObjectCastInterop",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Plain C# casts or pattern matches against IL2CPP-backed objects can fail to unwrap object proxies.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Prefer S1Interop.Generated.S1InteropObjectCast.As<T>/Is<T> for backend-neutral casts, or add an IL2CPP branch that calls TryCast<T>() and handles cast failures explicitly."));
+        }
+    }
+
+    private static void AddIl2CppBranchSourceRisks(
+        string sourceFile,
+        string relativePath,
+        IReadOnlyList<string> lines,
+        string trimmed,
+        int index,
+        List<SourceRisk> sourceRisks)
+    {
+        if (IsHarmonyTranspilerLine(trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "HarmonyTranspiler",
+                "high",
+                sourceFile,
+                index + 1,
+                "Harmony IL transpilers are not portable to IL2CPP builds.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Replace with prefix/postfix/finalizer patches or runtime-specific patch registration for IL2CPP."));
+        }
+
+        if (IsIl2CppByteBufferInteropLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppByteBufferInterop",
+                "high",
+                sourceFile,
+                index + 1,
+                "Native or game APIs that fill managed byte[] buffers can behave differently under IL2CPP marshalling.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Use an IL2CPP branch with Il2CppStructArray<byte> for receive/fill buffers, copy bytes into a managed byte[] before parsing, and consider pinning send buffers for IL2CPP."));
+        }
+
+        if (IsManagedCollectionSignatureInteropLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "ManagedCollectionSignatureInterop",
+                "medium",
+                sourceFile,
+                index + 1,
+                "Game-facing signatures that use managed collection types can miss IL2CPP wrapper collection parameters at runtime.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Add a MONO/IL2CPP signature branch so IL2CPP uses Il2CppSystem.Collections.Generic.List<T> for game-owned callback parameters."));
+        }
+
+        if (IsIl2CppListNullCoalesceLine(lines, index, trimmed))
+        {
+            sourceRisks.Add(new SourceRisk(
+                "Il2CppListNullCoalesce",
+                "high",
+                sourceFile,
+                index + 1,
+                "Il2CppSystem.Collections.Generic.List<T> wrappers can compile differently from normal nullable reference types.",
+                $"{relativePath}:{index + 1}: {trimmed}",
+                "Use an explicit ReferenceEquals null check before allocating the IL2CPP list fallback."));
+        }
+
         if (CSharpSourceScanner.EnumerateCodeSegments(trimmed).Any(segment => IsIl2CppObjectCastInteropLine(segment.Text)))
         {
             sourceRisks.Add(new SourceRisk(
@@ -367,11 +453,11 @@ public sealed class SourceInteropAnalyzer
 
         if (line.Contains("SteamNetworking.ReadP2PPacket", StringComparison.Ordinal))
         {
-            return true;
+            return UsesManagedByteArrayArgument(lines, line);
         }
 
         return LooksLikeNativeByteBufferFillCall(line) &&
-               DiscoverByteArrayVariableNames(lines).Any(name => line.Contains(name, StringComparison.Ordinal));
+               DiscoverByteArrayVariableNames(lines).Any(name => ContainsIdentifier(line, name));
     }
 
     private static bool LooksLikeNativeByteBufferFillCall(string line) =>
@@ -400,12 +486,34 @@ public sealed class SourceInteropAnalyzer
         return names;
     }
 
+    private static bool UsesManagedByteArrayArgument(IReadOnlyList<string> lines, string line)
+    {
+        int openParen = line.IndexOf('(');
+        if (openParen < 0)
+        {
+            return false;
+        }
+
+        int firstComma = line.IndexOf(',', openParen + 1);
+        string firstArgument = (firstComma < 0 ? line[(openParen + 1)..] : line[(openParen + 1)..firstComma]).Trim();
+        return firstArgument.Contains("new byte[", StringComparison.Ordinal) ||
+               DiscoverByteArrayVariableNames(lines).Contains(firstArgument);
+    }
+
+    private static bool ContainsIdentifier(string line, string identifier) =>
+        Regex.IsMatch(line, $@"(?<![A-Za-z0-9_]){Regex.Escape(identifier)}(?![A-Za-z0-9_])");
+
     private static bool IsManagedCollectionSignatureInteropLine(IReadOnlyList<string> lines, int index, string line) =>
         line.Contains("List<", StringComparison.Ordinal) &&
         line.Contains(')') &&
         !line.Contains('=') &&
         !line.Contains("Il2CppSystem.Collections.Generic.List", StringComparison.Ordinal) &&
         IsGameFacingSignatureContext(lines, index, line);
+
+    private static bool IsIl2CppListNullCoalesceLine(IReadOnlyList<string> lines, int index, string line) =>
+        line.Contains("?? new Il2CppSystem.Collections.Generic.List<", StringComparison.Ordinal) ||
+        (line.Contains("?? new System.Collections.Generic.List<", StringComparison.Ordinal) && IsInsideIl2CppRuntimeBranch(lines, index)) ||
+        (line.Contains("?? new List<", StringComparison.Ordinal) && IsInsideIl2CppRuntimeBranch(lines, index));
 
     private static bool IsGameFacingSignatureContext(IReadOnlyList<string> lines, int index, string line)
     {
@@ -748,6 +856,79 @@ public sealed class SourceInteropAnalyzer
 
         return runtimeGuardStack.Contains(true);
     }
+
+    private enum RuntimeBranch
+    {
+        Other,
+        Mono,
+        Il2Cpp
+    }
+
+    private static bool IsInsideIl2CppRuntimeBranch(IReadOnlyList<string> lines, int lineIndex)
+    {
+        var stack = new Stack<RuntimeBranch>();
+        for (int index = 0; index <= lineIndex && index < lines.Count; index++)
+        {
+            string trimmed = lines[index].TrimStart();
+            if (trimmed.StartsWith("#if ", StringComparison.Ordinal))
+            {
+                stack.Push(GetRuntimeBranch(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#elif ", StringComparison.Ordinal))
+            {
+                if (stack.Count > 0)
+                {
+                    stack.Pop();
+                }
+
+                stack.Push(GetRuntimeBranch(trimmed));
+                continue;
+            }
+
+            if (trimmed.StartsWith("#else", StringComparison.Ordinal))
+            {
+                if (stack.Count > 0)
+                {
+                    stack.Push(InvertRuntimeBranch(stack.Pop()));
+                }
+
+                continue;
+            }
+
+            if (trimmed.StartsWith("#endif", StringComparison.Ordinal) && stack.Count > 0)
+            {
+                stack.Pop();
+            }
+        }
+
+        return stack.Contains(RuntimeBranch.Il2Cpp);
+    }
+
+    private static RuntimeBranch GetRuntimeBranch(string directive)
+    {
+        if (directive.Contains("IL2CPP", StringComparison.OrdinalIgnoreCase) ||
+            directive.Contains("!MONO", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeBranch.Il2Cpp;
+        }
+
+        if (directive.Contains("MONO", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuntimeBranch.Mono;
+        }
+
+        return RuntimeBranch.Other;
+    }
+
+    private static RuntimeBranch InvertRuntimeBranch(RuntimeBranch branch) =>
+        branch switch
+        {
+            RuntimeBranch.Mono => RuntimeBranch.Il2Cpp,
+            RuntimeBranch.Il2Cpp => RuntimeBranch.Mono,
+            _ => RuntimeBranch.Other
+        };
 
     private static HashSet<string> DiscoverRuntimeSafeUnityListenerNames(IEnumerable<string> lines)
     {

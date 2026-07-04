@@ -149,6 +149,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorReportsWrongMethodParameterTypesWhenGameReferencesExist();
         count++;
+        S1InteropTypeRegistryGeneratorReportsIl2CppSourceBoundaryDiagnostics();
+        count++;
         BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases();
         count++;
         BackendNeutralTypeRegistryExecutesAgainstIl2CppLikeTypes();
@@ -253,6 +255,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         VerifyMigrationBuildGateStagesLocalS1InteropGeneratorPackage();
         count++;
+        VerifyMigrationBuildGateDoesNotForwardUnexpandedLocalProperties();
+        count++;
         VerifyMigrationBuildGatePreservesAncestorNuGetConfig();
         count++;
         CliReporterPrintsPackageRestoreSources();
@@ -320,6 +324,8 @@ internal sealed partial class S1InteropFixtureTests
         S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies();
         count++;
         S1InteropTypeRegistryGeneratorReportsWrongMethodParameterTypesWhenGameReferencesExist();
+        count++;
+        S1InteropTypeRegistryGeneratorReportsIl2CppSourceBoundaryDiagnostics();
         count++;
         BackendNeutralRuntimeDetectsDefaultBackendMarkersWithoutTypeAliases();
         count++;

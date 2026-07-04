@@ -1286,6 +1286,26 @@ internal sealed partial class S1InteropFixtureTests
                             spraySurfaces,
                             fuelData);
                     }
+
+                    public static object ExistingIl2CppFallback(VehicleData vehicleData)
+                    {
+                    #if IL2CPP
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new List<SpraySurfaceData>();
+                    #else
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new List<SpraySurfaceData>();
+                    #endif
+                        return spraySurfaces;
+                    }
+
+                    public static object RewrittenIl2CppFallback(VehicleData vehicleData)
+                    {
+                    #if IL2CPP
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new System.Collections.Generic.List<SpraySurfaceData>();
+                    #else
+                        var spraySurfaces = vehicleData.SpraySurfaces ?? new List<SpraySurfaceData>();
+                    #endif
+                        return spraySurfaces;
+                    }
                 }
 
                 public class CustomGamePayload : ScheduleOne.Persistence.Datas.GameData
@@ -1302,11 +1322,17 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 projectPlan.Operations.Any(operation => operation.RuleId == "game_constructor_requires_il2cpp_signature"),
                 "Mono-only game constructor fixture should plan an IL2CPP signature migration.");
+            Assert(
+                projectPlan.Operations.Any(operation => operation.RuleId == "rewrite_il2cpp_list_null_coalescing"),
+                "Already guarded IL2CPP list null-coalescing should plan a wrapper-safe rewrite.");
 
             MigrationApplyResult applyResult = new MigrationApplier().Apply(new MigrationPlan(tempProject, [projectPlan]));
             Assert(
                 applyResult.Operations.Any(operation => operation.RuleId == "game_constructor_requires_il2cpp_signature"),
                 "Migration should apply the game constructor signature repair.");
+            Assert(
+                applyResult.Operations.Any(operation => operation.RuleId == "rewrite_il2cpp_list_null_coalescing"),
+                "Migration should apply the IL2CPP list null-coalescing repair.");
 
             string migratedSource = File.ReadAllText(tempSource);
             Assert(
@@ -1320,6 +1346,14 @@ internal sealed partial class S1InteropFixtureTests
                 migratedSource.Contains("new Il2CppSystem.Collections.Generic.List<SpraySurfaceData>()", StringComparison.Ordinal),
                 "Migrated factory helper should use an IL2CPP list fallback under IL2CPP.");
             Assert(
+                CountOccurrences(migratedSource, "Il2CppSystem.Collections.Generic.List<SpraySurfaceData> spraySurfaces = new Il2CppSystem.Collections.Generic.List<SpraySurfaceData>();") >= 3 &&
+                CountOccurrences(migratedSource, "if (!System.Object.ReferenceEquals(vehicleData.SpraySurfaces, null))") >= 3 &&
+                migratedSource.Contains("foreach (SpraySurfaceData item in vehicleData.SpraySurfaces)", StringComparison.Ordinal) &&
+                migratedSource.Contains("spraySurfaces.Add(item);", StringComparison.Ordinal) &&
+                !migratedSource.Contains("vehicleData.SpraySurfaces ?? new Il2CppSystem.Collections.Generic.List<SpraySurfaceData>()", StringComparison.Ordinal) &&
+                !migratedSource.Contains("vehicleData.SpraySurfaces ?? new System.Collections.Generic.List<SpraySurfaceData>()", StringComparison.Ordinal),
+                "Migrated IL2CPP factory helper should copy list fallbacks into an IL2CPP list without null-coalescing or conditional-expression type inference.");
+            Assert(
                 migratedSource.Contains("new Il2CppSystem.Guid(vehicleData.GUID)", StringComparison.Ordinal),
                 "Migrated factory helper should construct Il2CppSystem.Guid under IL2CPP.");
             Assert(
@@ -1330,6 +1364,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 after.Diagnostics.All(diagnostic => diagnostic.RuleId != "game_constructor_requires_il2cpp_signature"),
                 "Migrated game constructor fixture should not retain the constructor signature diagnostic.");
+            Assert(
+                after.Projects.Single().SourceInterop?.SourceRisks.All(risk => risk.Kind != "Il2CppListNullCoalesce") == true,
+                "Migrated game constructor fixture should not retain IL2CPP list null-coalescing risk.");
         }
         finally
         {
