@@ -2140,8 +2140,9 @@ internal sealed partial class S1InteropFixtureTests
             ProcessResult dryRun = RunCli("sdkgen", projectPath, "--full-sdk");
             Assert(
                 dryRun.ExitCode == 0 &&
+                dryRun.Output.Contains("install_s1interop_generator_package", StringComparison.Ordinal) &&
                 dryRun.Output.Contains("generate_full_sdk_facade", StringComparison.Ordinal),
-                $"sdkgen --full-sdk dry-run should plan full SDK generation for a blank backend-neutral project with game references. Output: {dryRun.Output}");
+                $"sdkgen --full-sdk dry-run should plan generator package installation and full SDK generation for a blank backend-neutral project with game references. Output: {dryRun.Output}");
             Assert(!File.Exists(generatedFacade), "sdkgen --full-sdk dry-run should not write the generated facade.");
 
             ProcessResult apply = RunCli("sdkgen", projectPath, "--full-sdk", "--apply");

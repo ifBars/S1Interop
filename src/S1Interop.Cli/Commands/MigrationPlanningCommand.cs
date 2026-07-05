@@ -109,7 +109,11 @@ internal static class MigrationPlanningCommand
                 SdkFacadePlan facadePlan = new SdkFacadeGenerator()
                     .Plan(project, new SdkFacadeGeneratorOptions(FullSdk: fullSdk));
                 var operations = new List<MigrationOperation>();
-                if (facadePlan.TypeAliases.Count > 0)
+                bool needsGeneratorPackage =
+                    facadePlan.TypeAliases.Count > 0 ||
+                    facadePlan.NamespaceImports.Count > 0;
+
+                if (needsGeneratorPackage)
                 {
                     operations.Add(new MigrationOperation(
                         "install_s1interop_generator_package",

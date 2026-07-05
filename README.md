@@ -6,7 +6,7 @@ The main product direction is a generated backend-neutral SDK:
 
 - `s1interop new` starts a backend-neutral mod project.
 - `s1interop sdkgen` generates facades from local game reference metadata.
-- `s1interop migrate --dual-runtime` helps existing Mono mods move toward dual-runtime support.
+- `s1interop migrate --dual-runtime` helps existing Mono mods move toward two-assembly dual-runtime support.
 - `s1interop analyze`, `lint`, and `verify-migration` report unsafe IL2CPP boundary cases before they become runtime failures.
 
 It is not a finished "convert every mod with one command" tool yet. The current alpha already handles real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification, but unsupported or ambiguous cases are reported instead of guessed.
@@ -18,7 +18,9 @@ The full docs site lives under [`docs/docfx`](docs/docfx):
 - [Introduction](docs/docfx/articles/introduction.md)
 - [Getting started](docs/docfx/articles/getting-started.md)
 - [Backend-neutral SDK](docs/docfx/articles/backend-neutral-sdk.md)
-- [Migrating Mono mods](docs/docfx/articles/migrating-mono-mods.md)
+- [Migration overview](docs/docfx/articles/migrating-mono-mods.md)
+- [Migrate to backend-neutral](docs/docfx/articles/migrate-to-backend-neutral.md)
+- [Migrate to dual-runtime](docs/docfx/articles/migrate-to-dual-runtime.md)
 - [Diagnostics](docs/docfx/articles/diagnostics.md)
 - [Testing](docs/docfx/articles/testing.md)
 - [API reference scope](docs/docfx/articles/api-reference.md)
@@ -46,6 +48,7 @@ Run the CLI from source:
 ```powershell
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- new .\MyBackendNeutralMod --apply
+dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- init . --dry-run
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- sdkgen . --full-sdk --apply
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dual-runtime --dry-run
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime

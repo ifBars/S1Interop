@@ -28,4 +28,6 @@ For a blank project, seed the SDK from your local game references:
 s1interop sdkgen . --full-sdk --apply
 ```
 
-That generates declarations from local metadata. It does not commit game assemblies, wrapper dumps, or decompiled source.
+That generates declarations from local metadata. Full SDK mode adds broad type registration for Schedule One, then you add `S1InteropType` declarations for types where you want member facades.
+
+It does not commit game assemblies, wrapper dumps, or decompiled source.

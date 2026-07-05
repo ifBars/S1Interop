@@ -64,7 +64,14 @@ Seed a blank backend-neutral project from local game references:
 s1interop sdkgen . --full-sdk --apply
 ```
 
-Plan a dual-runtime migration:
+Move an existing Mono mod toward backend-neutral:
+
+```powershell
+s1interop init . --dry-run
+s1interop sdkgen . --dry-run
+```
+
+Plan a dual-runtime migration instead:
 
 ```powershell
 s1interop migrate . --dual-runtime --dry-run

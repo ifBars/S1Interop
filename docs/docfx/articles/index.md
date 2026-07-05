@@ -22,7 +22,9 @@ Use these docs when you are building, migrating, or validating a Schedule One mo
 
 | Page | Use it when |
 | --- | --- |
-| [Migrating Mono mods](migrating-mono-mods.md) | You are moving an existing Mono-only mod toward dual-runtime support. |
+| [Migration overview](migrating-mono-mods.md) | You need to choose between backend-neutral and dual-runtime migration. |
+| [Migrate to backend-neutral](migrate-to-backend-neutral.md) | You want one assembly backed by generated `S1Interop.*` facades. |
+| [Migrate to dual-runtime](migrate-to-dual-runtime.md) | You want separate Mono and IL2CPP assemblies/configurations. |
 | [Diagnostics](diagnostics.md) | You want to understand compiler errors and IL2CPP boundary checks. |
 | [Commands](commands.md) | You need the CLI command list and what each command is for. |
 | [Testing](testing.md) | You are validating S1Interop itself or a real-mod migration probe. |

@@ -18,8 +18,12 @@
       href: sdk-generation.md
 - name: Migration
   items:
-    - name: Migrating Mono mods
+    - name: Migration overview
       href: migrating-mono-mods.md
+    - name: Migrate to backend-neutral
+      href: migrate-to-backend-neutral.md
+    - name: Migrate to dual-runtime
+      href: migrate-to-dual-runtime.md
     - name: Diagnostics
       href: diagnostics.md
     - name: Commands

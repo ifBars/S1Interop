@@ -1,6 +1,18 @@
-# Migrating Mono mods
+# Migration overview
 
-Use migration when a project already builds against Mono and you want to move it toward dual-runtime or backend-neutral support.
+Use migration when a project already builds against Mono and you want S1Interop to move the project toward one of two shapes:
+
+- backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
+- dual-runtime: the project builds separate Mono and IL2CPP assemblies from runtime-specific configurations.
+
+Pick the shape first. The commands and output are different enough that the docs split them into separate pages.
+
+| Goal | Start here |
+| --- | --- |
+| One assembly that can run on either backend | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |
+| Two assemblies/configurations, one for Mono and one for IL2CPP | [Migrate to dual-runtime](migrate-to-dual-runtime.md) |
+
+## Common first step
 
 Start with analysis:
 
@@ -8,27 +20,19 @@ Start with analysis:
 s1interop analyze .
 ```
 
-Then run a dry-run migration:
+Analysis tells you which runtime the project currently targets, which game paths or references it can see, and which source patterns are likely to fail on IL2CPP.
 
-```powershell
-s1interop migrate . --dual-runtime --dry-run
-```
+## Safety model
 
-Review the plan before applying. A migration may:
+Commands that write files have a dry-run mode. Review that plan before applying. Depending on the path you choose, S1Interop may:
 
-- add IL2CPP build configurations;
-- update a sibling `.sln`;
-- create ignored local path props;
+- create or repair ignored local path props;
 - install the generator package reference;
 - generate SDK facade declarations;
+- add IL2CPP build configurations;
+- update a sibling `.sln`;
 - rewrite safe source patterns;
 - write a source-risk report for cases that still need review.
-
-Apply only when the plan is reasonable:
-
-```powershell
-s1interop migrate . --dual-runtime --apply
-```
 
 ## Rollback
 
@@ -38,15 +42,15 @@ Applied migrations write backups and a manifest under `s1interop-runs/<run-id>/`
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 
-## Sandbox verification
+## Verification
 
-Use verification before touching a real mod tree when possible:
+Use sandbox verification before touching a real mod tree when possible. This is most useful for dual-runtime migrations because `verify-migration` can apply the migration plan in a temporary copy:
 
 ```powershell
 s1interop verify-migration . --dual-runtime --include-source-migrations
 ```
 
-Build-gated verification can also compile both runtimes when local game paths are available:
+Build-gated verification can also compile both runtime configurations when local game paths are available:
 
 ```powershell
 s1interop verify-migration . --dual-runtime --build `
@@ -54,3 +58,4 @@ s1interop verify-migration . --dual-runtime --build `
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 
+For backend-neutral projects, the usual verification path is a normal build plus the generator diagnostics described in [Diagnostics](diagnostics.md).

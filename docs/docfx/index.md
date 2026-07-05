@@ -9,7 +9,7 @@ _layout: landing
   <div class="s1interop-actions">
     <a class="s1interop-action s1interop-action-primary" href="articles/getting-started.md">Get started</a>
     <a class="s1interop-action" href="articles/backend-neutral-sdk.md">Backend-neutral SDK</a>
-    <a class="s1interop-action" href="articles/migrating-mono-mods.md">Migrate a Mono mod</a>
+    <a class="s1interop-action" href="articles/migrating-mono-mods.md">Choose migration path</a>
   </div>
 </section>
 
@@ -24,9 +24,9 @@ _layout: landing
       <h3>Start backend-neutral</h3>
       <p>Create a new project with Mono and IL2CPP configurations, local path props, and generated SDK declarations from the start.</p>
     </a>
-    <a class="s1interop-card" href="articles/migrating-mono-mods.md">
+    <a class="s1interop-card" href="articles/migrate-to-backend-neutral.md">
       <h3>Migrate an existing mod</h3>
-      <p>Analyze a Mono-only project, add dual-runtime build shape, rewrite safe call sites, and keep rollback data.</p>
+      <p>Move a Mono-only project toward one backend-neutral assembly using generated SDK declarations and compile-time checks.</p>
     </a>
     <a class="s1interop-card" href="articles/diagnostics.md">
       <h3>Catch IL2CPP failures earlier</h3>

@@ -31,6 +31,28 @@ Generated SDK source can include:
 
 The generated SDK comes from local reference metadata. Do not commit game assemblies, generated IL2CPP wrappers, decompiled source, or static hand-maintained catalogs of Schedule One APIs.
 
+## Namespace and type declarations
+
+Full SDK generation usually starts with one broad namespace declaration:
+
+```csharp
+[assembly: S1Interop.S1InteropNamespace("ScheduleOne", IncludeSubnamespaces = true)]
+```
+
+That gives the runtime registry broad type coverage without generating a giant member facade for every type in the game.
+
+Add `S1InteropType` for types where mod code needs native-feeling member access:
+
+```csharp
+[assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle")]
+```
+
+The generated facade lives under the original namespace root:
+
+```text
+S1Interop.ScheduleOne.Vehicles.LandVehicle
+```
+
 ## When to add manual overrides
 
 Prefer generated type coverage first. Use namespace declarations for broad type registration, then add `S1InteropType` declarations for the specific types where the mod needs generated member facades.
