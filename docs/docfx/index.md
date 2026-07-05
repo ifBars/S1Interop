@@ -8,6 +8,7 @@ _layout: landing
   <p class="s1interop-lead">S1Interop analyzes Schedule One mod projects, generates backend-neutral SDK facades, migrates safe source patterns, and verifies the result in disposable sandboxes.</p>
   <div class="s1interop-actions">
     <a class="s1interop-action s1interop-action-primary" href="articles/getting-started.md">Get started</a>
+    <a class="s1interop-action" href="articles/core-concepts.md">Core concepts</a>
     <a class="s1interop-action" href="articles/backend-neutral-sdk.md">Backend-neutral SDK</a>
     <a class="s1interop-action" href="articles/migrating-mono-mods.md">Choose migration path</a>
   </div>

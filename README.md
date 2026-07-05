@@ -16,6 +16,7 @@ It is not a finished "convert every mod with one command" tool yet. The current 
 The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
+- [Core concepts](docs/docfx/articles/core-concepts.md)
 - [Getting started](docs/docfx/articles/getting-started.md)
 - [Commands](docs/docfx/articles/commands.md)
 - [Generated output](docs/docfx/articles/generator-package.md)

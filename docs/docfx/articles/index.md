@@ -7,6 +7,7 @@ Use these docs when you are building, migrating, or validating a Schedule One mo
 | Page | Use it when |
 | --- | --- |
 | [Introduction](introduction.md) | You want the short version of what S1Interop is, including the CLI vs generator split. |
+| [Core concepts](core-concepts.md) | You want the vocabulary (`S1InteropObject<TTag>`, facade, `Handle`, declarations, registry) defined once before reading the workflow pages. |
 | [Installation](getting-started.md) | You need the first commands for building and running the CLI, or packing the local alpha packages. |
 | [Local game paths](local-paths.md) | You are setting up Mono and IL2CPP game references on your machine. |
 

@@ -40,6 +40,8 @@ The generator package owns compile-time work. Once a project references `S1Inter
 
 Because the generator runs during compilation, generated symbols are only visible after a build (or after the IDE's design-time build regenerates them). See [Generated output](generator-package.md) for the full generated surface and build timing.
 
+For the vocabulary behind these terms (`S1InteropObject<TTag>`, facade, `Handle`, Tag, registry), see [Core concepts](core-concepts.md).
+
 ## What S1Interop is not
 
 S1Interop does not reverse IL2CPP back into Mono, hide every runtime difference behind reflection guesses, or convert every mod with one command. It also never redistributes Schedule One assemblies, IL2CPP wrappers, decompiled source, or game assets.
