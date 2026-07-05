@@ -24,21 +24,13 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 ## Last Local Verifications
 
-On July 4, 2026, the focused backend-neutral real-mod lane passed locally:
+On July 5, 2026, the focused backend-neutral real-mod lane passed locally against the current checkout:
 
 ```powershell
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
 ```
 
 Result: `S1Interop fixture tests passed (9 executed).`
-
-The focused build-gate lane also passed locally:
-
-```powershell
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
-```
-
-Result: `S1Interop fixture tests passed (5 executed).`
 
 The focused Hoverboard lane also passed locally:
 
@@ -47,6 +39,14 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 ```
 
 Result: `S1Interop fixture tests passed (3 executed).`
+
+The focused build-gate lane also passed locally:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
+```
+
+Result: `S1Interop fixture tests passed (5 executed).`
 
 These runs prove the focused backend-neutral, Hoverboard, and selected build-gated coverage listed below against the current local workspace and game reference paths. They are not a substitute for a full release-facing integration pass.
 
