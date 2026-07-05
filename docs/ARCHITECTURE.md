@@ -56,6 +56,19 @@ The CLI should stay thin. If a behavior is useful outside command-line output, p
 
 Path: `src/S1Interop.Core/`
 
+Core namespaces mirror the feature folders:
+
+- `S1Interop.Core.Contracts`: shared records, enums, and JSON context types returned by analysis, migration, and verification.
+- `S1Interop.Core.Analysis`: project/source discovery and diagnostics.
+- `S1Interop.Core.Migration`: planning, applying, rollback, build hooks, solution updates, and sandbox verification.
+- `S1Interop.Core.Rewriting`: narrow source transformations used by migration.
+- `S1Interop.Core.CodeGeneration`: migration-time source emitters.
+- `S1Interop.Core.Scaffolding`: backend-neutral project creation.
+- `S1Interop.Core.Packaging`: package IDs, versions, and restore metadata.
+- `S1Interop.Core.Utilities`: low-level shared helpers.
+
+Keep new code in the namespace that owns the behavior. Avoid adding new helpers to the root `S1Interop.Core` namespace; it is only a parent for the module namespaces.
+
 ### Analysis
 
 Path: `src/S1Interop.Core/Analysis/`

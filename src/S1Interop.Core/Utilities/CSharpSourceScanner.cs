@@ -1,6 +1,6 @@
-using System.Text;
+﻿using System.Text;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Utilities;
 
 internal static class CSharpSourceScanner
 {

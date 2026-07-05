@@ -1,4 +1,4 @@
-namespace S1Interop.Core;
+﻿namespace S1Interop.Core.Analysis;
 
 internal static class WorkspaceTraversal
 {

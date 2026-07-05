@@ -1,4 +1,5 @@
-using S1Interop.Core;
+using S1Interop.Core.Analysis;
+using S1Interop.Core.Contracts;
 
 internal static class CliCommandDispatcher
 {

@@ -1,4 +1,4 @@
-using S1Interop.Core;
+using S1Interop.Core.Contracts;
 
 public static class CliReporter
 {

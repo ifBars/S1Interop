@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Utilities;
 
 internal static class FileHash
 {

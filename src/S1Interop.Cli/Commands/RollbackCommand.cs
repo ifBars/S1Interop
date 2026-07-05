@@ -1,5 +1,6 @@
 using System.Text.Json;
-using S1Interop.Core;
+using S1Interop.Core.Contracts;
+using S1Interop.Core.Migration;
 
 internal static class RollbackCommand
 {

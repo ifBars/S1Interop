@@ -1,7 +1,7 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Rewriting;
 
 public static class ScheduleOneUsingRewriter
 {

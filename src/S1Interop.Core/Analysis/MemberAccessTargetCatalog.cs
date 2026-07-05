@@ -1,6 +1,6 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Analysis;
 
 public sealed class MemberAccessTargetCatalog
 {

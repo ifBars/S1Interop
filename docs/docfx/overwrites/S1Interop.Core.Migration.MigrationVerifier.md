@@ -1,5 +1,5 @@
 ---
-uid: S1Interop.Core.MigrationVerifier
+uid: S1Interop.Core.Migration.MigrationVerifier
 summary: Runs migration in a temporary sandbox and optionally builds the migrated result.
 ---
 

@@ -1,7 +1,7 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Migration;
 
 internal static class SolutionConfigurationScaffolder
 {

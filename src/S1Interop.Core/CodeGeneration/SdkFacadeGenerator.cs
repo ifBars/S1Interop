@@ -3,8 +3,6 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.RegularExpressions;
 
-using S1Interop.Core;
-
 namespace S1Interop.Core.CodeGeneration;
 
 public sealed partial class SdkFacadeGenerator

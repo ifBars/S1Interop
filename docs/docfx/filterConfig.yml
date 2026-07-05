@@ -2,7 +2,21 @@ apiRules:
   - include:
       uidRegex: ^S1Interop\.Core$
   - include:
-      uidRegex: ^S1Interop\.Core\.(RuntimeKind|DiagnosticSeverity|WorkspaceAnalysis|ProjectAnalysis|ConfigurationAnalysis|ReferenceInfo|PackageReferenceInfo|InteropDiagnostic|MigrationPlan|MigrationPlannerOptions|MigrationVerifierOptions|ProjectMigrationPlan|MigrationOperation|SdkFacadePlan|SdkTypeAlias|SourceInteropAnalysis|SourceRisk|InjectedTypeAnalysis|MigrationApplyResult|MigrationFileChange|MigrationRollbackResult|MigrationVerificationResult|MigrationBuildResult|MigrationBuildIssue|WorkspaceMigrationVerificationResult|WorkspaceAnalyzer|ProjectDiscovery|SourceInteropAnalyzer|MigrationPlanner|MigrationApplier|MigrationVerifier|S1InteropPackageInfo)$
+      uidRegex: ^S1Interop\.Core\.Contracts$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Contracts\.(RuntimeKind|DiagnosticSeverity|WorkspaceAnalysis|ProjectAnalysis|ConfigurationAnalysis|ReferenceInfo|PackageReferenceInfo|InteropDiagnostic|MigrationPlan|MigrationPlannerOptions|MigrationVerifierOptions|ProjectMigrationPlan|MigrationOperation|SdkFacadePlan|SdkTypeAlias|SourceInteropAnalysis|SourceRisk|InjectedTypeAnalysis|MigrationApplyResult|MigrationFileChange|MigrationRollbackResult|MigrationVerificationResult|MigrationBuildResult|MigrationBuildIssue|WorkspaceMigrationVerificationResult)$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Analysis$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Analysis\.(WorkspaceAnalyzer|ProjectDiscovery|SourceInteropAnalyzer)$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Migration$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Migration\.(MigrationPlanner|MigrationApplier|MigrationVerifier)$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Packaging$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Packaging\.S1InteropPackageInfo$
   - include:
       uidRegex: ^S1Interop\.Core\.Scaffolding$
   - include:

@@ -1,5 +1,7 @@
 using System.Text.Json;
-using S1Interop.Core;
+using S1Interop.Core.CodeGeneration;
+using S1Interop.Core.Contracts;
+using S1Interop.Core.Migration;
 
 internal static class MigrationPlanningCommand
 {
@@ -80,7 +82,7 @@ internal static class MigrationPlanningCommand
                         "Install the S1Interop Roslyn generator package for backend-neutral attributes and generated helpers.")
                 };
 
-                string starterPath = S1Interop.Core.CodeGeneration.BackendNeutralStarterGenerator.GetSourcePath(project.ProjectPath);
+                string starterPath = BackendNeutralStarterGenerator.GetSourcePath(project.ProjectPath);
                 if (!File.Exists(starterPath))
                 {
                     operations.Add(new MigrationOperation(
@@ -104,8 +106,8 @@ internal static class MigrationPlanningCommand
         ProjectMigrationPlan[] projects = analysis.Projects
             .Select(project =>
             {
-                SdkFacadePlan facadePlan = new S1Interop.Core.CodeGeneration.SdkFacadeGenerator()
-                    .Plan(project, new S1Interop.Core.CodeGeneration.SdkFacadeGeneratorOptions(FullSdk: fullSdk));
+                SdkFacadePlan facadePlan = new SdkFacadeGenerator()
+                    .Plan(project, new SdkFacadeGeneratorOptions(FullSdk: fullSdk));
                 var operations = new List<MigrationOperation>();
                 if (facadePlan.TypeAliases.Count > 0)
                 {

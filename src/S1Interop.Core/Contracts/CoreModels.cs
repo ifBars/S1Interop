@@ -1,6 +1,6 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Contracts;
 
 public enum RuntimeKind
 {

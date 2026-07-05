@@ -1,7 +1,7 @@
-using System.Text;
+﻿using System.Text;
 using System.Xml.Linq;
 
-namespace S1Interop.Core;
+namespace S1Interop.Core.Migration;
 
 public static class BuildValidationHook
 {

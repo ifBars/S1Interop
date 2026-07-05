@@ -1,5 +1,5 @@
 using System.Text.Json;
-using S1Interop.Core;
+using S1Interop.Core.Contracts;
 
 internal static class AnalysisBackedCommand
 {
