@@ -8,33 +8,31 @@
       href: getting-started.md
     - name: Local game paths
       href: local-paths.md
-- name: Backend-neutral development
+- name: CLI reference
   items:
-    - name: New projects
-      href: new-projects.md
+    - name: Commands
+      href: commands.md
+    - name: SDK generation
+      href: sdk-generation.md
+- name: Generator package
+  items:
+    - name: Generated output
+      href: generator-package.md
     - name: Backend-neutral SDK
       href: backend-neutral-sdk.md
     - name: Declarations
       href: backend-neutral-declarations.md
-    - name: SDK generation
-      href: sdk-generation.md
-- name: Migration
+    - name: Diagnostics
+      href: diagnostics.md
+- name: Workflows
   items:
+    - name: New projects
+      href: new-projects.md
     - name: Migration overview
       href: migrating-mono-mods.md
     - name: Migrate to backend-neutral
       href: migrate-to-backend-neutral.md
     - name: Migrate to dual-runtime
       href: migrate-to-dual-runtime.md
-    - name: Diagnostics
-      href: diagnostics.md
-    - name: Commands
-      href: commands.md
 - name: API reference
   href: api-reference.md
-- name: Maintainers
-  items:
-    - name: Testing
-      href: testing.md
-    - name: Publishing docs
-      href: publishing-docs.md

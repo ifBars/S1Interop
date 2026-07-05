@@ -6,7 +6,9 @@
   href: product-direction.md
 - name: Real-mod evidence
   href: real-mod-evidence.md
-- name: Testing notes
-  href: testing-notes.md
+- name: Testing
+  href: testing.md
+- name: Publishing docs
+  href: publishing-docs.md
 - name: Contributing
   href: contributing.md

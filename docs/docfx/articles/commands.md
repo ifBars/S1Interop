@@ -1,5 +1,7 @@
 # Commands
 
+This is the CLI reference for the `s1interop` command. The `S1Interop` package is a .NET global tool; it does not run during compilation. The compile-time generator package has its own reference under [Generated output](generator-package.md) and [Declarations](backend-neutral-declarations.md).
+
 Most commands default to the current directory when a path is optional.
 Unknown options, missing option values, and invalid option values fail before command dispatch so migration typos do not silently fall back to defaults.
 

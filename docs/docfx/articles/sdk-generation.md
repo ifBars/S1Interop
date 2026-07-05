@@ -1,6 +1,6 @@
 # SDK generation
 
-`sdkgen` writes the generated declarations that power the backend-neutral SDK.
+`sdkgen` is the CLI command that writes the generated declarations powering the backend-neutral SDK. It produces declaration files on disk; the `S1Interop.Generators` Roslyn package then consumes those declarations at build time. See [Generated output](generator-package.md) for the compile-time side.
 
 For existing source, use the narrow mode:
 

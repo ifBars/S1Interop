@@ -50,7 +50,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Run the full `--integration` lane when a change crosses multiple migration domains or before a broad release-facing validation pass. Do not use it as the default iteration loop.
 
-See [`REAL_MOD_EVIDENCE.md`](REAL_MOD_EVIDENCE.md) for the current real-mod coverage matrix and the limits of what those lanes prove.
+See Real-mod evidence (in the Contributors section) for the current real-mod coverage matrix and the limits of what those lanes prove.
 
 ### All
 

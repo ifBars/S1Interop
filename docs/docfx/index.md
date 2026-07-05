@@ -46,15 +46,19 @@ _layout: landing
       <h3>Generated facades</h3>
       <p>Generate `S1Interop.ScheduleOne.*` facades from local reference metadata instead of hand-maintaining wrapper catalogs.</p>
     </a>
+    <a class="s1interop-card" href="articles/generator-package.md">
+      <h3>Generated at build time</h3>
+      <p>The Roslyn generator emits facades, registries, and diagnostics during compilation. See what is generated and when symbols appear.</p>
+    </a>
     <a class="s1interop-card" href="articles/local-paths.md">
       <h3>Local paths stay local</h3>
       <p>Use ignored `local.build.props` files for each developer's Mono and IL2CPP game installs.</p>
     </a>
-    <a class="s1interop-card" href="articles/testing.md">
+    <a class="s1interop-card" href="contributors/testing.md">
       <h3>Verification paths</h3>
       <p>Run quick, portable, and real-mod integration tests without mutating a developer's real mod checkout.</p>
     </a>
-    <a class="s1interop-card" href="project/real-mod-evidence.md">
+    <a class="s1interop-card" href="contributors/real-mod-evidence.md">
       <h3>Real-mod evidence</h3>
       <p>Track which real Schedule One mods have exercised the migration and backend-neutral paths so claims stay grounded.</p>
     </a>
@@ -63,6 +67,8 @@ _layout: landing
 
 <section class="s1interop-section s1interop-bottom-links">
   <a href="articles/commands.md">Commands</a>
+  <a href="articles/generator-package.md">Generated output</a>
   <a href="api/S1Interop.Core.yml">API reference</a>
+  <a href="contributors/index.md">Contributors</a>
   <a href="https://github.com/ifBars/S1Interop">GitHub repository</a>
 </section>

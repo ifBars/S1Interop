@@ -2,6 +2,8 @@
 
 S1Interop tries to move common IL2CPP failures from "runtime surprise" to compile-time feedback.
 
+All diagnostics on this page are reported by the `S1Interop.Generators` Roslyn package during compilation. They do not require the CLI to run. See [Generated output](generator-package.md) for build timing and the conditions under which each diagnostic group stays quiet.
+
 ## Declaration diagnostics
 
 When a build has access to Mono or IL2CPP game reference assemblies, the Roslyn generator validates generated declarations and overrides.

@@ -2,6 +2,8 @@
 
 The backend-neutral SDK is the main S1Interop product direction.
 
+For what the generator emits at build time and when those symbols appear, see [Generated output](generator-package.md). For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md).
+
 Instead of writing code against `ScheduleOne.*` in Mono and `Il2CppScheduleOne.*` in IL2CPP, a mod can use generated facades under `S1Interop.ScheduleOne.*`.
 
 ```csharp

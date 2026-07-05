@@ -38,6 +38,8 @@ When testing unpublished local builds, keep both packages in the same local feed
 
 Generated projects already bridge that property into `RestoreAdditionalProjectSources`, so Visual Studio, Rider, and `dotnet build` can restore the local generator package without committing a machine-specific package source.
 
+For a conceptual overview of what each package does and when, see [Introduction](introduction.md). For what the generator emits and when symbols appear, see [Generated output](generator-package.md).
+
 ## First commands
 
 Analyze a project:

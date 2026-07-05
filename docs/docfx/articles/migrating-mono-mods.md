@@ -58,4 +58,4 @@ s1interop verify-migration . --dual-runtime --build `
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 
-For backend-neutral projects, the usual verification path is a normal build plus the generator diagnostics described in [Diagnostics](diagnostics.md).
+For backend-neutral projects, the usual verification path is a normal build plus the generator diagnostics described in [Diagnostics](diagnostics.md). The generator surface itself is documented in [Generated output](generator-package.md).

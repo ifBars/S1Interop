@@ -17,13 +17,17 @@ The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
 - [Getting started](docs/docfx/articles/getting-started.md)
+- [Commands](docs/docfx/articles/commands.md)
+- [Generated output](docs/docfx/articles/generator-package.md)
 - [Backend-neutral SDK](docs/docfx/articles/backend-neutral-sdk.md)
+- [Declarations](docs/docfx/articles/backend-neutral-declarations.md)
+- [SDK generation](docs/docfx/articles/sdk-generation.md)
 - [Migration overview](docs/docfx/articles/migrating-mono-mods.md)
 - [Migrate to backend-neutral](docs/docfx/articles/migrate-to-backend-neutral.md)
 - [Migrate to dual-runtime](docs/docfx/articles/migrate-to-dual-runtime.md)
 - [Diagnostics](docs/docfx/articles/diagnostics.md)
-- [Testing](docs/docfx/articles/testing.md)
 - [API reference scope](docs/docfx/articles/api-reference.md)
+- [Testing](docs/docfx/contributors/testing.md)
 
 Build the DocFX site locally:
 
