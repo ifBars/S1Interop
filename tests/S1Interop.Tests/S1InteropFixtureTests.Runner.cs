@@ -45,6 +45,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         CliRejectsInvalidOptionsBeforeDispatch();
         count++;
+        CliHelpUsageLinesAreDocumented();
+        count++;
         PackageInfoMatchesPackageProjects();
         count++;
         SourceInteropAnalyzerReportsIl2CppSourceRisks();
@@ -180,6 +182,8 @@ internal sealed partial class S1InteropFixtureTests
         CliVersionPrintsPackageVersionWithoutAnalyzingWorkspace();
         count++;
         CliRejectsInvalidOptionsBeforeDispatch();
+        count++;
+        CliHelpUsageLinesAreDocumented();
         count++;
         PackageInfoMatchesPackageProjects();
         count++;

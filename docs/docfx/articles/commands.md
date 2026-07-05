@@ -8,7 +8,7 @@ s1interop analyze [path=.] [--configuration name] [--format text|json]
 s1interop new <path> [--dry-run|--apply] [--format text|json]
 s1interop init [path=.] [--dry-run|--apply] [--format text|json]
 s1interop lint [path=.] [--configuration name] [--format text|json]
-s1interop sdkgen [path=.] [--dry-run|--apply] [--format text|json]
+s1interop sdkgen [path=.] [--full-sdk] [--dry-run|--apply] [--format text|json]
 s1interop build-hook [path=.] [--dry-run|--apply] [--format text|json]
 s1interop migrate [path=.] [--dry-run|--apply] [--dual-runtime] [--format text|json]
 s1interop verify-migration [path=.] [--dual-runtime] [--include-source-migrations] [--build] [--il2cpp-game-path path] [--mono-game-path path] [--build-timeout-seconds n] [--format text|json]
@@ -28,3 +28,11 @@ s1interop --version
 | `build-hook` | Add build-time validation hooks where supported. |
 | `migrate` | Plan or apply dual-runtime migration changes. |
 | `verify-migration` | Run migration plans in a disposable sandbox, optionally with builds. |
+
+## Dry-run and apply
+
+Commands that change files default to dry-run mode unless `--apply` is provided. Use the dry-run output to inspect planned operations before writing source, project, solution, props, or target files.
+
+`sdkgen` is usage-driven by default. Add `--full-sdk` when seeding a blank backend-neutral project from local game reference metadata.
+
+`verify-migration` always works in a temporary sandbox. It does not mutate the source project, and `--include-source-migrations` only changes what gets applied inside that sandbox.

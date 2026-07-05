@@ -38,6 +38,20 @@ internal sealed partial class S1InteropFixtureTests
             $"The documented --dry-run flag should be accepted as the default non-apply mode. Output: {dryRun.Output}");
     }
 
+    private void CliHelpUsageLinesAreDocumented()
+    {
+        ProcessResult help = RunCli("--help");
+        Assert(help.ExitCode == 0, $"s1interop --help should succeed. Output: {help.Output}");
+
+        string commandReference = File.ReadAllText(Path.Combine(RepositoryRoot, "docs", "docfx", "articles", "commands.md"));
+        foreach (string usageLine in GetHelpUsageLines(help.Output))
+        {
+            Assert(
+                commandReference.Contains(usageLine, StringComparison.Ordinal),
+                $"Command reference should document CLI usage line '{usageLine}'.");
+        }
+    }
+
     private void PackageInfoMatchesPackageProjects()
     {
         string cliProject = Path.Combine(RepositoryRoot, "src", "S1Interop.Cli", "S1Interop.Cli.csproj");
@@ -64,6 +78,18 @@ internal sealed partial class S1InteropFixtureTests
             S1InteropPackageInfo.CreateLocalGeneratorsPackageVersion(new DateTimeOffset(2026, 7, 4, 1, 2, 3, 456, TimeSpan.Zero))
                 .StartsWith($"{S1InteropPackageInfo.GeneratorsPackageVersion}.local.", StringComparison.Ordinal),
             "Local generator package versions should be derived from the public generator package version.");
+    }
+
+    private static IEnumerable<string> GetHelpUsageLines(string helpOutput)
+    {
+        foreach (string line in helpOutput.Split([Environment.NewLine], StringSplitOptions.None))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("s1interop ", StringComparison.Ordinal))
+            {
+                yield return trimmed;
+            }
+        }
     }
 
     private void AlwaysJackpotHasDualRuntimeShapeAndIl2CppFrameworkDiagnostic()
