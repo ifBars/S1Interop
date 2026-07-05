@@ -27,5 +27,10 @@ s1interop verify-migration . --dual-runtime --build `
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 
-Do not commit `local.build.props`. If a generated project needs an unpublished local generator package, set `S1InteropGeneratorPackageSource` in the same ignored file.
+Do not commit `local.build.props`. If a generated or migrated project needs an unpublished local generator package, set `S1InteropGeneratorPackageSource` in the same ignored file:
 
+```xml
+<S1InteropGeneratorPackageSource>...\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+```
+
+Generated projects map that property into `RestoreAdditionalProjectSources`, which keeps IDE and command-line restores pointed at the local alpha package without committing a NuGet source.

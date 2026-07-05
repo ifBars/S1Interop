@@ -18,8 +18,9 @@ After creating the project:
 
 1. Copy `local.build.props.example` to `local.build.props`.
 2. Set `MonoGamePath` and `Il2CppGamePath`.
-3. Open the `.sln` in Visual Studio or Rider.
-4. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
+3. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
+4. Open the `.sln` in Visual Studio or Rider.
+5. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
 
 For a blank project, seed the SDK from your local game references:
 
@@ -28,4 +29,3 @@ s1interop sdkgen . --full-sdk --apply
 ```
 
 That generates declarations from local metadata. It does not commit game assemblies, wrapper dumps, or decompiled source.
-

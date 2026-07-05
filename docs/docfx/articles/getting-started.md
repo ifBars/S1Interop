@@ -13,13 +13,30 @@ Run the CLI from source:
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
 ```
 
-Pack the local tool when you want the `s1interop` command:
+Pack the local alpha packages when you want the `s1interop` command and local generator restores:
 
 ```powershell
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
+dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
 dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
 .\.tools\s1interop --help
+.\.tools\s1interop --version
 ```
+
+## Local alpha packages
+
+S1Interop currently ships as two packages:
+
+- `S1Interop`: the CLI tool that provides the `s1interop` command.
+- `S1Interop.Generators`: the Roslyn generator/analyzer package restored by backend-neutral or migrated mod projects.
+
+When testing unpublished local builds, keep both packages in the same local feed, usually `artifacts/packages`. Projects created or migrated by the tool can restore the local generator package through `local.build.props`:
+
+```xml
+<S1InteropGeneratorPackageSource>...\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+```
+
+Generated projects already bridge that property into `RestoreAdditionalProjectSources`, so Visual Studio, Rider, and `dotnet build` can restore the local generator package without committing a machine-specific package source.
 
 ## First commands
 
@@ -60,4 +77,3 @@ s1interop verify-migration . --dual-runtime
 ```
 
 Use `--apply` only after the dry-run output makes sense.
-

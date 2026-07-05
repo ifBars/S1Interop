@@ -50,13 +50,17 @@ dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dua
 dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
 ```
 
-Pack and install the local tool:
+Pack and install the local alpha packages:
 
 ```powershell
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
+dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
 dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
 .\.tools\s1interop --help
+.\.tools\s1interop --version
 ```
+
+The CLI tool and Roslyn generator package are separate packages. During local alpha testing, keep both packages in the same local feed and set `S1InteropGeneratorPackageSource` in generated or migrated projects when they need to restore unpublished `S1Interop.Generators` builds.
 
 ## Local game paths
 
@@ -70,6 +74,12 @@ If S1Interop creates `local.build.props`, copy or edit the generated file and se
 ```
 
 For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, fill in both game paths, and open the generated `.sln` in Visual Studio or Rider.
+
+When using local unpublished packages, also set:
+
+```xml
+<S1InteropGeneratorPackageSource>...\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+```
 
 ## Repository layout
 

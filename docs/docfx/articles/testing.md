@@ -35,3 +35,19 @@ The safe validation shape is:
 
 This keeps local projects clean and avoids accidentally testing stale published packages.
 
+## CI-equivalent package smoke
+
+Run this path before pushing changes that affect CLI packaging, generator packaging, build verification, or public command behavior:
+
+```powershell
+dotnet restore .\S1Interop.sln
+dotnet build .\S1Interop.sln --no-restore --configuration Release
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
+dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj --no-build --configuration Release --output .\artifacts\packages
+dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output .\artifacts\packages
+dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
+.\.tools\s1interop --help
+.\.tools\s1interop --version
+```
+
+The generator package smoke matters because backend-neutral projects restore `S1Interop.Generators` at build time. A CLI-only package test can pass while generated or migrated projects still fail to restore the analyzer package.
