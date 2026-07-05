@@ -16,6 +16,7 @@
       "namespaceLayout": "Nested",
       "disableGitFeatures": false,
       "disableDefaultFilter": false,
+      "filter": "filterConfig.yml",
       "shouldSkipMarkup": false,
       "force": true,
       "repo": {
@@ -34,12 +35,21 @@
         "exclude": [
           "_site/**",
           "api/**",
+          "filterConfig.yml",
+          "overwrites/**",
           "templates/**"
         ]
       },
       {
         "files": [
           "api/**/*.yml"
+        ]
+      }
+    ],
+    "overwrite": [
+      {
+        "files": [
+          "overwrites/**/*.md"
         ]
       }
     ],

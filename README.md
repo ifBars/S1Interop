@@ -21,6 +21,7 @@ The full docs site lives under [`docs/docfx`](docs/docfx):
 - [Migrating Mono mods](docs/docfx/articles/migrating-mono-mods.md)
 - [Diagnostics](docs/docfx/articles/diagnostics.md)
 - [Testing](docs/docfx/articles/testing.md)
+- [API reference scope](docs/docfx/articles/api-reference.md)
 
 Build the DocFX site locally:
 

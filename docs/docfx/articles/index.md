@@ -27,3 +27,6 @@ Use these docs when you are building, migrating, or validating a Schedule One mo
 | [Commands](commands.md) | You need the CLI command list and what each command is for. |
 | [Testing](testing.md) | You are validating S1Interop itself or a real-mod migration probe. |
 
+## API reference
+
+The generated API reference is limited to stable `S1Interop.Core` models and library entry points. Use [API reference](api-reference.md) when you are embedding S1Interop in another tool or reading its result contracts.

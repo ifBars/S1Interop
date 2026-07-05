@@ -1,0 +1,11 @@
+apiRules:
+  - include:
+      uidRegex: ^S1Interop\.Core$
+  - include:
+      uidRegex: ^S1Interop\.Core\.(RuntimeKind|DiagnosticSeverity|WorkspaceAnalysis|ProjectAnalysis|ConfigurationAnalysis|ReferenceInfo|PackageReferenceInfo|InteropDiagnostic|MigrationPlan|MigrationPlannerOptions|MigrationVerifierOptions|ProjectMigrationPlan|MigrationOperation|SdkFacadePlan|SdkTypeAlias|SourceInteropAnalysis|SourceRisk|InjectedTypeAnalysis|MigrationApplyResult|MigrationFileChange|MigrationRollbackResult|MigrationVerificationResult|MigrationBuildResult|MigrationBuildIssue|WorkspaceMigrationVerificationResult|WorkspaceAnalyzer|ProjectDiscovery|SourceInteropAnalyzer|MigrationPlanner|MigrationApplier|MigrationVerifier|S1InteropPackageInfo)$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Scaffolding$
+  - include:
+      uidRegex: ^S1Interop\.Core\.Scaffolding\.(BackendNeutralProjectScaffolder|NewProjectPlan)$
+  - exclude:
+      uidRegex: .*

@@ -24,6 +24,8 @@
       href: diagnostics.md
     - name: Commands
       href: commands.md
+- name: API reference
+  href: api-reference.md
 - name: Maintainers
   items:
     - name: Testing
