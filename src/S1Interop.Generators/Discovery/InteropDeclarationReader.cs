@@ -5,11 +5,11 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace S1Interop.Generators;
+namespace S1Interop.Generators.Discovery;
 
-public sealed partial class S1InteropTypeRegistryGenerator
+internal static class InteropDeclarationReader
 {
-    private static ImmutableArray<S1InteropTypeEntry> GetAssemblyEntries(Compilation compilation)
+    public static ImmutableArray<S1InteropTypeEntry> GetAssemblyEntries(Compilation compilation)
     {
         INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(AttributeMetadataName);
         if (attributeType is null)
@@ -25,7 +25,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             .ToImmutableArray();
     }
 
-    private static ImmutableArray<S1InteropMemberEntry> GetAssemblyMemberEntries(Compilation compilation)
+    public static ImmutableArray<S1InteropMemberEntry> GetAssemblyMemberEntries(Compilation compilation)
     {
         INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(MemberAttributeMetadataName);
         if (attributeType is null)
@@ -42,7 +42,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             .ToImmutableArray();
     }
 
-    private static S1InteropBridgeRequests GetBridgeRequests(Compilation compilation) =>
+    public static S1InteropBridgeRequests GetBridgeRequests(Compilation compilation) =>
         new(
             HasAssemblyAttribute(compilation, UnityEventBridgeAttributeMetadataName),
             HasAssemblyAttribute(compilation, DelegateEventBridgeAttributeMetadataName));
@@ -54,7 +54,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
                compilation.Assembly.GetAttributes().Any(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType));
     }
 
-    private static S1InteropTypeEntry? GetTypeEntry(GeneratorSyntaxContext context)
+    public static S1InteropTypeEntry? GetTypeEntry(GeneratorSyntaxContext context)
     {
         if (context.SemanticModel.GetDeclaredSymbol(context.Node) is not INamedTypeSymbol typeSymbol)
         {
@@ -74,7 +74,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             : entry;
     }
 
-    private static S1InteropTypeEntry? TryCreateEntry(AttributeData attribute)
+    public static S1InteropTypeEntry? TryCreateEntry(AttributeData attribute)
     {
         if (attribute.ConstructorArguments.Length == 0 ||
             attribute.ConstructorArguments[0].Value is not string monoTypeName ||
@@ -108,7 +108,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             il2CppTypeName ?? ToIl2CppTypeName(monoTypeName));
     }
 
-    private static ImmutableArray<S1InteropTypeEntry> MergeTypeEntries(ImmutableArray<S1InteropTypeEntry> entries)
+    public static ImmutableArray<S1InteropTypeEntry> MergeTypeEntries(ImmutableArray<S1InteropTypeEntry> entries)
     {
         var merged = new Dictionary<string, S1InteropTypeEntry>(StringComparer.Ordinal);
         foreach (S1InteropTypeEntry entry in entries)
@@ -142,7 +142,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         return false;
     }
 
-    private static S1InteropMemberEntry? TryCreateMemberEntry(AttributeData attribute)
+    public static S1InteropMemberEntry? TryCreateMemberEntry(AttributeData attribute)
     {
         if (attribute.ConstructorArguments.Length < 2 ||
             attribute.ConstructorArguments[0].Value is not string ownerAlias ||

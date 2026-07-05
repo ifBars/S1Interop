@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace S1Interop.Generators;
+namespace S1Interop.Generators.Support;
 
-public sealed partial class S1InteropTypeRegistryGenerator
+internal static class TypeNameUtilities
 {
-    private static string ToIl2CppTypeName(string monoTypeName)
+    public static string ToIl2CppTypeName(string monoTypeName)
     {
         if (string.Equals(monoTypeName, "System.Guid", StringComparison.Ordinal) ||
             string.Equals(monoTypeName, "Guid", StringComparison.Ordinal))
@@ -60,6 +60,94 @@ public sealed partial class S1InteropTypeRegistryGenerator
         return monoTypeName;
     }
 
+    public static string GetSimpleName(string typeName)
+    {
+        int separator = typeName.LastIndexOf('.');
+        return separator < 0 ? typeName : typeName.Substring(separator + 1);
+    }
+
+    public static TypeFacadeName GetTypeFacadeName(S1InteropTypeEntry entry)
+    {
+        string[] parts = entry.MonoTypeName
+            .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizeIdentifier)
+            .ToArray();
+        if (parts.Length == 0)
+        {
+            return new TypeFacadeName("S1Interop", entry.Alias);
+        }
+
+        string typeName = parts[parts.Length - 1];
+        IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
+        return new TypeFacadeName(BuildTypeFacadeNamespace(namespaceParts), typeName);
+    }
+
+    public static string GetHandleTypeName(S1InteropTypeEntry entry) =>
+        $"S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias}Tag>";
+
+    public static string ToPascalIdentifier(string value)
+    {
+        string sanitized = SanitizeIdentifier(value);
+        if (sanitized.Length == 0)
+        {
+            return "Member";
+        }
+
+        if (sanitized.Length == 1)
+        {
+            return sanitized.ToUpperInvariant();
+        }
+
+        return char.ToUpperInvariant(sanitized[0]) + sanitized.Substring(1);
+    }
+
+    public static string SanitizeIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "RuntimeType";
+        }
+
+        var builder = new StringBuilder();
+        foreach (char character in value)
+        {
+            builder.Append(char.IsLetterOrDigit(character) || character == '_' ? character : '_');
+        }
+
+        if (builder.Length == 0 || char.IsDigit(builder[0]))
+        {
+            builder.Insert(0, '_');
+        }
+
+        return builder.ToString();
+    }
+
+    public static string Escape(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    public static string ToCSharpBoolean(bool value) => value ? "true" : "false";
+
+    public static string NormalizeComparableTypeName(string typeName) =>
+        typeName
+            .Replace("global::", string.Empty)
+            .Replace("System.Boolean", "bool")
+            .Replace("System.Byte", "byte")
+            .Replace("System.Char", "char")
+            .Replace("System.Decimal", "decimal")
+            .Replace("System.Double", "double")
+            .Replace("System.Int16", "short")
+            .Replace("System.Int32", "int")
+            .Replace("System.Int64", "long")
+            .Replace("System.Object", "object")
+            .Replace("System.SByte", "sbyte")
+            .Replace("System.Single", "float")
+            .Replace("System.String", "string")
+            .Replace("System.UInt16", "ushort")
+            .Replace("System.UInt32", "uint")
+            .Replace("System.UInt64", "ulong")
+            .Replace(" ", string.Empty)
+            .Trim();
+
     private static bool IsKnownValueTypeName(string typeName) =>
         typeName is "bool" or "byte" or "char" or "double" or "float" or "int" or "long" or "short" or "uint" or "ulong" or "System.Guid" or "Guid";
 
@@ -90,28 +178,6 @@ public sealed partial class S1InteropTypeRegistryGenerator
         return arguments.ToArray();
     }
 
-    private static string GetSimpleName(string typeName)
-    {
-        int separator = typeName.LastIndexOf('.');
-        return separator < 0 ? typeName : typeName.Substring(separator + 1);
-    }
-
-    private static TypeFacadeName GetTypeFacadeName(S1InteropTypeEntry entry)
-    {
-        string[] parts = entry.MonoTypeName
-            .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(SanitizeIdentifier)
-            .ToArray();
-        if (parts.Length == 0)
-        {
-            return new TypeFacadeName("S1Interop", entry.Alias);
-        }
-
-        string typeName = parts[parts.Length - 1];
-        IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
-        return new TypeFacadeName(BuildTypeFacadeNamespace(namespaceParts), typeName);
-    }
-
     private static string BuildTypeFacadeNamespace(IEnumerable<string> namespaceParts)
     {
         string namespaceSuffix = string.Join(".", namespaceParts);
@@ -119,49 +185,4 @@ public sealed partial class S1InteropTypeRegistryGenerator
             ? "S1Interop"
             : "S1Interop." + namespaceSuffix;
     }
-
-    private static string GetHandleTypeName(S1InteropTypeEntry entry) =>
-        $"S1Interop.Generated.S1InteropObject<S1Interop.Generated.S1InteropTypeRegistry.{entry.Alias}Tag>";
-
-    private static string ToPascalIdentifier(string value)
-    {
-        string sanitized = SanitizeIdentifier(value);
-        if (sanitized.Length == 0)
-        {
-            return "Member";
-        }
-
-        if (sanitized.Length == 1)
-        {
-            return sanitized.ToUpperInvariant();
-        }
-
-        return char.ToUpperInvariant(sanitized[0]) + sanitized.Substring(1);
-    }
-
-    private static string SanitizeIdentifier(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "RuntimeType";
-        }
-
-        var builder = new StringBuilder();
-        foreach (char character in value)
-        {
-            builder.Append(char.IsLetterOrDigit(character) || character == '_' ? character : '_');
-        }
-
-        if (builder.Length == 0 || char.IsDigit(builder[0]))
-        {
-            builder.Insert(0, '_');
-        }
-
-        return builder.ToString();
-    }
-
-    private static string Escape(string value) =>
-        value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-
-    private static string ToCSharpBoolean(bool value) => value ? "true" : "false";
 }

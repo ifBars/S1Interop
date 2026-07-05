@@ -23,11 +23,11 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Select(static (input, _) => RuntimeBackendResolver.Resolve(input.Left, input.Right));
 
         IncrementalValueProvider<ImmutableArray<S1InteropTypeEntry>> assemblyEntries = context.CompilationProvider
-            .Select(static (compilation, _) => GetAssemblyEntries(compilation));
+            .Select(static (compilation, _) => InteropDeclarationReader.GetAssemblyEntries(compilation));
         IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> memberEntries = context.CompilationProvider
-            .Select(static (compilation, _) => GetAssemblyMemberEntries(compilation));
+            .Select(static (compilation, _) => InteropDeclarationReader.GetAssemblyMemberEntries(compilation));
         IncrementalValueProvider<S1InteropBridgeRequests> bridgeRequests = context.CompilationProvider
-            .Select(static (compilation, _) => GetBridgeRequests(compilation));
+            .Select(static (compilation, _) => InteropDeclarationReader.GetBridgeRequests(compilation));
 
         context.RegisterSourceOutput(context.CompilationProvider, static (sourceContext, compilation) =>
         {
@@ -37,20 +37,20 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
         IncrementalValuesProvider<S1InteropTypeEntry> attributedTypeEntries = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is TypeDeclarationSyntax { AttributeLists.Count: > 0 },
-                transform: static (context, _) => GetTypeEntry(context))
+                transform: static (context, _) => InteropDeclarationReader.GetTypeEntry(context))
             .Where(static entry => entry is not null)
             .Select(static (entry, _) => entry!.Value);
 
         IncrementalValueProvider<ImmutableArray<S1InteropTypeEntry>> allEntries = assemblyEntries
             .Combine(attributedTypeEntries.Collect())
-            .Select(static (input, _) => MergeTypeEntries(input.Left.AddRange(input.Right)));
+            .Select(static (input, _) => InteropDeclarationReader.MergeTypeEntries(input.Left.AddRange(input.Right)));
 
         IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> allMemberEntries = context.CompilationProvider
             .Combine(allEntries)
             .Combine(memberEntries)
-            .Select(static (input, _) => MergeMemberEntries(
+            .Select(static (input, _) => PublicMemberCatalog.MergeMemberEntries(
                 input.Right,
-                DiscoverPublicMemberEntries(input.Left.Left, input.Left.Right)));
+                PublicMemberCatalog.DiscoverMemberEntries(input.Left.Left, input.Left.Right)));
 
         context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries), static (sourceContext, input) =>
         {

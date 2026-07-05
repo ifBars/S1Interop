@@ -118,7 +118,7 @@ Current examples:
 
 Rewriters should be idempotent. Running migration more than once must not degrade generated declarations or rewrite already migrated code into an invalid state.
 
-### Migration-Time Code Emission
+### Migration-Time Source Emission
 
 Path: `src/S1Interop.Core/CodeGeneration/`
 
@@ -135,7 +135,7 @@ Generated files include:
 
 Member access target discovery is scoped to backend/game surfaces and runs even when no source-risk report remains. Usage-driven declarations from helpers such as `ReflectionUtils.TryGetFieldOrProperty(vehicle, "vehicleName")` are generated as SDK surface because they make backend-neutral code more native-like. Discovery should not emit S1Interop declarations for MelonLoader-owned reflection internals such as `MelonEnvironment`, `MelonLogger`, or `MelonPreferences`; those are mod loader implementation details, not Schedule One Mono/IL2CPP wrapper drift.
 
-These are not Roslyn source generators. They are part of the CLI migration pipeline. Keep this namespace under `S1Interop.Core.CodeGeneration` so it does not blur together with the packaged Roslyn generator assembly.
+These are not Roslyn source generators. They are part of the CLI migration pipeline and should be described as source emitters or migration-time code emission. Keep this namespace under `S1Interop.Core.CodeGeneration` so it does not blur together with the packaged Roslyn generator assembly.
 
 ### Project Scaffolding
 
@@ -167,17 +167,12 @@ The registry generator is intentionally split by responsibility. Keep `S1Interop
 - `S1InteropTypeRegistryGenerator.cs`: incremental-generator wiring only.
 - `RuntimeBackendResolver.cs`: target-runtime resolution from MSBuild properties and preprocessor symbols.
 - `GeneratorConstants.cs` and `GeneratorDiagnosticDescriptors.cs`: shared metadata names, runtime probes, and diagnostic descriptors.
-- `S1InteropTypeRegistryGenerator.Models.cs`: internal data contracts used between collection, diagnostics, and emission.
-- `*.InputModel.cs`: attribute parsing, bridge requests, explicit type/member declarations, and merge rules.
-- `*.PublicMemberDiscovery.cs`: metadata-driven discovery of compatible public fields, properties, and unambiguous methods from referenced Mono/IL2CPP surfaces.
-- `*.DeclarationDiagnostics.cs`: `S1InteropType`/`S1InteropMember` declaration validation against available game reference surfaces.
-- `*.RegistryEmission.cs`: generated runtime registry and reflection-cache source emission.
-- `*.TypeFacadeEmission.cs`: generated type-scoped facade API source emission.
-- `*.MemberRegistryEmission.cs` and `*.Member*Emission.cs`: member-registry source emission, split between declared accessors, value access, conversion, invocation, and member resolution helper groups.
-- `*.RuntimeEmission.cs`: object handles, casts, and delegate bridge runtime helpers.
-- `*.AttributeEmission.cs`: attribute and bridge source templates.
-- `*.Diagnostics.cs`: source-boundary diagnostics.
-- `*.TypeNameHelpers.cs`: shared name normalization.
+- `Model/`: internal data contracts used between collection, diagnostics, and emission.
+- `Discovery/InteropDeclarationReader.cs`: attribute parsing, bridge requests, explicit type/member declarations, and merge rules.
+- `Discovery/PublicMemberCatalog.cs`: metadata-driven discovery of compatible public fields, properties, and unambiguous methods from referenced Mono/IL2CPP surfaces.
+- `Diagnostics/`: declaration validation and source-boundary diagnostics.
+- `Emission/`: generated attribute, runtime registry, member registry, type facade, runtime helper, conversion, invocation, and bridge source rendering.
+- `Support/TypeNameUtilities.cs`: shared type-name conversion, facade naming, and identifier normalization.
 
 The target API shape is type-first. `S1InteropType` is enough to request a backend-neutral facade for a game type and now discovers compatible public fields/properties plus unambiguous public methods from referenced Mono and IL2CPP metadata. `S1InteropMember` is the override path for private members, readable aliases, ambiguous overloads, pinned method bindings, or specific migration-inferred reflection bindings. Avoid designing new features that make developers manually enumerate every common public field/property or simple method after they already opted into the type.
 

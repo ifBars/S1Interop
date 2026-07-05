@@ -4,11 +4,11 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 
-namespace S1Interop.Generators;
+namespace S1Interop.Generators.Discovery;
 
-public sealed partial class S1InteropTypeRegistryGenerator
+internal static class PublicMemberCatalog
 {
-    private static ImmutableArray<S1InteropMemberEntry> DiscoverPublicMemberEntries(
+    public static ImmutableArray<S1InteropMemberEntry> DiscoverMemberEntries(
         Compilation compilation,
         ImmutableArray<S1InteropTypeEntry> entries)
     {
@@ -41,7 +41,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
     private static string GetDiscoveredMemberAlias(S1InteropTypeEntry entry, DiscoveredMember member) =>
         SanitizeIdentifier(entry.Alias + ToPascalIdentifier(member.Name));
 
-    private static ImmutableArray<S1InteropMemberEntry> MergeMemberEntries(
+    public static ImmutableArray<S1InteropMemberEntry> MergeMemberEntries(
         ImmutableArray<S1InteropMemberEntry> explicitMembers,
         ImmutableArray<S1InteropMemberEntry> discoveredMembers)
     {
@@ -76,7 +76,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
     private static string GetMemberDeclarationKey(S1InteropMemberEntry member) =>
         $"{member.OwnerAlias}.{member.Alias}";
 
-    private static string GetFacadeMemberKey(S1InteropMemberEntry member) =>
+    public static string GetFacadeMemberKey(S1InteropMemberEntry member) =>
         $"{member.OwnerAlias}.{GetFacadeMemberCategory(member)}.{member.IsStatic}.{ToPascalIdentifier(member.MemberName)}";
 
     private static string GetFacadeMemberCategory(S1InteropMemberEntry member) =>

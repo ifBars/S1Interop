@@ -58,9 +58,9 @@ Use the full `--integration` lane only when broad release-facing local validatio
 - Generator diagnostics that validate game type/member strings must only fail when the relevant Mono/IL2CPP reference surface is available in the current compilation.
 - Keep CLI code thin. Put reusable behavior in Core.
 - Keep generated project templates and backend-neutral `new` project shape in Core scaffolding, not inside CLI command handlers.
-- Keep Core analysis, migration, rewriting, and code-emission boundaries separate. Use `S1Interop.Core.CodeGeneration` for CLI-written files and reserve `S1Interop.Generators` for the packaged Roslyn generator/analyzer assembly.
+- Keep Core analysis, migration, rewriting, and code-emission boundaries separate. `S1Interop.Core.CodeGeneration` is migration-time source emission for files the CLI writes into target projects; reserve `S1Interop.Generators` for the packaged Roslyn generator/analyzer assembly.
 - Prefer specific analyzers/catalogs/rewriters over broad string hacks. Use XML APIs for project files and structured C# logic where practical.
-- Keep Roslyn generator entry points thin. `S1InteropTypeRegistryGenerator.cs` should wire incremental providers and source outputs; runtime selection, model contracts, diagnostics, and source rendering belong in focused internal files.
+- Keep Roslyn generator entry points thin. `S1InteropTypeRegistryGenerator.cs` should wire incremental providers and source outputs; runtime selection, model contracts, discovery, diagnostics, support helpers, and source rendering belong in focused internal folders.
 - Treat backend-neutral type coverage as generated SDK output from source usage and reference metadata. Do not build or maintain a hand-written wrapper catalog for every Schedule One type.
 - Design SDK work around type-first facades: `S1InteropType` should eventually expose compatible public members for that type, while `S1InteropMember` is an override path for private members, aliases, ambiguous overloads, and migration-inferred reflection seams.
 - Keep `sdkgen --full-sdk` metadata-driven and opt-in. It is the blank-project seeding path, not a committed catalog of game APIs.

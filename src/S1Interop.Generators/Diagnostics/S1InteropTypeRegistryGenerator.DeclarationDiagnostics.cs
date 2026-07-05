@@ -90,7 +90,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         var targets = ImmutableArray.CreateBuilder<S1InteropTypeDiagnosticTarget>();
         foreach (AttributeData attribute in compilation.Assembly.GetAttributes().Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType)))
         {
-            S1InteropTypeEntry? entry = TryCreateEntry(attribute);
+            S1InteropTypeEntry? entry = InteropDeclarationReader.TryCreateEntry(attribute);
             if (entry is not null)
             {
                 targets.Add(new S1InteropTypeDiagnosticTarget(entry.Value, GetAttributeLocation(attribute)));
@@ -101,7 +101,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         {
             AttributeData? attribute = typeSymbol.GetAttributes()
                 .FirstOrDefault(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType));
-            S1InteropTypeEntry? entry = attribute is null ? null : TryCreateEntry(attribute);
+            S1InteropTypeEntry? entry = attribute is null ? null : InteropDeclarationReader.TryCreateEntry(attribute);
             if (entry is null)
             {
                 continue;
@@ -126,7 +126,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
 
         return compilation.Assembly.GetAttributes()
             .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
-            .Select(attribute => (Entry: TryCreateMemberEntry(attribute), Location: GetAttributeLocation(attribute)))
+            .Select(attribute => (Entry: InteropDeclarationReader.TryCreateMemberEntry(attribute), Location: GetAttributeLocation(attribute)))
             .Where(target => target.Entry is not null)
             .Select(target => new S1InteropMemberDiagnosticTarget(target.Entry!.Value, target.Location))
             .Distinct(S1InteropMemberDiagnosticTargetComparer.Instance)
@@ -337,26 +337,5 @@ public sealed partial class S1InteropTypeRegistryGenerator
             SpecialType.System_UInt64 => "ulong",
             _ => null
         };
-
-    private static string NormalizeComparableTypeName(string typeName) =>
-        typeName
-            .Replace("global::", string.Empty)
-            .Replace("System.Boolean", "bool")
-            .Replace("System.Byte", "byte")
-            .Replace("System.Char", "char")
-            .Replace("System.Decimal", "decimal")
-            .Replace("System.Double", "double")
-            .Replace("System.Int16", "short")
-            .Replace("System.Int32", "int")
-            .Replace("System.Int64", "long")
-            .Replace("System.Object", "object")
-            .Replace("System.SByte", "sbyte")
-            .Replace("System.Single", "float")
-            .Replace("System.String", "string")
-            .Replace("System.UInt16", "ushort")
-            .Replace("System.UInt32", "uint")
-            .Replace("System.UInt64", "ulong")
-            .Replace(" ", string.Empty)
-            .Trim();
 
 }

@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 
-namespace S1Interop.Generators;
+namespace S1Interop.Generators.Model;
 
 internal readonly struct S1InteropTypeEntry
 {

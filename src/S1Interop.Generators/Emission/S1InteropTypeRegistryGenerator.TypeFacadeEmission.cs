@@ -88,7 +88,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         var emittedFacadeMembers = new HashSet<string>(StringComparer.Ordinal);
         foreach (S1InteropMemberEntry member in members.OrderBy(member => member.MemberName, StringComparer.Ordinal))
         {
-            if (emittedFacadeMembers.Add(GetFacadeMemberKey(member)))
+            if (emittedFacadeMembers.Add(PublicMemberCatalog.GetFacadeMemberKey(member)))
             {
                 GenerateTypeFacadeMember(builder, member);
             }
