@@ -40,3 +40,6 @@ jobs:
 
       - name: Smoke CLI tool command
         run: .\.tools\s1interop --help
+
+      - name: Smoke CLI tool version
+        run: .\.tools\s1interop --version
