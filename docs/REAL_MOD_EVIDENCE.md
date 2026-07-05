@@ -40,7 +40,15 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Result: `S1Interop fixture tests passed (5 executed).`
 
-These runs prove the focused backend-neutral and selected build-gated coverage listed below against the current local workspace and game reference paths. They are not a substitute for a full release-facing integration pass.
+The focused Hoverboard lane also passed locally:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
+```
+
+Result: `S1Interop fixture tests passed (3 executed).`
+
+These runs prove the focused backend-neutral, Hoverboard, and selected build-gated coverage listed below against the current local workspace and game reference paths. They are not a substitute for a full release-facing integration pass.
 
 ## Current Real-Mod Coverage
 
