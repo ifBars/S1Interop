@@ -36,9 +36,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 else
                 {
                     builder.AppendLine($"        public static object? Invoke{member.Alias}(object? instance, params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)}, instance, args);");
-                    builder.AppendLine($"        public static object? Invoke{member.Alias}(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance, params object?[] args) => Invoke(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, {GenerateParameterTypeNamesExpression(runtime, entries, member)}, instance.Instance, args);");
                     builder.AppendLine($"        public static T? Invoke{member.Alias}<T>(object? instance, params object?[] args) => CastResult<T>(Invoke{member.Alias}(instance, args));");
-                    builder.AppendLine($"        public static T? Invoke{member.Alias}<T>(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance, params object?[] args) => CastResult<T>(Invoke{member.Alias}(instance, args));");
                 }
             }
             else
@@ -64,13 +62,9 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 else
                 {
                     builder.AppendLine($"        public static object? Get{member.Alias}(object instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, {memberKind});");
-                    builder.AppendLine($"        public static object? Get{member.Alias}(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance) => GetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance.Instance, {memberKind});");
                     builder.AppendLine($"        public static T? Get{member.Alias}<T>(object instance) where T : class => Get{member.Alias}(instance) as T;");
-                    builder.AppendLine($"        public static T? Get{member.Alias}<T>(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance) where T : class => Get{member.Alias}(instance) as T;");
                     builder.AppendLine($"        public static T? Get{member.Alias}Value<T>(object instance) where T : struct => Get{member.Alias}(instance) is T value ? value : (T?)null;");
-                    builder.AppendLine($"        public static T? Get{member.Alias}Value<T>(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance) where T : struct => Get{member.Alias}(instance) is T value ? value : (T?)null;");
                     builder.AppendLine($"        public static bool TrySet{member.Alias}(object instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance, value, {memberKind});");
-                    builder.AppendLine($"        public static bool TrySet{member.Alias}(S1InteropObject<S1InteropTypeRegistry.{member.OwnerAlias}Tag> instance, object? value) => TrySetValue(S1InteropTypeRegistry.{member.OwnerAlias}Name, {member.Alias}Name, instance.Instance, value, {memberKind});");
                 }
             }
 

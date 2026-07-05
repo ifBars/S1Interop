@@ -8,11 +8,12 @@ namespace S1Interop.Generators.Model;
 
 internal readonly struct S1InteropTypeEntry
 {
-    public S1InteropTypeEntry(string alias, string monoTypeName, string il2CppTypeName)
+    public S1InteropTypeEntry(string alias, string monoTypeName, string il2CppTypeName, bool discoverMembers = true)
     {
         Alias = alias;
         MonoTypeName = monoTypeName;
         Il2CppTypeName = il2CppTypeName;
+        DiscoverMembers = discoverMembers;
     }
 
     public string Alias { get; }
@@ -21,8 +22,26 @@ internal readonly struct S1InteropTypeEntry
 
     public string Il2CppTypeName { get; }
 
+    public bool DiscoverMembers { get; }
+
     public S1InteropTypeEntry WithAlias(string alias) =>
-        new(alias, MonoTypeName, Il2CppTypeName);
+        new(alias, MonoTypeName, Il2CppTypeName, DiscoverMembers);
+}
+
+internal readonly struct S1InteropNamespaceEntry
+{
+    public S1InteropNamespaceEntry(string namespaceName, bool includeSubnamespaces, bool includeMembers)
+    {
+        NamespaceName = namespaceName;
+        IncludeSubnamespaces = includeSubnamespaces;
+        IncludeMembers = includeMembers;
+    }
+
+    public string NamespaceName { get; }
+
+    public bool IncludeSubnamespaces { get; }
+
+    public bool IncludeMembers { get; }
 }
 
 internal readonly struct TypeFacadeName
@@ -146,7 +165,8 @@ internal sealed class S1InteropTypeEntryComparer : IEqualityComparer<S1InteropTy
     public bool Equals(S1InteropTypeEntry x, S1InteropTypeEntry y) =>
         string.Equals(x.Alias, y.Alias, StringComparison.Ordinal) &&
         string.Equals(x.MonoTypeName, y.MonoTypeName, StringComparison.Ordinal) &&
-        string.Equals(x.Il2CppTypeName, y.Il2CppTypeName, StringComparison.Ordinal);
+        string.Equals(x.Il2CppTypeName, y.Il2CppTypeName, StringComparison.Ordinal) &&
+        x.DiscoverMembers == y.DiscoverMembers;
 
     public int GetHashCode(S1InteropTypeEntry obj)
     {
@@ -156,6 +176,7 @@ internal sealed class S1InteropTypeEntryComparer : IEqualityComparer<S1InteropTy
             hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.Alias);
             hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.MonoTypeName);
             hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.Il2CppTypeName);
+            hash = (hash * 31) + (obj.DiscoverMembers ? 1 : 0);
             return hash;
         }
     }

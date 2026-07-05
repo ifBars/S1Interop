@@ -8,6 +8,7 @@ The core product promise is:
 
 - New backend-neutral mods should start from an SDK-shaped project, not from raw reflection helpers.
 - Migrated mods should move toward the same SDK shape instead of accumulating more conditional code.
+- `S1InteropNamespace` is the broad type-registration path, not an instruction to generate every public member for every type.
 - `S1InteropType` is a declaration of type coverage, not a requirement to manually list the type's public members.
 - `S1InteropMember` is an override and escape hatch for surfaces that cannot be safely discovered yet.
 - The generated SDK must come from local reference metadata so drift is visible and no proprietary game artifacts are committed.
@@ -49,6 +50,14 @@ float throttle = LandVehicle.GetCurrentThrottle<float>(vehicle);
 `S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API. Do not emit both shortened and root-preserving namespaces for the same game type. Schedule One facades belong under `S1Interop.ScheduleOne.*`; future supported surfaces should preserve their own roots, such as `S1Interop.FishNet.Runtime.*`.
 
 ## Type-First SDK Generation
+
+`S1InteropNamespace` should cover broad type registration without forcing developers to emit thousands of per-type attributes:
+
+```csharp
+[assembly: S1Interop.S1InteropNamespace("ScheduleOne", IncludeSubnamespaces = true)]
+```
+
+Namespace imports are type-only by default. Use `IncludeMembers = true` only for narrow namespaces where the extra generated member surface is intentional.
 
 `S1InteropType` should mean "generate the backend-neutral facade for this game type." It should not require developers to manually declare every ordinary public member.
 

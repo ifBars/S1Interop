@@ -20,13 +20,25 @@ internal static class PublicMemberCatalog
         var builder = ImmutableArray.CreateBuilder<S1InteropMemberEntry>();
         foreach (S1InteropTypeEntry entry in entries)
         {
+            if (!entry.DiscoverMembers)
+            {
+                continue;
+            }
+
+            var seenAliases = new HashSet<string>(StringComparer.Ordinal);
             INamedTypeSymbol? monoType = compilation.GetTypeByMetadataName(entry.MonoTypeName);
             INamedTypeSymbol? il2CppType = compilation.GetTypeByMetadataName(entry.Il2CppTypeName);
 
             foreach (DiscoveredMember member in DiscoverCompatiblePublicMembers(monoType, il2CppType))
             {
+                string alias = GetDiscoveredMemberAlias(entry, member);
+                if (!seenAliases.Add(alias))
+                {
+                    continue;
+                }
+
                 builder.Add(new S1InteropMemberEntry(
-                    GetDiscoveredMemberAlias(entry, member),
+                    alias,
                     entry.Alias,
                     member.Name,
                     member.Kind,
@@ -69,8 +81,47 @@ internal static class PublicMemberCatalog
             .OrderBy(member => member.OwnerAlias, StringComparer.Ordinal)
             .ThenBy(member => member.Alias, StringComparer.Ordinal)
             .ThenBy(member => member.MemberName, StringComparer.Ordinal)
+            .GroupBy(member => member.Alias, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .WhereNoGeneratedRegistryNameCollisions()
             .Distinct(S1InteropMemberEntryComparer.Instance)
             .ToImmutableArray();
+    }
+
+    private static IEnumerable<S1InteropMemberEntry> WhereNoGeneratedRegistryNameCollisions(
+        this IEnumerable<S1InteropMemberEntry> members)
+    {
+        var generatedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (S1InteropMemberEntry member in members)
+        {
+            string[] memberGeneratedNames = GetGeneratedRegistryMemberNames(member);
+            if (memberGeneratedNames.Any(name => generatedNames.Contains(name)))
+            {
+                continue;
+            }
+
+            foreach (string name in memberGeneratedNames)
+            {
+                generatedNames.Add(name);
+            }
+
+            yield return member;
+        }
+    }
+
+    private static string[] GetGeneratedRegistryMemberNames(S1InteropMemberEntry member)
+    {
+        if (member.Kind == S1InteropMemberKind.Method)
+        {
+            return [$"Invoke{member.Alias}"];
+        }
+
+        return
+        [
+            $"Get{member.Alias}",
+            $"Get{member.Alias}Value",
+            $"TrySet{member.Alias}"
+        ];
     }
 
     private static string GetMemberDeclarationKey(S1InteropMemberEntry member) =>

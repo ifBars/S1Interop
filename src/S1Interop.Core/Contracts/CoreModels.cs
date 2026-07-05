@@ -104,7 +104,15 @@ public sealed record SdkFacadePlan(
     string OutputPath,
     IReadOnlyList<string> ScheduleOneNamespaces,
     IReadOnlyList<SdkTypeAlias> TypeAliases,
-    bool HasContent);
+    bool HasContent)
+{
+    public IReadOnlyList<SdkNamespaceImport> NamespaceImports { get; init; } = Array.Empty<SdkNamespaceImport>();
+}
+
+public sealed record SdkNamespaceImport(
+    string Namespace,
+    bool IncludeSubnamespaces,
+    bool IncludeMembers = false);
 
 public sealed record SdkTypeAlias(
     string Alias,

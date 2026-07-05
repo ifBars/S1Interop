@@ -25,6 +25,51 @@ internal static class InteropDeclarationReader
             .ToImmutableArray();
     }
 
+    public static ImmutableArray<S1InteropTypeEntry> GetNamespaceEntries(Compilation compilation)
+    {
+        INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(NamespaceAttributeMetadataName);
+        if (attributeType is null)
+        {
+            return ImmutableArray<S1InteropTypeEntry>.Empty;
+        }
+
+        S1InteropNamespaceEntry[] namespaces = compilation.Assembly.GetAttributes()
+            .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeType))
+            .Select(TryCreateNamespaceEntry)
+            .Where(entry => entry is not null)
+            .Select(entry => entry!.Value)
+            .ToArray();
+        if (namespaces.Length == 0)
+        {
+            return ImmutableArray<S1InteropTypeEntry>.Empty;
+        }
+
+        string[] monoTypeNames = EnumerateReferencedTypes(compilation.GlobalNamespace)
+            .Select(symbol => ToMonoTypeName(symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))
+            .Where(typeName => namespaces.Any(ns => IsNamespaceMatch(typeName, ns)))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(typeName => typeName, StringComparer.Ordinal)
+            .ToArray();
+        Dictionary<string, int> simpleNameCounts = monoTypeNames
+            .GroupBy(GetSimpleName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        var usedAliases = new HashSet<string>(StringComparer.Ordinal);
+        var entries = ImmutableArray.CreateBuilder<S1InteropTypeEntry>(monoTypeNames.Length);
+        foreach (string monoTypeName in monoTypeNames)
+        {
+            string simpleName = GetSimpleName(monoTypeName);
+            string alias = simpleNameCounts[simpleName] == 1
+                ? SanitizeIdentifier(simpleName)
+                : CreateQualifiedAlias(monoTypeName);
+            alias = EnsureUniqueAlias(alias, usedAliases);
+            bool discoverMembers = namespaces.Any(ns => ns.IncludeMembers && IsNamespaceMatch(monoTypeName, ns));
+            entries.Add(new S1InteropTypeEntry(alias, monoTypeName, ToIl2CppTypeName(monoTypeName), discoverMembers));
+        }
+
+        return entries.ToImmutable();
+    }
+
     public static ImmutableArray<S1InteropMemberEntry> GetAssemblyMemberEntries(Compilation compilation)
     {
         INamedTypeSymbol? attributeType = compilation.GetTypeByMetadataName(MemberAttributeMetadataName);
@@ -108,6 +153,122 @@ internal static class InteropDeclarationReader
             il2CppTypeName ?? ToIl2CppTypeName(monoTypeName));
     }
 
+    private static S1InteropNamespaceEntry? TryCreateNamespaceEntry(AttributeData attribute)
+    {
+        if (attribute.ConstructorArguments.Length == 0 ||
+            attribute.ConstructorArguments[0].Value is not string namespaceName ||
+            string.IsNullOrWhiteSpace(namespaceName))
+        {
+            return null;
+        }
+
+        bool includeSubnamespaces = false;
+        bool includeMembers = false;
+        foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
+        {
+            if (argument.Key == "IncludeSubnamespaces" && argument.Value.Value is bool value)
+            {
+                includeSubnamespaces = value;
+            }
+            else if (argument.Key == "IncludeMembers" && argument.Value.Value is bool includeMembersValue)
+            {
+                includeMembers = includeMembersValue;
+            }
+        }
+
+        return new S1InteropNamespaceEntry(
+            namespaceName.StartsWith("Il2Cpp", StringComparison.Ordinal)
+                ? namespaceName.Substring("Il2Cpp".Length)
+                : namespaceName,
+            includeSubnamespaces,
+            includeMembers);
+    }
+
+    private static bool IsNamespaceMatch(string monoTypeName, S1InteropNamespaceEntry entry)
+    {
+        string prefix = entry.NamespaceName + ".";
+        if (!monoTypeName.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (entry.IncludeSubnamespaces)
+        {
+            return true;
+        }
+
+        string remainder = monoTypeName.Substring(prefix.Length);
+        return !remainder.Contains(".", StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<INamedTypeSymbol> EnumerateReferencedTypes(INamespaceSymbol namespaceSymbol)
+    {
+        foreach (INamedTypeSymbol type in namespaceSymbol.GetTypeMembers())
+        {
+            if (IsNamespaceImportCandidate(type))
+            {
+                yield return type;
+            }
+        }
+
+        foreach (INamespaceSymbol child in namespaceSymbol.GetNamespaceMembers())
+        {
+            foreach (INamedTypeSymbol type in EnumerateReferencedTypes(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static bool IsNamespaceImportCandidate(INamedTypeSymbol type) =>
+        type.DeclaredAccessibility == Accessibility.Public &&
+        type.TypeKind != TypeKind.Error &&
+        type.TypeKind != TypeKind.Delegate &&
+        type.TypeParameters.Length == 0 &&
+        type.ContainingType is null &&
+        !type.IsImplicitlyDeclared &&
+        !string.Equals(type.Name, "Handle", StringComparison.Ordinal) &&
+        !string.IsNullOrWhiteSpace(type.ContainingNamespace?.ToDisplayString());
+
+    private static string ToMonoTypeName(string typeName)
+    {
+        string normalized = typeName.Replace("global::", string.Empty);
+        return normalized.StartsWith("Il2Cpp", StringComparison.Ordinal)
+            ? normalized.Substring("Il2Cpp".Length)
+            : normalized;
+    }
+
+    private static string CreateQualifiedAlias(string monoTypeName)
+    {
+        string[] parts = monoTypeName.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return SanitizeIdentifier(monoTypeName);
+        }
+
+        int start = parts.Length > 1 && string.Equals(parts[0], "ScheduleOne", StringComparison.Ordinal) ? 1 : 0;
+        var builder = new System.Text.StringBuilder();
+        for (int index = start; index < parts.Length; index++)
+        {
+            builder.Append(SanitizeIdentifier(parts[index]));
+        }
+
+        return builder.Length == 0 ? SanitizeIdentifier(parts[parts.Length - 1]) : builder.ToString();
+    }
+
+    private static string EnsureUniqueAlias(string alias, HashSet<string> usedAliases)
+    {
+        string candidate = alias;
+        int suffix = 2;
+        while (!usedAliases.Add(candidate))
+        {
+            candidate = alias + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            suffix++;
+        }
+
+        return candidate;
+    }
+
     public static ImmutableArray<S1InteropTypeEntry> MergeTypeEntries(ImmutableArray<S1InteropTypeEntry> entries)
     {
         var merged = new Dictionary<string, S1InteropTypeEntry>(StringComparer.Ordinal);
@@ -137,6 +298,11 @@ internal static class InteropDeclarationReader
         if (candidateHasExplicitIl2CppName != existingHasExplicitIl2CppName)
         {
             return candidateHasExplicitIl2CppName;
+        }
+
+        if (candidate.DiscoverMembers != existing.DiscoverMembers)
+        {
+            return candidate.DiscoverMembers;
         }
 
         return false;

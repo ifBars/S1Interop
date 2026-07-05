@@ -16,13 +16,14 @@ For a blank or exploratory project, use the full SDK mode:
 s1interop sdkgen . --full-sdk --apply
 ```
 
-This seeds declarations for discoverable Schedule One types from the configured local reference surface.
+This seeds a compact namespace declaration for discoverable Schedule One types from the configured local reference surface. It does not generate every public member for every type.
 
 ## What gets generated
 
 Generated SDK source can include:
 
 - `S1InteropType` declarations;
+- `S1InteropNamespace` declarations;
 - root-preserving facades under `S1Interop.ScheduleOne.*`;
 - runtime type registry entries;
 - bridge helpers for Unity events or delegate conversion;
@@ -32,7 +33,7 @@ The generated SDK comes from local reference metadata. Do not commit game assemb
 
 ## When to add manual overrides
 
-Prefer generated type coverage first.
+Prefer generated type coverage first. Use namespace declarations for broad type registration, then add `S1InteropType` declarations for the specific types where the mod needs generated member facades.
 
 Add explicit member overrides only when a binding cannot safely come from metadata:
 
@@ -40,4 +41,3 @@ Add explicit member overrides only when a binding cannot safely come from metada
 - an overload needs explicit parameter names or by-ref markers;
 - Mono and IL2CPP disagree in a way that needs a pinned binding;
 - a migration found reflection code that needs a stable generated target.
-

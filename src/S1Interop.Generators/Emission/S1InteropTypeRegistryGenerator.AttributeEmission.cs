@@ -30,6 +30,21 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 public string? Alias { get; set; }
             }
 
+            [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
+            internal sealed class S1InteropNamespaceAttribute : System.Attribute
+            {
+                public S1InteropNamespaceAttribute(string namespaceName)
+                {
+                    NamespaceName = namespaceName;
+                }
+
+                public string NamespaceName { get; }
+
+                public bool IncludeSubnamespaces { get; set; }
+
+                public bool IncludeMembers { get; set; }
+            }
+
             internal enum S1InteropMemberKind
             {
                 FieldOrProperty = 0,

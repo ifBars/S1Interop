@@ -38,9 +38,20 @@ public sealed partial class SdkFacadeGenerator
         string outputPath = Path.Combine(projectDirectory, "S1Interop.Generated", "S1Interop.GlobalUsings.g.cs");
         IReadOnlyList<string> namespaces = DiscoverScheduleOneNamespaces(projectDirectory);
         IReadOnlyList<SdkTypeAlias> aliases = options.FullSdk
-            ? DiscoverFullSdkTypeAliases(project)
+            ? Array.Empty<SdkTypeAlias>()
             : DiscoverTypeAliases(projectDirectory, project);
-        return new SdkFacadePlan(project.ProjectPath, outputPath, namespaces, aliases, namespaces.Count > 0 || aliases.Count > 0);
+        IReadOnlyList<SdkNamespaceImport> namespaceImports = options.FullSdk
+            ? new[] { new SdkNamespaceImport("ScheduleOne", IncludeSubnamespaces: true) }
+            : Array.Empty<SdkNamespaceImport>();
+        return new SdkFacadePlan(
+            project.ProjectPath,
+            outputPath,
+            namespaces,
+            aliases,
+            namespaces.Count > 0 || aliases.Count > 0 || namespaceImports.Count > 0)
+        {
+            NamespaceImports = namespaceImports
+        };
     }
 
     private static IReadOnlyList<string> DiscoverScheduleOneNamespaces(string projectDirectory)

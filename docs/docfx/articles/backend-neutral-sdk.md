@@ -27,6 +27,14 @@ S1Interop does not emit shortened duplicate namespaces such as `S1Interop.Vehicl
 
 ## Type-first coverage
 
+Use `S1InteropNamespace` when a project needs broad runtime type registration:
+
+```csharp
+[assembly: S1Interop.S1InteropNamespace("ScheduleOne", IncludeSubnamespaces = true)]
+```
+
+Namespace declarations are type-only by default. They keep full-SDK builds practical while still allowing registry lookup for the whole namespace.
+
 `S1InteropType` means "generate backend-neutral coverage for this game type."
 
 ```csharp
@@ -42,4 +50,3 @@ When reference metadata is available, that type declaration can generate:
 - invokers for unambiguous public methods.
 
 `S1InteropMember` remains available for cases the type facade cannot safely infer yet: private members, better aliases, ambiguous overloads, pinned Harmony targets, and migration-specific reflection bindings.
-

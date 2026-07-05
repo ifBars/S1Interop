@@ -3,6 +3,7 @@ namespace S1Interop.Generators;
 internal static class GeneratorConstants
 {
     public const string AttributeMetadataName = "S1Interop.S1InteropTypeAttribute";
+    public const string NamespaceAttributeMetadataName = "S1Interop.S1InteropNamespaceAttribute";
     public const string MemberAttributeMetadataName = "S1Interop.S1InteropMemberAttribute";
     public const string UnityEventBridgeAttributeMetadataName = "S1Interop.S1InteropGenerateUnityEventBridgeAttribute";
     public const string DelegateEventBridgeAttributeMetadataName = "S1Interop.S1InteropGenerateDelegateEventBridgeAttribute";

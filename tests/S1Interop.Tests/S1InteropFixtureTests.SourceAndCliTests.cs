@@ -2140,8 +2140,7 @@ internal sealed partial class S1InteropFixtureTests
             ProcessResult dryRun = RunCli("sdkgen", projectPath, "--full-sdk");
             Assert(
                 dryRun.ExitCode == 0 &&
-                dryRun.Output.Contains("generate_full_sdk_facade", StringComparison.Ordinal) &&
-                dryRun.Output.Contains("install_s1interop_generator_package", StringComparison.Ordinal),
+                dryRun.Output.Contains("generate_full_sdk_facade", StringComparison.Ordinal),
                 $"sdkgen --full-sdk dry-run should plan full SDK generation for a blank backend-neutral project with game references. Output: {dryRun.Output}");
             Assert(!File.Exists(generatedFacade), "sdkgen --full-sdk dry-run should not write the generated facade.");
 
@@ -2151,11 +2150,10 @@ internal sealed partial class S1InteropFixtureTests
 
             string source = File.ReadAllText(generatedFacade);
             Assert(
-                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\", Il2CppTypeName = \"Il2CppScheduleOne.PlayerScripts.Player\")]", StringComparison.Ordinal) &&
-                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.UI.Phone.Phone\", Alias = \"UIPhonePhone\", Il2CppTypeName = \"Il2CppScheduleOne.UI.Phone.Phone\")]", StringComparison.Ordinal) &&
-                source.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.DevUtilities.Phone\", Alias = \"DevUtilitiesPhone\", Il2CppTypeName = \"Il2CppScheduleOne.DevUtilities.Phone\")]", StringComparison.Ordinal) &&
+                source.Contains("[assembly: S1Interop.S1InteropNamespace(\"ScheduleOne\", IncludeSubnamespaces = true)]", StringComparison.Ordinal) &&
+                !source.Contains("[assembly: S1Interop.S1InteropType(", StringComparison.Ordinal) &&
                 !source.Contains("global using Player =", StringComparison.Ordinal),
-                "Full SDK generation should emit backend-neutral S1InteropType declarations for reference metadata and avoid broad global aliases.");
+                "Full SDK generation should emit a compact backend-neutral namespace declaration for reference metadata and avoid broad global aliases.");
 
             ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(
                 source,

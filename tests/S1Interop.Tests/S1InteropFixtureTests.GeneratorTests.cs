@@ -437,13 +437,13 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static global::System.Reflection.MethodInfo? LandVehicleAssignDriverMethod => ResolveMethod(S1InteropTypeRegistry.LandVehicleName, LandVehicleAssignDriverName, new string[] { \"Il2CppScheduleOne.PlayerScripts.Player\" });", StringComparison.Ordinal),
             $"Discovered methods should preserve parameter-specific lookup and runtime type-name conversion. Generated source:{Environment.NewLine}{generated}");
         Assert(
-            generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName(value);", StringComparison.Ordinal) &&
-            generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName<T>(value);", StringComparison.Ordinal) &&
-            generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleCurrentThrottleValue<T>(value);", StringComparison.Ordinal) &&
-            generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleCurrentThrottle(value, memberValue);", StringComparison.Ordinal),
+            generated.Contains("public object? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName(value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName<T>(value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleCurrentThrottleValue<T>(value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleCurrentThrottle(value.Instance, memberValue);", StringComparison.Ordinal),
             $"Type facade handles should expose native-like instance accessors for discovered field/property members. Generated source:{Environment.NewLine}{generated}");
         Assert(
-            !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value);", StringComparison.Ordinal),
+            !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value.Instance);", StringComparison.Ordinal),
             $"Type facade handles should not generate accessors that collide with built-in handle members. Generated source:{Environment.NewLine}{generated}");
         Assert(
             !generated.Contains("Il2CppOnlyName", StringComparison.Ordinal) &&
@@ -454,6 +454,90 @@ internal sealed partial class S1InteropFixtureTests
             !generated.Contains("GenericMethodName", StringComparison.Ordinal) &&
             !generated.Contains("Il2CppOnlyMethodName", StringComparison.Ordinal),
             $"Discovered member facades should skip one-sided, non-public, const, indexer, overloaded, and generic members. Generated source:{Environment.NewLine}{generated}");
+    }
+
+    private void S1InteropTypeRegistryGeneratorExpandsNamespaceDeclarations()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "NamespaceExpansionMonoGame",
+            """
+            namespace ScheduleOne.Vehicles
+            {
+                public sealed class LandVehicle
+                {
+                    public string vehicleName = "";
+                }
+
+                public sealed class Wheel
+                {
+                }
+            }
+
+            namespace ScheduleOne.GameTime
+            {
+                public sealed class TimeManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.Internal
+            {
+                internal sealed class HiddenType
+                {
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "NamespaceExpansionIl2CppGame",
+            """
+            namespace Il2CppScheduleOne.Vehicles
+            {
+                public sealed class LandVehicle
+                {
+                    public string vehicleName = "";
+                }
+
+                public sealed class Wheel
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.GameTime
+            {
+                public sealed class TimeManager
+                {
+                }
+            }
+            """);
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropNamespace("ScheduleOne", IncludeSubnamespaces = true)]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+            """;
+
+        string generated = RunTypeRegistryGenerator(
+            source,
+            [monoGameReference, il2CppGameReference],
+            "IL2CPP");
+
+        Assert(
+            generated.Contains("public const string LandVehicleName = \"Il2CppScheduleOne.Vehicles.LandVehicle\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string TimeManagerName = \"Il2CppScheduleOne.GameTime.TimeManager\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string WheelName = \"Il2CppScheduleOne.Vehicles.Wheel\";", StringComparison.Ordinal),
+            $"Namespace declarations should expand public referenced ScheduleOne types into registry entries. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("namespace S1Interop.ScheduleOne.Vehicles", StringComparison.Ordinal) &&
+            generated.Contains("public readonly struct Handle", StringComparison.Ordinal),
+            $"Namespace-expanded types should still emit root-preserving facades. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            !generated.Contains("HiddenType", StringComparison.Ordinal),
+            $"Namespace declarations should skip non-public reference types. Generated source:{Environment.NewLine}{generated}");
     }
 
     private void S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases()
@@ -1403,18 +1487,16 @@ internal sealed partial class S1InteropFixtureTests
         object? setResult = trySetScale!.Invoke(null, [hud, "42"]);
         Assert(setResult is true, "Generated field setter should convert string values to the reflected integer field type.");
 
-        MethodInfo? getScaleTyped = memberRegistryType.GetMethods()
-            .FirstOrDefault(method => method.Name == "GetHudScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
-        MethodInfo? getScaleValueTyped = memberRegistryType.GetMethods()
-            .FirstOrDefault(method => method.Name == "GetHudScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { handleType }));
-        MethodInfo? trySetScaleTyped = memberRegistryType.GetMethod("TrySetHudScale", [handleType, typeof(object)]);
-        Assert(getScaleTyped is not null, "Generated member registry should expose a typed-handle GetHudScale helper.");
-        Assert(getScaleValueTyped is not null, "Generated member registry should expose a typed-handle GetHudScaleValue helper.");
-        Assert(trySetScaleTyped is not null, "Generated member registry should expose a typed-handle TrySetHudScale helper.");
-        Assert(trySetScaleTyped!.Invoke(null, [typedHud, "44"]) is true, "Generated typed-handle member setter should write values.");
-        Assert(getScaleTyped!.Invoke(null, [typedHud]) is 44, "Generated typed-handle member getter should read values.");
-        object? typedScaleValue = getScaleValueTyped!.MakeGenericMethod(typeof(int)).Invoke(null, [typedHud]);
-        Assert(typedScaleValue is 44, $"Generated typed-handle value getter should preserve value-type convenience. Result={typedScaleValue}");
+        MethodInfo? getScaleObject = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetHudScale" && !method.IsGenericMethod && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object) }));
+        MethodInfo? getScaleValueObject = memberRegistryType.GetMethods()
+            .FirstOrDefault(method => method.Name == "GetHudScaleValue" && method.IsGenericMethodDefinition && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(new[] { typeof(object) }));
+        Assert(getScaleObject is not null, "Generated member registry should expose an object GetHudScale helper.");
+        Assert(getScaleValueObject is not null, "Generated member registry should expose an object GetHudScaleValue helper.");
+        Assert(trySetScale!.Invoke(null, [hud, "44"]) is true, "Generated object member setter should write values.");
+        Assert(getScaleObject!.Invoke(null, [hud]) is 44, "Generated object member getter should read values.");
+        object? typedScaleValue = getScaleValueObject!.MakeGenericMethod(typeof(int)).Invoke(null, [hud]);
+        Assert(typedScaleValue is 44, $"Generated object value getter should preserve value-type convenience. Result={typedScaleValue}");
 
         object? scale = hud.GetType().GetField("Scale")?.GetValue(hud);
         Assert(scale is 44, $"Generated field setter should update the fake Il2Cpp field. Scale={scale}");

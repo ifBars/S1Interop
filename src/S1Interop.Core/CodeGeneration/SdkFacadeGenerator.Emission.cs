@@ -51,6 +51,22 @@ public sealed partial class SdkFacadeGenerator
 
     private static void AppendTypeDeclarations(StringBuilder builder, SdkFacadePlan plan)
     {
+        foreach (SdkNamespaceImport import in plan.NamespaceImports.OrderBy(value => value.Namespace, StringComparer.OrdinalIgnoreCase))
+        {
+            builder.Append($"[assembly: S1Interop.S1InteropNamespace(\"{Escape(import.Namespace)}\", IncludeSubnamespaces = {import.IncludeSubnamespaces.ToString().ToLowerInvariant()}");
+            if (import.IncludeMembers)
+            {
+                builder.Append(", IncludeMembers = true");
+            }
+
+            builder.AppendLine(")]");
+        }
+
+        if (plan.NamespaceImports.Count > 0)
+        {
+            builder.AppendLine();
+        }
+
         foreach (SdkTypeAlias alias in plan.TypeAliases.OrderBy(value => value.Alias, StringComparer.OrdinalIgnoreCase))
         {
             builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{Escape(alias.MonoType)}\", Alias = \"{Escape(alias.Alias)}\", Il2CppTypeName = \"{Escape(alias.Il2CppType)}\")]");
