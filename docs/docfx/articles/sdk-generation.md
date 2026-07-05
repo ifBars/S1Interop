@@ -33,6 +33,8 @@ The generated SDK comes from local reference metadata. Do not commit game assemb
 
 ## Namespace and type declarations
 
+For a detailed declaration reference, see [Backend-neutral declarations](backend-neutral-declarations.md).
+
 Full SDK generation usually starts with one broad namespace declaration:
 
 ```csharp

@@ -3,8 +3,17 @@ using System.Text;
 
 namespace S1Interop.Core.Scaffolding;
 
+/// <summary>
+/// Creates the backend-neutral project shape used by the S1Interop CLI.
+/// </summary>
 public sealed class BackendNeutralProjectScaffolder
 {
+    /// <summary>
+    /// Builds a file plan for a new backend-neutral Schedule One mod project.
+    /// </summary>
+    /// <param name="targetDirectory">The directory that should contain the generated project.</param>
+    /// <returns>The planned project paths and generated project name.</returns>
+    /// <exception cref="ArgumentException">Thrown when a valid project name cannot be inferred from <paramref name="targetDirectory"/>.</exception>
     public NewProjectPlan CreatePlan(string targetDirectory)
     {
         string fullTargetDirectory = Path.GetFullPath(targetDirectory);
@@ -27,6 +36,13 @@ public sealed class BackendNeutralProjectScaffolder
             Path.Combine(fullTargetDirectory, "README.md"));
     }
 
+    /// <summary>
+    /// Writes the files described by a backend-neutral project plan.
+    /// </summary>
+    /// <param name="plan">The project plan to write to disk.</param>
+    /// <remarks>
+    /// Existing files at the planned paths are overwritten. Call <see cref="CreatePlan(string)"/> first when callers need to review paths before writing.
+    /// </remarks>
     public void Apply(NewProjectPlan plan)
     {
         Directory.CreateDirectory(plan.TargetDirectory);

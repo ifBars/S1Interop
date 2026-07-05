@@ -5,6 +5,13 @@ using System.Xml.Linq;
 
 namespace S1Interop.Core.Migration;
 
+/// <summary>
+/// Verifies migrations by applying planned operations to disposable sandbox copies.
+/// </summary>
+/// <remarks>
+/// Verification copies project files into a temporary sandbox, applies migration operations there, and attempts to delete the sandbox before returning.
+/// The original project is not mutated by this verifier.
+/// </remarks>
 public sealed class MigrationVerifier
 {
     private const string SandboxPrefix = "S1Interop.Verify.";
@@ -125,9 +132,21 @@ public sealed class MigrationVerifier
 
     private sealed record StagedS1InteropGeneratorPackage(string SourcePath, string Version);
 
+    /// <summary>
+    /// Verifies a single project using default verification options.
+    /// </summary>
+    /// <param name="path">A project path or directory that resolves to exactly one project.</param>
+    /// <returns>The sandbox verification result for the project.</returns>
     public MigrationVerificationResult Verify(string path) =>
         Verify(path, MigrationVerifierOptions.Default);
 
+    /// <summary>
+    /// Verifies a single project using explicit verification options.
+    /// </summary>
+    /// <param name="path">A project path or directory that resolves to exactly one project.</param>
+    /// <param name="options">Options that control planning mode, source migrations, sandbox builds, timeouts, and local game paths.</param>
+    /// <returns>The sandbox verification result for the project.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when <paramref name="path"/> does not resolve to exactly one project.</exception>
     public MigrationVerificationResult Verify(string path, MigrationVerifierOptions options)
     {
         WorkspaceAnalysis sourceAnalysis = analyzer.Analyze(path);
@@ -135,9 +154,20 @@ public sealed class MigrationVerifier
         return VerifyProject(sourceProject.ProjectPath, options);
     }
 
+    /// <summary>
+    /// Verifies every discovered project in a workspace using default verification options.
+    /// </summary>
+    /// <param name="path">A workspace directory or project path to verify.</param>
+    /// <returns>The aggregate verification result for all discovered projects.</returns>
     public WorkspaceMigrationVerificationResult VerifyWorkspace(string path) =>
         VerifyWorkspace(path, MigrationVerifierOptions.Default);
 
+    /// <summary>
+    /// Verifies every discovered project in a workspace using explicit verification options.
+    /// </summary>
+    /// <param name="path">A workspace directory or project path to verify.</param>
+    /// <param name="options">Options that control planning mode, source migrations, sandbox builds, timeouts, and local game paths.</param>
+    /// <returns>The aggregate verification result for all discovered projects.</returns>
     public WorkspaceMigrationVerificationResult VerifyWorkspace(string path, MigrationVerifierOptions options)
     {
         WorkspaceAnalysis sourceAnalysis = analyzer.Analyze(path);

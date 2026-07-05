@@ -58,6 +58,8 @@ Namespace declarations are type-only by default. Add `S1InteropType` for types w
 [assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle")]
 ```
 
+See [Backend-neutral declarations](backend-neutral-declarations.md) when you need to review generated declarations or add explicit `S1InteropMember` overrides by hand.
+
 ## 4. Use the generated facade
 
 Generated facades preserve the original runtime namespace under `S1Interop`:

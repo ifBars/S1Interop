@@ -27,6 +27,8 @@ S1Interop does not emit shortened duplicate namespaces such as `S1Interop.Vehicl
 
 ## Type-first coverage
 
+Use [Backend-neutral declarations](backend-neutral-declarations.md) as the detailed reference for declaration semantics. The short version is:
+
 Use `S1InteropNamespace` when a project needs broad runtime type registration:
 
 ```csharp

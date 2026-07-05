@@ -1,7 +1,17 @@
 ﻿namespace S1Interop.Core.Analysis;
 
+/// <summary>
+/// Discovers C# project files from a workspace, project directory, or project file path.
+/// </summary>
 public static class ProjectDiscovery
 {
+    /// <summary>
+    /// Returns project files that should be analyzed for the supplied path.
+    /// </summary>
+    /// <param name="path">A workspace directory, project directory, or <c>.csproj</c> file.</param>
+    /// <returns>
+    /// A single nearest project when one is found, all projects under a workspace otherwise, or an empty list when no project exists.
+    /// </returns>
     public static IReadOnlyList<string> DiscoverProjects(string path)
     {
         string fullPath = Path.GetFullPath(path);

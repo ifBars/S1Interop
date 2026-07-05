@@ -15,71 +15,162 @@ public sealed partial class S1InteropTypeRegistryGenerator
 
         namespace S1Interop
         {
+            /// <summary>
+            /// Requests backend-neutral type registration and facade generation for a Mono game type.
+            /// </summary>
+            /// <remarks>
+            /// Use this attribute for specific game types where source code needs generated type helpers or public member facades.
+            /// </remarks>
             [System.AttributeUsage(System.AttributeTargets.Assembly | System.AttributeTargets.Class | System.AttributeTargets.Struct, AllowMultiple = true)]
             internal sealed class S1InteropTypeAttribute : System.Attribute
             {
+                /// <summary>
+                /// Initializes a type declaration for the Mono runtime type name.
+                /// </summary>
+                /// <param name="monoTypeName">The full Mono runtime type name, such as <c>ScheduleOne.Vehicles.LandVehicle</c>.</param>
                 public S1InteropTypeAttribute(string monoTypeName)
                 {
                     MonoTypeName = monoTypeName;
                 }
 
+                /// <summary>
+                /// Gets the full Mono runtime type name.
+                /// </summary>
                 public string MonoTypeName { get; }
 
+                /// <summary>
+                /// Gets or sets the full IL2CPP wrapper type name when the default name mapping is not sufficient.
+                /// </summary>
                 public string? Il2CppTypeName { get; set; }
 
+                /// <summary>
+                /// Gets or sets the generated alias used for registry and facade names.
+                /// </summary>
                 public string? Alias { get; set; }
             }
 
+            /// <summary>
+            /// Requests backend-neutral type registration for all matching types in a namespace.
+            /// </summary>
+            /// <remarks>
+            /// Namespace declarations are type-only by default. Set <see cref="IncludeMembers"/> only when broad member facade generation is intentional.
+            /// </remarks>
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
             internal sealed class S1InteropNamespaceAttribute : System.Attribute
             {
+                /// <summary>
+                /// Initializes a namespace declaration.
+                /// </summary>
+                /// <param name="namespaceName">The Mono runtime namespace to include, such as <c>ScheduleOne</c>.</param>
                 public S1InteropNamespaceAttribute(string namespaceName)
                 {
                     NamespaceName = namespaceName;
                 }
 
+                /// <summary>
+                /// Gets the Mono runtime namespace to include.
+                /// </summary>
                 public string NamespaceName { get; }
 
+                /// <summary>
+                /// Gets or sets whether child namespaces should be included.
+                /// </summary>
                 public bool IncludeSubnamespaces { get; set; }
 
+                /// <summary>
+                /// Gets or sets whether compatible public members should be discovered for matching types.
+                /// </summary>
                 public bool IncludeMembers { get; set; }
             }
 
+            /// <summary>
+            /// Identifies the kind of member targeted by a generated member binding.
+            /// </summary>
             internal enum S1InteropMemberKind
             {
+                /// <summary>
+                /// Resolve a field first and fall back to a property with the same name.
+                /// </summary>
                 FieldOrProperty = 0,
+
+                /// <summary>
+                /// Resolve a method binding.
+                /// </summary>
                 Method = 1,
+
+                /// <summary>
+                /// Resolve a field binding.
+                /// </summary>
                 Field = 2,
+
+                /// <summary>
+                /// Resolve a property binding.
+                /// </summary>
                 Property = 3
             }
 
+            /// <summary>
+            /// Requests an explicit generated binding for a member that cannot safely be inferred from type metadata alone.
+            /// </summary>
+            /// <remarks>
+            /// Use explicit member declarations for private members, ambiguous overloads, pinned Harmony targets, or migration-discovered reflection access.
+            /// </remarks>
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
             internal sealed class S1InteropMemberAttribute : System.Attribute
             {
+                /// <summary>
+                /// Initializes a member binding for a declared type alias.
+                /// </summary>
+                /// <param name="ownerAlias">The alias of a declared <c>S1InteropType</c> owner.</param>
+                /// <param name="memberName">The runtime member name to resolve.</param>
                 public S1InteropMemberAttribute(string ownerAlias, string memberName)
                 {
                     OwnerAlias = ownerAlias;
                     MemberName = memberName;
                 }
 
+                /// <summary>
+                /// Gets the alias of the declared owner type.
+                /// </summary>
                 public string OwnerAlias { get; }
 
+                /// <summary>
+                /// Gets the runtime member name to resolve.
+                /// </summary>
                 public string MemberName { get; }
 
+                /// <summary>
+                /// Gets or sets the generated registry helper alias for this member.
+                /// </summary>
                 public string? Alias { get; set; }
 
+                /// <summary>
+                /// Gets or sets the member kind to resolve.
+                /// </summary>
                 public S1InteropMemberKind Kind { get; set; }
 
+                /// <summary>
+                /// Gets or sets whether the target member is static.
+                /// </summary>
                 public bool IsStatic { get; set; }
 
+                /// <summary>
+                /// Gets or sets method parameter type names used to disambiguate overloads.
+                /// </summary>
                 public string[] ParameterTypeNames { get; set; } = System.Array.Empty<string>();
             }
 
+            /// <summary>
+            /// Requests generated helpers for converting simple UnityEvent listener registrations across runtimes.
+            /// </summary>
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = false)]
             internal sealed class S1InteropGenerateUnityEventBridgeAttribute : System.Attribute
             {
             }
 
+            /// <summary>
+            /// Requests generated helpers for combining and removing delegate event listeners across runtimes.
+            /// </summary>
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = false)]
             internal sealed class S1InteropGenerateDelegateEventBridgeAttribute : System.Attribute
             {
@@ -97,11 +188,19 @@ public sealed partial class S1InteropTypeRegistryGenerator
 
         namespace S1Interop.Generated
         {
+        /// <summary>
+        /// Provides runtime-specific listener conversion for migrated UnityEvent add/remove calls.
+        /// </summary>
         internal static class S1InteropUnityEventBridge
         {
             private static readonly System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, System.Delegate>> WrappedListeners =
                 new System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, System.Delegate>>();
 
+            /// <summary>
+            /// Adds a parameterless listener to a UnityEvent using the delegate shape required by the active runtime.
+            /// </summary>
+            /// <param name="unityEvent">The UnityEvent receiving the listener.</param>
+            /// <param name="listener">The managed listener to wrap and register.</param>
             public static void Add(UnityEngine.Events.UnityEvent unityEvent, System.Action listener)
             {
                 if (object.ReferenceEquals(unityEvent, null) || object.ReferenceEquals(listener, null) || HasWrapper(unityEvent, listener))
@@ -119,6 +218,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 StoreWrapper(unityEvent, listener, wrapped);
             }
 
+            /// <summary>
+            /// Removes a parameterless listener previously registered through this bridge.
+            /// </summary>
+            /// <param name="unityEvent">The UnityEvent that owns the listener.</param>
+            /// <param name="listener">The managed listener originally passed to the matching <c>Add</c> overload.</param>
             public static void Remove(UnityEngine.Events.UnityEvent unityEvent, System.Action listener)
             {
                 System.Delegate wrapped;
@@ -140,6 +244,12 @@ public sealed partial class S1InteropTypeRegistryGenerator
         #endif
             }
 
+            /// <summary>
+            /// Adds a one-argument listener to a UnityEvent using the delegate shape required by the active runtime.
+            /// </summary>
+            /// <typeparam name="T0">The UnityEvent argument type.</typeparam>
+            /// <param name="unityEvent">The UnityEvent receiving the listener.</param>
+            /// <param name="listener">The managed listener to wrap and register.</param>
             public static void Add<T0>(UnityEngine.Events.UnityEvent<T0> unityEvent, System.Action<T0> listener)
             {
                 if (object.ReferenceEquals(unityEvent, null) || object.ReferenceEquals(listener, null) || HasWrapper(unityEvent, listener))
@@ -157,6 +267,12 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 StoreWrapper(unityEvent, listener, wrapped);
             }
 
+            /// <summary>
+            /// Removes a one-argument listener previously registered through this bridge.
+            /// </summary>
+            /// <typeparam name="T0">The UnityEvent argument type.</typeparam>
+            /// <param name="unityEvent">The UnityEvent that owns the listener.</param>
+            /// <param name="listener">The managed listener originally passed to the matching <c>Add</c> overload.</param>
             public static void Remove<T0>(UnityEngine.Events.UnityEvent<T0> unityEvent, System.Action<T0> listener)
             {
                 System.Delegate wrapped;
@@ -226,13 +342,30 @@ public sealed partial class S1InteropTypeRegistryGenerator
 
         namespace S1Interop.Generated
         {
+        /// <summary>
+        /// Provides generated helpers for migrated delegate event combine/remove assignments.
+        /// </summary>
         internal static class S1InteropDelegateEventBridge
         {
+            /// <summary>
+            /// Combines a delegate event value with a managed listener and returns the updated delegate value.
+            /// </summary>
+            /// <typeparam name="TDelegate">The delegate type used by the event field or property.</typeparam>
+            /// <param name="current">The current delegate value.</param>
+            /// <param name="listener">The listener delegate to add.</param>
+            /// <returns>The combined delegate value cast back to <typeparamref name="TDelegate"/>.</returns>
             public static TDelegate Combine<TDelegate>(TDelegate current, System.Delegate listener) where TDelegate : class
             {
                 return (TDelegate)(object)System.Delegate.Combine(current as System.Delegate, listener);
             }
 
+            /// <summary>
+            /// Removes a managed listener from a delegate event value and returns the updated delegate value.
+            /// </summary>
+            /// <typeparam name="TDelegate">The delegate type used by the event field or property.</typeparam>
+            /// <param name="current">The current delegate value.</param>
+            /// <param name="listener">The listener delegate to remove.</param>
+            /// <returns>The updated delegate value cast back to <typeparamref name="TDelegate"/>.</returns>
             public static TDelegate Remove<TDelegate>(TDelegate current, System.Delegate listener) where TDelegate : class
             {
                 return (TDelegate)(object)System.Delegate.Remove(current as System.Delegate, listener);

@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Analysis;
 
+/// <summary>
+/// Scans project source files for Mono-to-IL2CPP interop risks that are not visible from project references alone.
+/// </summary>
 public sealed class SourceInteropAnalyzer
 {
     private static readonly HashSet<string> ExcludedDirectoryNames = new(
@@ -64,6 +67,11 @@ public sealed class SourceInteropAnalyzer
         @"\bGUI\.Window\s*\(\s*[^,]+\s*,\s*[^,]+\s*,\s*(?<listener>[A-Za-z_][A-Za-z0-9_\.]*)\s*,",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Analyzes source files under a project directory for injected-type requirements, runtime guards, bridge usage, and source migration risks.
+    /// </summary>
+    /// <param name="projectPath">The <c>.csproj</c> file whose source directory should be scanned.</param>
+    /// <returns>The source-level interop analysis for the project.</returns>
     public SourceInteropAnalysis Analyze(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);

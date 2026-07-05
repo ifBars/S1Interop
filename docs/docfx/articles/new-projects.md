@@ -30,4 +30,6 @@ s1interop sdkgen . --full-sdk --apply
 
 That generates declarations from local metadata. Full SDK mode adds broad type registration for Schedule One, then you add `S1InteropType` declarations for types where you want member facades.
 
+Use [Backend-neutral declarations](backend-neutral-declarations.md) when you need to review or hand-edit the generated declaration file.
+
 It does not commit game assemblies, wrapper dumps, or decompiled source.

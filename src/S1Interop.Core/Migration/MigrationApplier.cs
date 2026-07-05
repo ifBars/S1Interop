@@ -5,6 +5,13 @@ using System.Xml.Linq;
 
 namespace S1Interop.Core.Migration;
 
+/// <summary>
+/// Applies automatic migration operations and records rollback metadata.
+/// </summary>
+/// <remarks>
+/// Apply writes backups and a manifest under a project-local <c>s1interop-runs</c> directory rooted at the migration plan path.
+/// Use <see cref="Rollback(string)"/> with the returned manifest path to restore an apply run.
+/// </remarks>
 public sealed class MigrationApplier
 {
     private static readonly Regex ConfigurationConditionRegex = new(
@@ -35,6 +42,11 @@ public sealed class MigrationApplier
         @"^(?<indent>\s*)(?<prefix>.*=\s*)(?<left>.+?)\s*\?\?\s*new\s+Il2CppSystem\.Collections\.Generic\.List<(?<type>[^>]+)>\(\);(?<suffix>\s*)$",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Applies automatic operations from a migration plan.
+    /// </summary>
+    /// <param name="plan">The migration plan to apply.</param>
+    /// <returns>The apply result, including the rollback manifest and changed files.</returns>
     public MigrationApplyResult Apply(MigrationPlan plan)
     {
         string runId = $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..30];
@@ -2048,6 +2060,11 @@ public sealed class MigrationApplier
         return true;
     }
 
+    /// <summary>
+    /// Restores files from a migration manifest produced by <see cref="Apply(MigrationPlan)"/>.
+    /// </summary>
+    /// <param name="manifestPath">The manifest path returned by a previous apply run.</param>
+    /// <returns>The rollback result, including restored and removed files.</returns>
     public MigrationRollbackResult Rollback(string manifestPath)
     {
         MigrationApplyResult manifest = JsonSerializer.Deserialize(

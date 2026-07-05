@@ -3,6 +3,7 @@
   topicHref: articles/index.md
 - name: API
   href: api/
+  topicHref: articles/api-reference.md
 - name: Project
   href: project/
   topicHref: project/index.md

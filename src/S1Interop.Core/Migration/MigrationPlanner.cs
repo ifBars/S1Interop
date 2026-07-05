@@ -4,15 +4,29 @@ using System.Xml.Linq;
 
 namespace S1Interop.Core.Migration;
 
+/// <summary>
+/// Converts analysis diagnostics and source-risk evidence into migration operations.
+/// </summary>
 public sealed class MigrationPlanner
 {
     private static readonly Regex SourceDiagnosticEvidenceRegex = new(
         @"^(?<path>.+\.cs):(?<line>\d+):\s*(?<member>[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)(?:\((?<params>[^)]*)\))?\s+uses\s+",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Creates a migration plan using the default planner options.
+    /// </summary>
+    /// <param name="analysis">The workspace analysis to plan from.</param>
+    /// <returns>The planned migration operations for each analyzed project.</returns>
     public MigrationPlan Plan(WorkspaceAnalysis analysis) =>
         Plan(analysis, MigrationPlannerOptions.Default);
 
+    /// <summary>
+    /// Creates a migration plan using explicit planner options.
+    /// </summary>
+    /// <param name="analysis">The workspace analysis to plan from.</param>
+    /// <param name="options">Options that control dual-runtime scaffolding, build hooks, and source-risk operations.</param>
+    /// <returns>The planned migration operations for each analyzed project.</returns>
     public MigrationPlan Plan(WorkspaceAnalysis analysis, MigrationPlannerOptions options)
     {
         ProjectMigrationPlan[] projects = analysis.Projects
