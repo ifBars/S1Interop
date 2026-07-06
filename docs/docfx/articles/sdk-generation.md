@@ -64,4 +64,4 @@ Add explicit member overrides only when a binding cannot safely come from metada
 - the member is private or internal;
 - an overload needs explicit parameter names or by-ref markers;
 - Mono and IL2CPP disagree in a way that needs a pinned binding;
-- a migration found reflection code that needs a stable generated target.
+- a migration found reflection code that needs a stable generated target, such as a cached `FieldInfo`, `PropertyInfo`, `AccessTools.Field(typeof(...), "...")`, or `AccessTools.Property(typeof(...), "...")` binding in a consumer mod.

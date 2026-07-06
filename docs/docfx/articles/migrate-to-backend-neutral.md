@@ -43,6 +43,8 @@ s1interop sdkgen . --apply
 
 This inspects source references, aliases, namespace imports, string-held game type names, and local game metadata. It emits the types the mod appears to use.
 
+Usage-driven generation also picks up simple reflection metadata bindings when they point at Schedule One game types. For example, a consumer mod that keeps S1API for quests but caches `AccessTools.Field(typeof(S1Quests.Quest), "title")` for its own patch can get a generated `S1InteropMember` target instead of keeping that backend-sensitive lookup in mod code.
+
 For a blank or exploratory backend-neutral project, seed broad type coverage from local game references:
 
 ```powershell
@@ -83,6 +85,8 @@ if (vehicle.HasValue)
 The goal is to keep mod code close to normal game API usage while moving backend differences into generated code.
 
 For a real patch mod, that usually means replacing code like "read the vehicle/player/UI object differently on Mono and IL2CPP" before touching unrelated systems. Keep Harmony patch methods small and let services use generated facades behind them.
+
+For a mod that already uses S1API, keep the S1API calls where they are. Move only the direct Schedule One access that S1API does not own: Harmony targets, direct game-wrapper casts, cached member metadata, and small field/property reads around the patch.
 
 ## 5. Build and review diagnostics
 

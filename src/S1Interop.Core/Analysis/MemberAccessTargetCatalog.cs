@@ -20,6 +20,10 @@ public sealed class MemberAccessTargetCatalog
         @"typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
 
+    private static readonly Regex AccessToolsFieldOrPropertyRegex = new(
+        @"AccessTools\.(?<kind>Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        RegexOptions.Compiled);
+
     private static readonly Regex InstanceGetTypeFieldOrPropertyRegex = new(
         @"(?<receiver>[_A-Za-z][A-Za-z0-9_]*)\s*\.\s*GetType\s*\(\s*\)\s*\.\s*Get(?<kind>Field|Property)\s*\(\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""\s*(?:,|\))",
         RegexOptions.Compiled);
@@ -123,6 +127,27 @@ public sealed class MemberAccessTargetCatalog
                     SanitizeAlias(memberName),
                     IsStatic: IsStaticMemberLookup(lines, index),
                     Kind: GetMemberAccessKind(match.Groups["kind"].Value)));
+            }
+
+            foreach (Match accessToolsMatch in AccessToolsFieldOrPropertyRegex.Matches(lines[index]))
+            {
+                string ownerTypeName = ResolveRuntimeTypeName(accessToolsMatch.Groups["type"].Value, scheduleOneUsings);
+                if (IsIgnoredOwnerTypeName(ownerTypeName))
+                {
+                    continue;
+                }
+
+                string ownerAlias = GetSimpleTypeName(ownerTypeName);
+                string memberName = accessToolsMatch.Groups["member"].Value;
+                targets.Add(new MemberAccessTarget(
+                    Path.GetFullPath(sourceFile),
+                    index + 1,
+                    ownerAlias,
+                    ownerTypeName,
+                    memberName,
+                    SanitizeAlias(memberName),
+                    IsStatic: false,
+                    Kind: GetMemberAccessKind(accessToolsMatch.Groups["kind"].Value)));
             }
 
             foreach (Match instanceMatch in InstanceGetTypeFieldOrPropertyRegex.Matches(lines[index]))

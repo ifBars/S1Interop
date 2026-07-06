@@ -495,7 +495,7 @@ public sealed class MigrationPlanner
                         null,
                         "low",
                         true,
-                        "Rewrite simple direct typeof(...).GetField/GetProperty lookups through generated S1InteropMemberRegistry FieldInfo/PropertyInfo accessors."));
+                        "Rewrite simple direct typeof(...).GetField(...), typeof(...).GetProperty(...), and AccessTools field/property lookups through generated S1InteropMemberRegistry FieldInfo/PropertyInfo accessors."));
                 }
             }
 

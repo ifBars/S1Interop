@@ -2,15 +2,15 @@
 
 If you already know S1API, the obvious question is why S1Interop exists at all.
 
-Short answer: use S1API when it owns the modding workflow you need. Use S1Interop when you or a library still need direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access and do not want to hand-maintain backend conditionals.
+Short answer: keep S1API when it owns the modding workflow your mod needs. Use S1Interop when your mod still has direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access beside S1API and you do not want to hand-maintain backend conditionals.
 
 They solve different problems.
 
-## What S1API owns
+## What S1API owns in your mod
 
 S1API is a curated modding API. It has hand-written modules, runtime packaging, loader support, docs, examples, and public API decisions. Its job is to give modders stable gameplay workflows.
 
-Use S1API for:
+Use S1API for the workflows it already covers:
 
 - items, products, stations, shops, money, and inventory workflows;
 - custom NPCs, dealers, customers, schedules, dialogue, relationships, and appearance defaults;
@@ -21,19 +21,19 @@ Use S1API for:
 
 S1API is more than wrappers. It encodes real modding decisions: when game systems are ready, how content should be registered, how data should survive save/load, how IL2CPP delegate quirks are hidden, and which game concepts deserve friendly builders.
 
-## What S1Interop owns
+## What S1Interop owns in your mod
 
 S1Interop is a generated interop surface. It is not trying to design item builders, NPC schedules, phone apps, or save systems.
 
 Use S1Interop for:
 
 - generated facades for direct `ScheduleOne.*` and `Il2CppScheduleOne.*` types;
-- reducing duplicated `#if MONO` / `#if IL2CPP` code in direct patch mods;
-- moving an existing Mono mod toward IL2CPP, dual-runtime, or backend-neutral builds;
+- reducing duplicated `#if MONO` / `#if IL2CPP` code in direct patch mods, including mods that also depend on S1API;
+- moving an existing Mono consumer mod toward IL2CPP, dual-runtime, or backend-neutral builds;
 - generating typed fields, properties, enum mirrors, constructors, and simple methods from local metadata when safe;
 - compile-time diagnostics for missing declarations, bad member bindings, and known IL2CPP boundary issues;
 - project migration, rollback manifests, local path setup, and sandbox verification;
-- helping API maintainers avoid hand-writing the same low-level wrapper glue every time the game surface changes.
+- replacing copied or local reflection helpers when the mod only needs a stable generated member binding.
 
 S1Interop should be boring infrastructure. The best version of it makes direct game access feel less special, then gets out of the way.
 
@@ -41,15 +41,15 @@ S1Interop should be boring infrastructure. The best version of it makes direct g
 
 S1API has to decide what a good modding API should look like. That takes human judgment. A generated tool cannot know that an NPC builder should precreate schedule actions for FishNet stability, that saveables need load-order semantics, or that item registration should validate IDs and keep hidden prefab references stable.
 
-S1Interop can cover a different kind of work: repetitive backend glue. S1API currently contains many runtime-specific aliases, casts, collection conversions, reflection helpers, and delegate adaptations because Mono and IL2CPP expose the game differently. Direct patch mods have the same problem, just with less structure.
+S1Interop can cover a different kind of work: repetitive backend glue in the consuming mod. Mods that require S1API often still have their own Harmony patches, direct field reads, type lookups, or copied reflection helpers for game surfaces S1API does not wrap. Those local seams are the S1Interop target.
 
 That is the overlap: both care about Mono and IL2CPP. The difference is where the abstraction lives.
 
 | Question | Prefer S1API | Prefer S1Interop |
 | --- | --- | --- |
 | "I want to add an item, NPC, quest, phone app, save data, or content workflow." | Yes. Use the module that owns the workflow. | Only for direct game access the module does not expose. |
-| "I need to patch a vanilla method and read a few game properties." | Maybe, if S1API already has the wrapper you need. | Yes, especially when the code currently branches between `ScheduleOne.*` and `Il2CppScheduleOne.*`. |
-| "I maintain an API and keep updating wrapper glue after game changes." | S1API is the API surface users consume. | S1Interop can generate some low-level facades and diagnostics so less glue is hand-maintained. |
+| "My mod requires S1API, but I also patch a vanilla method and read a few game properties." | Keep S1API for the content workflow. | Yes, especially when that patch currently branches between `ScheduleOne.*` and `Il2CppScheduleOne.*`. |
+| "My mod copied a helper that caches `FieldInfo`, `PropertyInfo`, or Harmony `AccessTools` bindings." | S1API may still own the higher-level workflow. | Yes, when the binding points at a Schedule One game type and can be generated from local metadata. |
 | "I want one player-facing dependency with content helpers and loader behavior." | Yes. S1API has runtime packages and `S1APILoader`. | No. The generator package is a build-time tool, not a gameplay framework. |
 | "I want a backend-neutral direct game SDK for types S1API does not wrap." | No, unless S1API adds that domain. | Yes. Declare the type and let the generator emit facades where metadata is safe. |
 
@@ -59,9 +59,9 @@ New modders should not have to pick a side.
 
 If they are building content that S1API supports, point them to S1API first. It is friendlier and has the domain concepts they need. If they hit a direct game type that S1API does not expose, S1Interop can cover that narrow gap without forcing the whole mod into hand-written backend branches.
 
-Existing direct-mod authors should start with `s1interop analyze .`. They can keep their MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game seam, not the whole project.
+Existing mod authors should start with `s1interop analyze .`. They can keep their MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game seam, not the whole project.
 
-API maintainers should look at S1Interop as a way to reduce maintenance pressure. S1API still decides the public workflow. S1Interop can generate lower-level handles, member accessors, enum mirrors, constructor helpers, and diagnostics from local metadata so maintainers spend less time retyping backend glue.
+For S1API consumer mods, a good first target is the code outside the S1API workflow: a Harmony target lookup, a cached `FieldInfo`, a local `ReflectionUtils.TryGetFieldOrProperty(...)`, or a direct cast to a game wrapper. Leave the S1API builder code alone unless that code itself crosses into a runtime-specific game type.
 
 ## Boundary to keep clear
 

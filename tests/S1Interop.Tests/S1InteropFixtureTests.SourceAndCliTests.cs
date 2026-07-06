@@ -828,9 +828,11 @@ internal sealed partial class S1InteropFixtureTests
             File.WriteAllText(
                 tempSource,
                 """
+                using HarmonyLib;
                 using System.Reflection;
+                using S1Quests = ScheduleOne.Quests;
 
-                namespace DirectReflectionMod;
+                namespace S1ApiConsumerReflectionMod;
 
                 public static class DirectReflection
                 {
@@ -843,6 +845,7 @@ internal sealed partial class S1InteropFixtureTests
                     {
                         var property = typeof(MelonEnvironment).GetProperty("UserDataDirectory",
                             BindingFlags.Public | BindingFlags.Static);
+                        var accessToolsProperty = AccessTools.Property(typeof(MelonEnvironment), "UserDataDirectory");
                         return property;
                     }
 
@@ -858,6 +861,12 @@ internal sealed partial class S1InteropFixtureTests
                         return teleportField;
                     }
 
+                    public static FieldInfo GetQuestTitleField()
+                    {
+                        FieldInfo titleField = AccessTools.Field(typeof(S1Quests.Quest), "title");
+                        return titleField;
+                    }
+
                     public static PropertyInfo? GetEnumeratorCurrent(object enumerator)
                     {
                         var current = enumerator.GetType().GetProperty("Current");
@@ -869,8 +878,8 @@ internal sealed partial class S1InteropFixtureTests
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 3,
-                $"Source analyzer should report direct typeof(...).GetField/GetProperty lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
+                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 4,
+                $"Source analyzer should report direct typeof(...).GetField(...), typeof(...).GetProperty(...), and AccessTools.Field(...) lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
             Assert(
                 risks.All(risk => !risk.Evidence.Contains("GetEnumeratorCurrent", StringComparison.Ordinal) &&
                                   !risk.Evidence.Contains("GetProperty(\"Current\")", StringComparison.Ordinal)),
@@ -912,16 +921,21 @@ internal sealed partial class S1InteropFixtureTests
                 !generatedTargets.Contains("MelonEnvironment", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"SystemInfo\", \"deviceUniqueIdentifier\", Alias = \"deviceUniqueIdentifier\", Kind = S1Interop.S1InteropMemberKind.Property)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\")]", StringComparison.Ordinal) &&
-                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal),
-                "Generated member-access targets should include direct member reflection declarations and typed GetType receiver declarations while skipping MelonLoader internals.");
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Quests.Quest\", Alias = \"Quest\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Quest\", \"title\", Alias = \"title\")]", StringComparison.Ordinal),
+                "Generated member-access targets should include direct member reflection, AccessTools field declarations, and typed GetType receiver declarations while skipping MelonLoader internals.");
             string rewrittenSource = File.ReadAllText(tempSource);
             Assert(
                 rewrittenSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var property = typeof(MelonEnvironment).GetProperty(\"UserDataDirectory\",", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("var accessToolsProperty = AccessTools.Property(typeof(MelonEnvironment), \"UserDataDirectory\");", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var originalMethod = S1Interop.Generated.S1InteropMemberRegistry.deviceUniqueIdentifierPropertyInfo!.GetMethod;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var teleportField = S1Interop.Generated.S1InteropMemberRegistry.teleportFieldInfo;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("FieldInfo titleField = S1Interop.Generated.S1InteropMemberRegistry.titleFieldInfo;", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("typeof(SystemInfo).GetProperty(\"deviceUniqueIdentifier\").GetMethod", StringComparison.Ordinal) &&
-                !rewrittenSource.Contains("targetPlayer.GetType().GetField(\"teleport\"", StringComparison.Ordinal),
+                !rewrittenSource.Contains("targetPlayer.GetType().GetField(\"teleport\"", StringComparison.Ordinal) &&
+                !rewrittenSource.Contains("AccessTools.Field(typeof(S1Quests.Quest), \"title\")", StringComparison.Ordinal),
                 $"Direct member reflection lookups should be rewritten to generated typed metadata accessors. Source:{Environment.NewLine}{rewrittenSource}");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);

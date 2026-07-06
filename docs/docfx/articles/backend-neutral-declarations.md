@@ -124,7 +124,7 @@ Use `S1InteropMember` for:
 - better aliases for readability;
 - overloaded methods that need explicit parameter type names or by-ref markers;
 - Mono/IL2CPP disagreements that need a pinned binding;
-- migration-inferred reflection patterns that cannot yet be represented by the automatic type facade.
+- migration-inferred reflection patterns that cannot yet be represented by the automatic type facade, including simple cached `FieldInfo`/`PropertyInfo` lookups from `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `AccessTools.Field(typeof(...), "...")`, or `AccessTools.Property(typeof(...), "...")`.
 
 ## Bridge declarations
 

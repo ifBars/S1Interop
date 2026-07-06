@@ -8,6 +8,10 @@ public sealed class DirectMemberReflectionLookupRewriter
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex AccessToolsFieldOrPropertyRegex = new(
+        @"AccessTools\.(?<kind>Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        RegexOptions.Compiled);
+
     private static readonly Regex PropertyAccessorRegex = new(
         @"\.GetProperty\s*\([^)]*\)\s*\.\s*(?<accessor>GetMethod|SetMethod)\b",
         RegexOptions.Compiled);
@@ -169,6 +173,13 @@ public sealed class DirectMemberReflectionLookupRewriter
 
     private static bool TryGetReplacementPrefix(string firstLine, out string prefix)
     {
+        int accessToolsIndex = firstLine.IndexOf("AccessTools.", StringComparison.Ordinal);
+        if (accessToolsIndex >= 0)
+        {
+            prefix = firstLine[..accessToolsIndex];
+            return true;
+        }
+
         int typeOfIndex = firstLine.IndexOf("typeof", StringComparison.Ordinal);
         if (typeOfIndex >= 0)
         {
@@ -287,6 +298,8 @@ public sealed class DirectMemberReflectionLookupRewriter
     private static bool HasSupportedReceiver(string statement, MemberAccessTarget target) =>
         statement.Contains($"typeof({target.OwnerAlias})", StringComparison.Ordinal) ||
         statement.Contains($"typeof({target.OwnerTypeName})", StringComparison.Ordinal) ||
+        statement.Contains("AccessTools.Field", StringComparison.Ordinal) ||
+        statement.Contains("AccessTools.Property", StringComparison.Ordinal) ||
         statement.Contains(".GetType().Get", StringComparison.Ordinal) ||
         statement.Contains(".GetType() .Get", StringComparison.Ordinal);
 
@@ -345,6 +358,16 @@ public sealed class DirectMemberReflectionLookupRewriter
 
     private static bool TryGetLookupKind(string statement, string memberName, out MemberAccessKind kind)
     {
+        Match accessToolsMatch = AccessToolsFieldOrPropertyRegex.Match(statement);
+        if (accessToolsMatch.Success &&
+            accessToolsMatch.Groups["member"].Value.Equals(memberName, StringComparison.Ordinal))
+        {
+            kind = accessToolsMatch.Groups["kind"].Value.Equals("Field", StringComparison.Ordinal)
+                ? MemberAccessKind.Field
+                : MemberAccessKind.Property;
+            return true;
+        }
+
         if (statement.Contains($".GetField(\"{memberName}\"", StringComparison.Ordinal))
         {
             kind = MemberAccessKind.Field;

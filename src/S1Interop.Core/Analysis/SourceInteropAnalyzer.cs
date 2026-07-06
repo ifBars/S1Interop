@@ -43,8 +43,16 @@ public sealed class SourceInteropAnalyzer
         @"typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)\s*\.\s*Get(?:Field|Property)\s*\(\s*""[A-Za-z_][A-Za-z0-9_]*""\s*(?:,|\))",
         RegexOptions.Compiled);
 
+    private static readonly Regex ScheduleOneUsingAliasRegex = new(
+        @"^\s*using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)*\s*;",
+        RegexOptions.Compiled);
+
     private static readonly Regex ReflectionLookupReceiverRegex = new(
         @"(?<receiver>typeof\s*\(\s*[A-Za-z_][A-Za-z0-9_.]*\s*\)|[A-Za-z_][A-Za-z0-9_.]*\s*\.\s*GetType\s*\(\s*\))\s*\.\s*Get(?<kind>Field|Property)\s*\(",
+        RegexOptions.Compiled);
+
+    private static readonly Regex AccessToolsFieldOrPropertyLookupRegex = new(
+        @"AccessTools\.(?:Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""[A-Za-z_][A-Za-z0-9_]*""",
         RegexOptions.Compiled);
 
     private static readonly Regex GetTypeReceiverRegex = new(
@@ -633,6 +641,12 @@ public sealed class SourceInteropAnalyzer
     private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
+        Match accessToolsLookup = AccessToolsFieldOrPropertyLookupRegex.Match(line);
+        if (accessToolsLookup.Success)
+        {
+            return IsPotentialAccessToolsMemberReceiver(lines, accessToolsLookup.Groups["type"].Value);
+        }
+
         Match lookup = ReflectionLookupReceiverRegex.Match(line);
         if (!lookup.Success)
         {
@@ -780,6 +794,27 @@ public sealed class SourceInteropAnalyzer
         }
 
         return IsScheduleOneTypeName(typeName) || !typeName.Contains('.', StringComparison.Ordinal);
+    }
+
+    private static bool IsPotentialAccessToolsMemberReceiver(IReadOnlyList<string> lines, string typeName)
+    {
+        if (IsIgnoredReflectionOwnerTypeName(typeName))
+        {
+            return false;
+        }
+
+        if (IsScheduleOneTypeName(typeName) || !typeName.Contains('.', StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        string rootName = typeName.Split('.')[0];
+        return lines.Any(line =>
+        {
+            Match alias = ScheduleOneUsingAliasRegex.Match(line);
+            return alias.Success &&
+                   alias.Groups["alias"].Value.Equals(rootName, StringComparison.Ordinal);
+        });
     }
 
     private static bool IsIgnoredReflectionOwnerTypeName(string typeName)
