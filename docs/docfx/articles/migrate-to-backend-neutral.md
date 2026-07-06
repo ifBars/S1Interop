@@ -43,7 +43,7 @@ s1interop sdkgen . --apply
 
 This inspects source references, aliases, namespace imports, string-held game type names, and local game metadata. It emits the types the mod appears to use.
 
-Usage-driven generation also picks up simple reflection metadata bindings when they point at Schedule One game types. For example, a mod that caches `AccessTools.Field(typeof(S1Quests.Quest), "title")` for a patch can get a generated `S1InteropMember` target instead of keeping that backend-sensitive lookup in mod code.
+Usage-driven generation also picks up simple reflection metadata bindings when they point at Schedule One game types. For example, a mod that caches `AccessTools.Field(typeof(S1Quests.Quest), "title")` or `AccessTools.PropertyGetter(typeof(Grid), "Container")` for a patch can get a generated `S1InteropMember` target instead of keeping that backend-sensitive lookup in mod code.
 
 For a blank or exploratory backend-neutral project, seed broad type coverage from local game references:
 

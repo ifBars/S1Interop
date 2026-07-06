@@ -52,7 +52,7 @@ public sealed class SourceInteropAnalyzer
         RegexOptions.Compiled);
 
     private static readonly Regex AccessToolsFieldOrPropertyLookupRegex = new(
-        @"AccessTools\.(?:Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""[A-Za-z_][A-Za-z0-9_]*""",
+        @"AccessTools\.(?:Field|Property(?:Getter|Setter)?)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""[A-Za-z_][A-Za-z0-9_]*""",
         RegexOptions.Compiled);
 
     private static readonly Regex GetTypeReceiverRegex = new(

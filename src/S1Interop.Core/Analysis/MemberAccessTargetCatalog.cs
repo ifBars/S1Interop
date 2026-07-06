@@ -21,7 +21,7 @@ public sealed class MemberAccessTargetCatalog
         RegexOptions.Compiled);
 
     private static readonly Regex AccessToolsFieldOrPropertyRegex = new(
-        @"AccessTools\.(?<kind>Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        @"AccessTools\.(?<kind>Field|Property(?:Getter|Setter)?)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
         RegexOptions.Compiled);
 
     private static readonly Regex InstanceGetTypeFieldOrPropertyRegex = new(

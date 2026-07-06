@@ -9,7 +9,11 @@ public sealed class DirectMemberReflectionLookupRewriter
         RegexOptions.Compiled);
 
     private static readonly Regex AccessToolsFieldOrPropertyRegex = new(
-        @"AccessTools\.(?<kind>Field|Property)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        @"AccessTools\.(?<kind>Field|Property(?:Getter|Setter)?)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex AccessToolsPropertyAccessorRegex = new(
+        @"AccessTools\.Property(?<accessor>Getter|Setter)\s*\(",
         RegexOptions.Compiled);
 
     private static readonly Regex PropertyAccessorRegex = new(
@@ -312,10 +316,14 @@ public sealed class DirectMemberReflectionLookupRewriter
                trimmed.StartsWith("FieldInfo? ", StringComparison.Ordinal) ||
                trimmed.StartsWith("PropertyInfo ", StringComparison.Ordinal) ||
                trimmed.StartsWith("PropertyInfo? ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("MethodInfo ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("MethodInfo? ", StringComparison.Ordinal) ||
                trimmed.StartsWith("System.Reflection.FieldInfo ", StringComparison.Ordinal) ||
                trimmed.StartsWith("System.Reflection.FieldInfo? ", StringComparison.Ordinal) ||
                trimmed.StartsWith("System.Reflection.PropertyInfo ", StringComparison.Ordinal) ||
-               trimmed.StartsWith("System.Reflection.PropertyInfo? ", StringComparison.Ordinal);
+               trimmed.StartsWith("System.Reflection.PropertyInfo? ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("System.Reflection.MethodInfo ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("System.Reflection.MethodInfo? ", StringComparison.Ordinal);
     }
 
     private static bool IsAssignmentPrefix(string statement)
@@ -393,6 +401,15 @@ public sealed class DirectMemberReflectionLookupRewriter
         if (kind != MemberAccessKind.Property)
         {
             return expression;
+        }
+
+        Match accessToolsAccessor = AccessToolsPropertyAccessorRegex.Match(statement);
+        if (accessToolsAccessor.Success)
+        {
+            string accessorMember = accessToolsAccessor.Groups["accessor"].Value.Equals("Getter", StringComparison.Ordinal)
+                ? "GetMethod"
+                : "SetMethod";
+            return $"{expression}!.{accessorMember}";
         }
 
         Match accessor = PropertyAccessorRegex.Match(statement);

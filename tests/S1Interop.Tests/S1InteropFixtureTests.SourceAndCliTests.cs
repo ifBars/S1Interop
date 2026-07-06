@@ -830,6 +830,7 @@ internal sealed partial class S1InteropFixtureTests
                 """
                 using HarmonyLib;
                 using System.Reflection;
+                using S1Grids = ScheduleOne.Tiles;
                 using S1Quests = ScheduleOne.Quests;
 
                 namespace S1ApiConsumerReflectionMod;
@@ -867,6 +868,12 @@ internal sealed partial class S1InteropFixtureTests
                         return titleField;
                     }
 
+                    public static MethodInfo? GetGridContainerGetter()
+                    {
+                        MethodInfo? containerGetter = AccessTools.PropertyGetter(typeof(S1Grids.Grid), "Container");
+                        return containerGetter;
+                    }
+
                     public static PropertyInfo? GetEnumeratorCurrent(object enumerator)
                     {
                         var current = enumerator.GetType().GetProperty("Current");
@@ -878,8 +885,8 @@ internal sealed partial class S1InteropFixtureTests
             ProjectAnalysis project = new WorkspaceAnalyzer().Analyze(tempProject).Projects.Single();
             SourceRisk[] risks = project.SourceInterop!.SourceRisks.ToArray();
             Assert(
-                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 4,
-                $"Source analyzer should report direct typeof(...).GetField(...), typeof(...).GetProperty(...), and AccessTools.Field(...) lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
+                risks.Count(risk => risk.Kind == "DirectMemberReflectionLookup") == 5,
+                $"Source analyzer should report direct typeof(...).GetField(...), typeof(...).GetProperty(...), AccessTools.Field(...), and AccessTools.PropertyGetter(...) lookups as generated member-target guidance. Risks:{Environment.NewLine}{string.Join(Environment.NewLine, risks.Select(risk => $"{risk.Kind}: {risk.Evidence}"))}");
             Assert(
                 risks.All(risk => !risk.Evidence.Contains("GetEnumeratorCurrent", StringComparison.Ordinal) &&
                                   !risk.Evidence.Contains("GetProperty(\"Current\")", StringComparison.Ordinal)),
@@ -922,9 +929,11 @@ internal sealed partial class S1InteropFixtureTests
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"SystemInfo\", \"deviceUniqueIdentifier\", Alias = \"deviceUniqueIdentifier\", Kind = S1Interop.S1InteropMemberKind.Property)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Tiles.Grid\", Alias = \"Grid\")]", StringComparison.Ordinal) &&
+                generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Grid\", \"Container\", Alias = \"Container\", Kind = S1Interop.S1InteropMemberKind.Property)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Quests.Quest\", Alias = \"Quest\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Quest\", \"title\", Alias = \"title\")]", StringComparison.Ordinal),
-                "Generated member-access targets should include direct member reflection, AccessTools field declarations, and typed GetType receiver declarations while skipping MelonLoader internals.");
+                "Generated member-access targets should include direct member reflection, AccessTools field/property accessor declarations, and typed GetType receiver declarations while skipping MelonLoader internals.");
             string rewrittenSource = File.ReadAllText(tempSource);
             Assert(
                 rewrittenSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry._homeScreenInstanceFieldInfo;", StringComparison.Ordinal) &&
@@ -933,9 +942,11 @@ internal sealed partial class S1InteropFixtureTests
                 rewrittenSource.Contains("var originalMethod = S1Interop.Generated.S1InteropMemberRegistry.deviceUniqueIdentifierPropertyInfo!.GetMethod;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("var teleportField = S1Interop.Generated.S1InteropMemberRegistry.teleportFieldInfo;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("FieldInfo titleField = S1Interop.Generated.S1InteropMemberRegistry.titleFieldInfo;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("MethodInfo? containerGetter = S1Interop.Generated.S1InteropMemberRegistry.ContainerPropertyInfo!.GetMethod;", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("typeof(SystemInfo).GetProperty(\"deviceUniqueIdentifier\").GetMethod", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("targetPlayer.GetType().GetField(\"teleport\"", StringComparison.Ordinal) &&
-                !rewrittenSource.Contains("AccessTools.Field(typeof(S1Quests.Quest), \"title\")", StringComparison.Ordinal),
+                !rewrittenSource.Contains("AccessTools.Field(typeof(S1Quests.Quest), \"title\")", StringComparison.Ordinal) &&
+                !rewrittenSource.Contains("AccessTools.PropertyGetter(typeof(S1Grids.Grid), \"Container\")", StringComparison.Ordinal),
                 $"Direct member reflection lookups should be rewritten to generated typed metadata accessors. Source:{Environment.NewLine}{rewrittenSource}");
 
             MigrationRollbackResult rollbackResult = new MigrationApplier().Rollback(applyResult.ManifestPath);
