@@ -1,6 +1,6 @@
 # Migration overview
 
-Use migration when a project already builds against Mono and you want S1Interop to move the project toward one of two shapes:
+Use migration when a project already builds against Mono, already has Mono/IL2CPP configurations, or uses helper APIs while still carrying direct game-wrapper code. S1Interop can move that project toward one of two shapes:
 
 - backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
 - dual-runtime: the project builds separate Mono and IL2CPP assemblies from runtime-specific configurations.
@@ -22,7 +22,7 @@ s1interop analyze .
 
 Analysis tells you which runtime the project currently targets, which game paths or references it can see, and which source patterns are likely to fail on IL2CPP.
 
-For real mods, this is usually more useful than starting with a migration command. A typical Mono project already has a MelonLoader entry point, Harmony patches, local deployment events, helper libraries, and maybe S1API or MAPI references. `analyze` lets you separate normal mod structure from the small set of direct game calls that actually need interop work.
+For real mods, this is usually more useful than starting with a migration command. A typical project may already have native Mono/IL2CPP configurations, a MelonLoader entry point, Harmony patches, local deployment events, helper libraries, and maybe S1API or MAPI references. `analyze` lets you separate normal mod structure from the direct game calls that actually need interop work.
 
 ## Safety model
 
@@ -74,4 +74,4 @@ Do not try to move an entire mature mod in one pass. Start with the direct game-
 - constructor calls where Mono and IL2CPP wrappers differ;
 - string-held type names used for Harmony targets or reflection.
 
-Leave higher-level mod code alone at first. S1API item builders, MAPI model construction, SteamNetworkLib DTOs, bGUI menus, logging, config files, and packaging scripts should only change when they directly depend on a runtime-specific game type.
+Leave higher-level mod code alone at first. Native build configurations, S1API item builders, MAPI model construction, SteamNetworkLib DTOs, bGUI menus, logging, config files, and packaging scripts should only change when they directly depend on a runtime-specific game type.

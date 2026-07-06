@@ -16,7 +16,9 @@ Most Schedule One projects already fall into a few familiar shapes. S1Interop sh
 | Project shape | Common today | S1Interop role |
 | --- | --- | --- |
 | Direct MelonLoader patch mod | A small `MelonMod`, Harmony patches, direct `ScheduleOne.*` or `Il2CppScheduleOne.*` references, and local game paths in `local.build.props`. | Keep the mod shape. Use `analyze`, `sdkgen`, and generated facades to remove duplicated Mono/IL2CPP conditionals around game types and members. |
+| Native Mono/IL2CPP configured mod | One source tree with existing `Mono`, `Il2Cpp`, `Debug Il2Cpp`, or branch-specific build configurations and runtime-specific references. | Keep the honest runtime split while moving portable game access toward generated facades. Use dual-runtime verification when the project still needs separate outputs. |
 | S1API content mod | Items, NPCs, shops, saveables, or UI built through S1API builders and lifecycle hooks. | Keep S1API for the gameplay workflow. Use S1Interop underneath or beside it when the mod still needs direct game-wrapper access that S1API does not cover. |
+| Hybrid S1API/direct mod | S1API handles content registration, but the mod also has Harmony patches, direct game reads, cached reflection bindings, or backend-specific helper code. | Treat each layer separately: leave S1API-owned workflows alone and migrate the direct game seams that cause Mono/IL2CPP friction. |
 | MAPI/building mod | Meshes, interiors, GLTF loading, or building helpers that try to avoid game assembly churn. | Use MAPI for content construction. Use S1Interop only for the direct Schedule One calls that remain. |
 | SteamNetworkLib or FishNet multiplayer mod | Runtime-specific networking references, host/client authority checks, and sometimes DTO libraries. | Start with analysis and dual-runtime verification. Move small direct game seams to facades before trying to make the whole project backend-neutral. |
 | Dedicated server addon | Headless safety, server/client splits, command permissions, and persistence hooks. | Treat server and client surfaces separately. S1Interop can reduce wrapper differences, but it does not replace server authority or lifecycle design. |
@@ -81,6 +83,8 @@ Then choose the smallest next step that matches the project:
 When testing unpublished S1Interop changes against a real mod, use a temporary copy of the mod. Pack the current `S1Interop.Generators` package into a temporary local feed and point the copy at that feed. Otherwise the mod may restore an older generator package and reproduce bugs that are already fixed in source.
 
 Existing mods usually have a mix of concerns: MelonLoader lifecycle wiring, Harmony patches, helper APIs, local deployment scripts, and direct game references. Start by moving only the direct game references that cause backend friction. Leave content builders, packaging, logging, and deployment scripts alone unless the analyzer reports a concrete problem.
+
+Do not assume the project has only one identity. A mod can already have native Mono/IL2CPP configs, require S1API for content workflows, and still contain its own direct Schedule One patch code. S1Interop should follow those boundaries instead of flattening the project into one migration story.
 
 ## What to avoid at first
 

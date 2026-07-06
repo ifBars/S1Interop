@@ -2,7 +2,7 @@
 
 S1Interop is an alpha toolchain for Schedule One mod developers who want to move Mono mods toward IL2CPP, dual-runtime builds, or a backend-neutral single-assembly shape without hand-editing every project file and wrapper difference.
 
-The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop is for the direct game access that remains in the consumer mod.
+The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop is for the direct game access that remains in a mod, whether that mod is standalone, S1API-based, or a mix of both.
 
 That matters for real Schedule One projects because most mods are not blank SDK samples. A small Harmony patch mod, an S1API content mod, a MAPI building mod, a SteamNetworkLib multiplayer mod, and a dedicated server addon all have different owners for gameplay, networking, assets, and packaging. S1Interop should only take over the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` interop seams that make those projects hard to keep portable.
 

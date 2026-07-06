@@ -14,7 +14,7 @@ s1interop analyze .
 
 Fix missing local paths or package restore problems first. The generator needs game reference metadata to validate requested types and produce useful facades.
 
-If the mod already uses S1API, MAPI, SteamNetworkLib, bGUI, or a dedicated server API, keep those dependencies in place. Backend-neutral migration is about the direct Schedule One seams that still require runtime-specific references. It is not a reason to replace a working item builder, networking helper, UI library, or server lifecycle API.
+If the mod already uses native Mono/IL2CPP configurations, S1API, MAPI, SteamNetworkLib, bGUI, or a dedicated server API, keep those parts honest while you inspect the direct Schedule One seams. Backend-neutral migration is not a reason to replace a working item builder, networking helper, UI library, server lifecycle API, or build split that still represents real runtime differences.
 
 ## 2. Add backend-neutral support
 
@@ -43,7 +43,7 @@ s1interop sdkgen . --apply
 
 This inspects source references, aliases, namespace imports, string-held game type names, and local game metadata. It emits the types the mod appears to use.
 
-Usage-driven generation also picks up simple reflection metadata bindings when they point at Schedule One game types. For example, a consumer mod that keeps S1API for quests but caches `AccessTools.Field(typeof(S1Quests.Quest), "title")` for its own patch can get a generated `S1InteropMember` target instead of keeping that backend-sensitive lookup in mod code.
+Usage-driven generation also picks up simple reflection metadata bindings when they point at Schedule One game types. For example, a mod that caches `AccessTools.Field(typeof(S1Quests.Quest), "title")` for a patch can get a generated `S1InteropMember` target instead of keeping that backend-sensitive lookup in mod code.
 
 For a blank or exploratory backend-neutral project, seed broad type coverage from local game references:
 
@@ -86,7 +86,7 @@ The goal is to keep mod code close to normal game API usage while moving backend
 
 For a real patch mod, that usually means replacing code like "read the vehicle/player/UI object differently on Mono and IL2CPP" before touching unrelated systems. Keep Harmony patch methods small and let services use generated facades behind them.
 
-For a mod that already uses S1API, keep the S1API calls where they are. Move only the direct Schedule One access that S1API does not own: Harmony targets, direct game-wrapper casts, cached member metadata, and small field/property reads around the patch.
+For a mod that already uses S1API, keep the S1API calls where they are. For a mod that already has real Mono/IL2CPP configurations, keep those builds as validation targets. Move the direct Schedule One access that can be shared safely: Harmony targets, direct game-wrapper casts, cached member metadata, and small field/property reads around patches.
 
 ## 5. Build and review diagnostics
 
