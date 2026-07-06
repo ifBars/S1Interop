@@ -9,7 +9,7 @@ s1interop new .\MyBackendNeutralMod --apply
 The scaffold includes:
 
 - a C# project and solution;
-- Mono and IL2CPP build configurations;
+- Mono and IL2CPP build configurations for validating the same backend-neutral source against both reference surfaces;
 - `local.build.props.example` for machine-specific game paths;
 - a starter `S1Interop.Generated/S1Interop.BackendNeutral.cs` declaration file;
 - package references needed by the generated helpers.
@@ -21,6 +21,8 @@ After creating the project:
 3. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
 4. Open the `.sln` in Visual Studio or Rider.
 5. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
+
+Those two configurations are not meant to make you maintain two source implementations. They are validation targets. Your mod code should still prefer generated `S1Interop.ScheduleOne.*` facades and shared source wherever S1Interop can express the backend difference safely.
 
 For a blank project, seed the SDK from your local game references:
 

@@ -6,12 +6,58 @@ For the high-level "what is S1Interop" pitch, see [Introduction](introduction.md
 
 ## Runtimes and backends
 
+Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you would need to maintain two separate mod assemblies — one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`. S1Interop lets you target both from a single codebase by abstracting the difference behind generated facades.
+
+### Mono vs IL2CPP at a glance
+
+| Aspect | Mono | IL2CPP |
+| --- | --- | --- |
+| **Game assembly** | `Assembly-CSharp.dll` | `Il2CppAssembly-CSharp.dll` |
+| **Game type namespace** | `ScheduleOne.*` | `Il2CppScheduleOne.*` |
+| **Interop layer** | Ordinary managed .NET | Il2CppInterop-generated wrapper types |
+| **Harmony patching** | Standard `MethodBase` | Proxy-aware; transpilers restricted |
+| **Delegate events** | Standard `+=` / `-=` | Requires `DelegateSupport.ConvertDelegate` |
+| **Object casts** | Standard `as` / `is` | Must route through `TryCast<T>` on proxy |
+
+> [!NOTE]
+> S1Interop diagnostic codes `S1I004`-`S1I007` catch known IL2CPP boundary failures — Harmony transpiler misuse, managed collection callbacks, managed byte buffers at native boundaries, and plain object casts — at compile time. They only fire when the compilation targets IL2CPP.
+
+### How S1Interop resolves the backend
+
+S1Interop needs to know the active backend so it can route type resolution and member access to the right runtime surface. It resolves the backend in priority order:
+
+1. **`S1InteropTargetRuntime` MSBuild property** — set this in your project file or `local.build.props` to pin the backend at compile time (values: `Mono`, `Il2Cpp`).
+2. **Preprocessor symbols** — define `MONO` or `IL2CPP` in your `<DefineConstants>` to tell the generator explicitly.
+3. **Runtime probes** — when no compile-time signal is present, the generated `S1InteropRuntime` type probes well-known type and assembly names at startup to detect which backend is loaded.
+
+> [!TIP]
+> Pinning the backend at compile time via `S1InteropTargetRuntime` lets the generator emit `Backend` as a `const`, which in turn lets the compiler eliminate the dead branch entirely in release builds.
+
+### Reading the backend at runtime
+
+The generator emits `S1InteropRuntime` and `S1InteropRuntimeBackend` into every project that references `S1Interop.Generators`. You can read the active backend from your mod code at any time:
+
+```csharp
+using S1Interop.Generated;
+
+// Enum value: S1InteropRuntimeBackend.Mono, .Il2Cpp, or .Unknown
+S1InteropRuntimeBackend backend = S1InteropRuntime.Backend;
+
+// Convenience booleans
+bool onMono   = S1InteropRuntime.IsMono;
+bool onIl2Cpp = S1InteropRuntime.IsIl2Cpp;
+```
+
+When the build target is known at compile time — through the MSBuild property or preprocessor symbols — `Backend` is emitted as a `const` field rather than a runtime-resolved property. This means the compiler can eliminate the unused code path entirely in an optimised build.
+
+### Term reference
+
 | Term | Meaning |
 | --- | --- |
 | **Mono** | The managed runtime Schedule One ships with in its default build. Mod assemblies reference `Assembly-CSharp.dll` and use ordinary managed types under `ScheduleOne.*`. |
 | **IL2CPP** | The alternate runtime Schedule One ships for IL2CPP builds. Mod assemblies reference `Il2CppAssembly-CSharp.dll` and use Il2CppInterop-generated wrapper types under `Il2CppScheduleOne.*`. |
 | **Backend** | The active runtime for a given compilation or process: `Mono`, `Il2Cpp`, or `Unknown` (when the generator cannot tell). S1Interop resolves the backend at compile time when preprocessor symbols or the `S1InteropTargetRuntime` MSBuild property are set, and falls back to runtime probes otherwise. |
-| **Backend-neutral** | Source that compiles and runs against either backend from one assembly, using generated `S1Interop.ScheduleOne.*` facades instead of direct `ScheduleOne.*` or `Il2CppScheduleOne.*` references. |
+| **Backend-neutral** | Source that compiles and runs against either backend from one assembly, using generated `S1Interop.ScheduleOne.*` facades instead of direct `ScheduleOne.*` or `Il2CppScheduleOne.*` references. A backend-neutral project may still keep Mono and IL2CPP build configurations as validation targets for the same source. |
 
 ## The two packages
 
@@ -23,6 +69,8 @@ S1Interop is two NuGet packages. Mixing them up is the most common source of con
 | **Generator package** | `S1Interop.Generators` | A Roslyn incremental source generator and analyzer. Reads declarations and emits source plus diagnostics. | During every build (and IDE design-time build) of a project that references it. |
 
 A mod project that only wants the generated SDK surface can reference just the generator package and author declarations by hand. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
+
+S1Interop's package split is also its product boundary. The generator and CLI own interop mechanics: type registration, facade emission, source-risk diagnostics, migration, rollback, and sandbox verification. Higher-level gameplay APIs can sit above that layer and keep their own domain abstractions.
 
 ## Declarations
 
@@ -56,7 +104,7 @@ A per-type empty `readonly struct` (for example `LandVehicleTag`) generated for 
 
 A `static internal class` emitted under `S1Interop.ScheduleOne.*` for each declared `S1InteropType`. Preserves the original runtime namespace root under `S1Interop`: `ScheduleOne.Vehicles.LandVehicle` becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`. The generator never emits shortened duplicate namespaces.
 
-A facade exposes `Handle`, `Type`, `TypeName`, `Create(...)`, `Is(...)`, `TryAs(...)`, `As(...)`, `Get(...)`, `TrySet(...)`, `Invoke(...)`, plus discovered or declared typed member accessors.
+A facade exposes `Handle`, `Type`, `TypeName`, `Create(...)`, `Is(...)`, `TryAs(...)`, `As(...)`, `Get(...)`, `TrySet(...)`, `Invoke(...)`, plus discovered or declared typed member accessors. Prefer named facade members when they exist; the string-based helpers are fallback and migration support.
 
 ### Handle
 
@@ -112,7 +160,7 @@ The generator does not emit shortened duplicates like `S1Interop.Vehicles.LandVe
 | **Rollback manifest** | A JSON manifest written under `s1interop-runs/<run-id>/` for every applied migration. Consumed by `s1interop migrate rollback`. |
 | **Source-risk report** | A generated report of cases the migration could not safely rewrite. These remain as diagnostics or manual review items instead of being guessed. |
 
-The pipeline is `analyze` → `plan` → `apply` → `verify`. See [Migration overview](migrating-mono-mods.md) for the workflow paths.
+The pipeline is `analyze` -> `plan` -> `apply` -> `verify`. See [Migration overview](migrating-mono-mods.md) for the workflow paths.
 
 ## SDK generation
 

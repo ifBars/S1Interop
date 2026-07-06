@@ -27,6 +27,12 @@ FishNet.Runtime.*                -> S1Interop.FishNet.Runtime.*
 
 S1Interop does not emit shortened duplicate namespaces such as `S1Interop.Vehicles.*`. One canonical namespace is easier to learn, search, and document.
 
+## Authoring model and validation targets
+
+Backend-neutral is about the source code a mod author writes. The goal is one source surface with generated facades, not one pile of `#if MONO` / `#if IL2CPP` branches.
+
+Projects can still keep Mono and IL2CPP build configurations. Those configurations validate the same backend-neutral source against both local reference surfaces and give the generator enough context to report missing types, missing members, or IL2CPP-only boundary problems. Treat them as validation targets rather than separate implementation tracks.
+
 ## Type-first coverage
 
 Use [Backend-neutral declarations](backend-neutral-declarations.md) as the detailed reference for declaration semantics. The short version is:
@@ -54,3 +60,11 @@ When reference metadata is available, that type declaration can generate:
 - invokers for unambiguous public methods.
 
 `S1InteropMember` remains available for cases the type facade cannot safely infer yet: private members, better aliases, ambiguous overloads, pinned Harmony targets, and migration-specific reflection bindings.
+
+## Current alpha ergonomics
+
+The current facade layer intentionally favors correctness over pretending every game API is already a normal C# wrapper. You will still see `Handle`, `As`, `TryAs`, `Get<T>`, `Get...Value<T>`, `TrySet...`, and `Invoke` patterns in generated output.
+
+Use named facade members first when they are generated. Fall back to string-based `Get`, `TrySet`, or `Invoke` only when the member is not yet safe to expose as a typed facade member. If a public member is missing, the usual reasons are overload ambiguity, generic method shape, incompatible Mono/IL2CPP signatures, or a conversion rule S1Interop does not know yet.
+
+Future SDK work should keep moving ordinary public members toward native-feeling facade access while leaving the registry and reflection helpers as implementation details or explicit escape hatches.

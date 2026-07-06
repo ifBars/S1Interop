@@ -4,6 +4,8 @@ Use this path when you want an existing Mono mod to move toward one assembly tha
 
 This is the main S1Interop product direction. It does not mean "compile the same source twice and ship two DLLs." It means the mod source moves away from direct `ScheduleOne.*` or `Il2CppScheduleOne.*` calls and uses generated facades under `S1Interop.ScheduleOne.*`.
 
+Mono and IL2CPP build configurations can still be useful after the migration. In a backend-neutral project they are validation targets for the same source, not a commitment to keep two conditional implementations alive.
+
 ## 1. Analyze the mod
 
 ```powershell
@@ -91,3 +93,5 @@ If both Mono and IL2CPP references are configured, generator diagnostics can cat
 ## Current limits
 
 Backend-neutral migration is still alpha. The tool can generate facades and move some source patterns, but advanced mods may still need explicit declarations or small source edits. Unsupported cases should show up as diagnostics or source-risk reports rather than silent guesses.
+
+The current generated facade surface is useful but still conservative. Ordinary public members are generated when Mono and IL2CPP metadata make them safe. Overloads, constructors, collection conversions, `Il2CppSystem.Guid`, Unity object/proxy casts, and arbitrary reflection flows may still need explicit `S1InteropMember` declarations, generated reports, or hand-written runtime-specific code.

@@ -46,4 +46,11 @@ End-to-end paths that combine CLI commands and the generator package.
 
 The generated API reference is limited to stable `S1Interop.Core` models and library entry points. Use [API reference](api-reference.md) when you are embedding S1Interop in another tool or reading its result contracts.
 
+## Troubleshooting
+
+| Page | Use it when |
+| --- | --- |
+| [Common issues](troubleshooting.md) | Something is silently wrong — missing generated symbols, failed restores, stale IDE state, migration rollback. |
+| [FAQ](faq.md) | You have questions about migration paths, package usage, alpha limitations, or the safety model. |
+
 For architecture, product direction, real-mod evidence, testing, publishing, and contributing, see [Contributors](../contributors/index.md).

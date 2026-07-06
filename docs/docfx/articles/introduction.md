@@ -4,6 +4,8 @@ S1Interop is a toolchain for Schedule One mod developers who need to move Mono m
 
 The alpha is already useful for real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification. It is intentionally conservative: if S1Interop cannot prove a rewrite is safe, it leaves a report instead of guessing.
 
+Think of S1Interop as the generated interop layer for direct game-wrapper work. It is not trying to replace higher-level modding APIs such as S1API. Those APIs can still own gameplay-oriented builders and workflows; S1Interop's job is to make the Mono/IL2CPP boundary, generated wrapper drift, type lookup, member binding, casts, delegates, and validation paths easier to handle.
+
 ## Two packages, one workflow
 
 S1Interop ships as two separate NuGet packages. Understanding which one does what is the key to using the toolchain well.
@@ -45,6 +47,8 @@ For the vocabulary behind these terms (`S1InteropObject<TTag>`, facade, `Handle`
 ## What S1Interop is not
 
 S1Interop does not reverse IL2CPP back into Mono, hide every runtime difference behind reflection guesses, or convert every mod with one command. It also never redistributes Schedule One assemblies, IL2CPP wrappers, decompiled source, or game assets.
+
+Backend-neutral also does not mean "no per-runtime validation." A backend-neutral project can still have Mono and IL2CPP build configurations so the same source is checked against both local reference surfaces. Those configurations are validation targets, not an invitation to maintain two sets of handwritten conditionals.
 
 ## Current product direction
 

@@ -13,6 +13,34 @@ The core product promise is:
 - `S1InteropMember` is an override and escape hatch for surfaces that cannot be safely discovered yet.
 - The generated SDK must come from local reference metadata so drift is visible and no proprietary game artifacts are committed.
 
+## Positioning
+
+S1Interop is the low-level interop layer for direct Schedule One game-wrapper work. It should make IL2CPP and backend-neutral development approachable without becoming a hand-written replacement for every higher-level modding API.
+
+That means:
+
+- S1Interop should hide repetitive Mono/IL2CPP wrapper differences, type lookup, member binding, casts, delegate conversion, and build-validation mechanics.
+- S1Interop should not grow into a manually maintained S1API-style catalog of gameplay concepts, item builders, NPC builders, shops, saveables, or UI workflows.
+- Higher-level APIs can build on top of S1Interop when they need backend-neutral internals, while still owning their own domain abstractions.
+- Generated metadata-backed coverage is preferred over a committed static wrapper catalog because Schedule One and MelonLoader wrapper output can drift.
+
+## Backend-neutral authoring vs validation
+
+Backend-neutral is an authoring model first: mod code should move toward one source surface under `S1Interop.ScheduleOne.*`. The project may still expose Mono and IL2CPP build configurations so developers can validate the same source against both local reference surfaces.
+
+Those configurations should be presented as validation targets, not as a requirement to maintain two conditional codepaths. A new developer should be able to start with the generated facade model, fill in local paths, and build both reference surfaces without needing to understand every wrapper naming rule up front.
+
+## Current alpha bar
+
+The current generated facade is intentionally conservative. `Handle`, `As`, `TryAs`, `Is`, `Create`, named member accessors, and low-level `Get`/`TrySet`/`Invoke` helpers are useful now, but the public authoring goal is still more native-feeling than the current object/reflection-shaped fallback layer.
+
+Near-term SDK quality should prioritize:
+
+- typed property and method facades where Mono and IL2CPP metadata agree;
+- clear diagnostics or generated reports for members skipped because they are overloaded, generic, ambiguous, missing, or incompatible across backends;
+- constructor helpers and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
+- keeping `S1Interop.Generated.S1InteropMemberRegistry` and other registry types as implementation details in docs, examples, and migration rewrites whenever a type facade can express the same operation.
+
 ## Target Experience
 
 Today, backend-neutral code can use generated type handles:

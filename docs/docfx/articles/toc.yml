@@ -38,3 +38,9 @@
       href: migrate-to-dual-runtime.md
 - name: API reference
   href: api-reference.md
+- name: Troubleshooting
+  items:
+    - name: Common issues
+      href: troubleshooting.md
+    - name: FAQ
+      href: faq.md

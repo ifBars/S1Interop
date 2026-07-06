@@ -2,6 +2,8 @@
 
 S1Interop is an alpha toolchain for Schedule One mod developers who want to move Mono mods toward IL2CPP, dual-runtime builds, or a backend-neutral single-assembly shape without hand-editing every project file and wrapper difference.
 
+The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop sits underneath that kind of API and reduces the Mono/IL2CPP maintenance burden.
+
 The main product direction is a generated backend-neutral SDK:
 
 - `s1interop new` starts a backend-neutral mod project.
@@ -10,6 +12,8 @@ The main product direction is a generated backend-neutral SDK:
 - `s1interop analyze`, `lint`, and `verify-migration` report unsafe IL2CPP boundary cases before they become runtime failures.
 
 It is not a finished "convert every mod with one command" tool yet. The current alpha already handles real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification, but unsupported or ambiguous cases are reported instead of guessed.
+
+Backend-neutral authoring means one source model and generated `S1Interop.ScheduleOne.*` facades. It does not mean developers should never build against Mono and IL2CPP references. Per-runtime build configurations remain useful validation targets so generator diagnostics can catch missing types, wrapper drift, and IL2CPP boundary failures before runtime.
 
 ## Documentation
 
@@ -27,6 +31,8 @@ The full docs site lives under [`docs/docfx`](docs/docfx):
 - [Migrate to backend-neutral](docs/docfx/articles/migrate-to-backend-neutral.md)
 - [Migrate to dual-runtime](docs/docfx/articles/migrate-to-dual-runtime.md)
 - [Diagnostics](docs/docfx/articles/diagnostics.md)
+- [Troubleshooting](docs/docfx/articles/troubleshooting.md)
+- [FAQ](docs/docfx/articles/faq.md)
 - [API reference scope](docs/docfx/articles/api-reference.md)
 - [Testing](docs/docfx/contributors/testing.md)
 
