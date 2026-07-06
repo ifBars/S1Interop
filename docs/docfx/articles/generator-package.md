@@ -70,13 +70,14 @@ Each facade exposes:
 - `Handle`: a readonly struct wrapping the runtime instance. Exposes `HasValue`, `Instance`, `Value`, and an implicit conversion to the underlying `S1InteropObject<LandVehicleTag>`.
 - `Type`: the resolved `System.Type?` for the active backend.
 - `TypeName`: the runtime type name string.
-- `Create(...)` and `Create<T>(...)`: constructor helpers.
+- `Create(...)` and `Create<T>(...)`: object-returning constructor helpers.
+- `CreateHandle(...)` and `TryCreate(out Handle, ...)`: constructor helpers that immediately wrap successful creations as the facade `Handle`.
 - `Is(object?)`: instance check.
 - `TryAs(object?, out Handle)` and `As(object?)`: backend-neutral wrapping.
 - `Get(handle, memberName)` and `Get(instance, memberName)`: reflection get.
 - `TrySet(handle, memberName, value)` and `TrySet(instance, memberName, value)`: reflection set.
 - `Invoke(handle, methodName, ...)`, `Invoke(instance, methodName, ...)`, and `Invoke<T>(...)` overloads: reflection invocation.
-- Named member accessors discovered from reference metadata or declared via `S1InteropMember`. Metadata-discovered scalar, string, object, and void method shapes get concrete signatures; game wrapper types, collections, by-ref parameters, generated backing fields, ambiguous overloads, and explicit member declarations stay on object/generic fallback helpers.
+- Named member accessors discovered from reference metadata or declared via `S1InteropMember`. Metadata-discovered scalar, string, object, void method shapes, and game-object values with declared facades get concrete signatures; undeclared game wrapper types, collections, by-ref parameters, generated backing fields, ambiguous overloads, and explicit member declarations stay on object/generic fallback helpers.
 
 Generated facades are `internal` by default. The generator does not shorten namespaces: `ScheduleOne.Vehicles.LandVehicle` always becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`, never `S1Interop.Vehicles.LandVehicle`.
 

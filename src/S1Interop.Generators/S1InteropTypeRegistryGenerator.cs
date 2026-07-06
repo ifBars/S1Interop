@@ -58,11 +58,15 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
                 input.Right,
                 PublicMemberCatalog.DiscoverMemberEntries(input.Left.Left, input.Left.Right)));
 
-        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries), static (sourceContext, input) =>
+        IncrementalValueProvider<ImmutableArray<S1InteropConstructorEntry>> allConstructorEntries = context.CompilationProvider
+            .Combine(allEntries)
+            .Select(static (input, _) => PublicMemberCatalog.DiscoverConstructorEntries(input.Left, input.Right));
+
+        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries).Combine(allConstructorEntries), static (sourceContext, input) =>
         {
             sourceContext.AddSource(
                 "S1Interop.TypeRegistry.g.cs",
-                SourceText.From(GenerateRegistrySource(input.Left.Left, input.Left.Right, input.Right), Encoding.UTF8));
+                SourceText.From(GenerateRegistrySource(input.Left.Left.Left, input.Left.Left.Right, input.Left.Right, input.Right), Encoding.UTF8));
         });
         context.RegisterSourceOutput(bridgeRequests, static (sourceContext, requests) =>
         {

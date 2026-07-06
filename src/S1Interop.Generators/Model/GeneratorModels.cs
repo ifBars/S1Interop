@@ -117,6 +117,25 @@ internal readonly struct S1InteropMemberEntry
     public ImmutableArray<string> ParameterNames { get; }
 }
 
+internal readonly struct S1InteropConstructorEntry
+{
+    public S1InteropConstructorEntry(
+        string ownerAlias,
+        ImmutableArray<string> parameterTypeNames,
+        ImmutableArray<string> parameterNames)
+    {
+        OwnerAlias = ownerAlias;
+        ParameterTypeNames = parameterTypeNames;
+        ParameterNames = parameterNames;
+    }
+
+    public string OwnerAlias { get; }
+
+    public ImmutableArray<string> ParameterTypeNames { get; }
+
+    public ImmutableArray<string> ParameterNames { get; }
+}
+
 internal readonly struct DiscoveredMember
 {
     public DiscoveredMember(
@@ -144,6 +163,21 @@ internal readonly struct DiscoveredMember
     public ImmutableArray<string> ParameterTypeNames { get; }
 
     public string? ValueTypeName { get; }
+
+    public ImmutableArray<string> ParameterNames { get; }
+}
+
+internal readonly struct DiscoveredConstructor
+{
+    public DiscoveredConstructor(
+        ImmutableArray<string> parameterTypeNames,
+        ImmutableArray<string> parameterNames)
+    {
+        ParameterTypeNames = parameterTypeNames;
+        ParameterNames = parameterNames;
+    }
+
+    public ImmutableArray<string> ParameterTypeNames { get; }
 
     public ImmutableArray<string> ParameterNames { get; }
 }
@@ -242,6 +276,29 @@ internal sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1Interop
             foreach (string parameterName in obj.ParameterNames)
             {
                 hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(parameterName);
+            }
+
+            return hash;
+        }
+    }
+}
+
+internal sealed class S1InteropConstructorEntryComparer : IEqualityComparer<S1InteropConstructorEntry>
+{
+    public static readonly S1InteropConstructorEntryComparer Instance = new();
+
+    public bool Equals(S1InteropConstructorEntry x, S1InteropConstructorEntry y) =>
+        string.Equals(x.OwnerAlias, y.OwnerAlias, StringComparison.Ordinal) &&
+        x.ParameterTypeNames.SequenceEqual(y.ParameterTypeNames, StringComparer.Ordinal);
+
+    public int GetHashCode(S1InteropConstructorEntry obj)
+    {
+        unchecked
+        {
+            int hash = StringComparer.Ordinal.GetHashCode(obj.OwnerAlias);
+            foreach (string parameterTypeName in obj.ParameterTypeNames)
+            {
+                hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(parameterTypeName);
             }
 
             return hash;

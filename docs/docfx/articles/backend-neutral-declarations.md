@@ -72,13 +72,13 @@ Opts a single game type into a backend-neutral facade with discovered public mem
 A `S1Interop.ScheduleOne.Vehicles.LandVehicle` facade with:
 
 - a `Handle` readonly struct wrapping the runtime instance;
-- `Type`, `TypeName`, `Create(...)`, `Create<T>(...)`;
+- `Type`, `TypeName`, `Create(...)`, `Create<T>(...)`, `CreateHandle(...)`, `TryCreate(out Handle, ...)`;
 - `Is(object?)`, `TryAs(object?, out Handle)`, `As(object?)`;
 - `Get`/`TrySet`/`Invoke`/`Invoke<T>` reflection helpers for both `Handle` and raw `object?` receivers;
 - accessors for compatible public fields, properties, and unambiguous public methods, discovered from the referenced Mono and IL2CPP metadata;
 - the underlying registry `Tag` and resolution entries in `S1Interop.Generated.S1InteropTypeRegistry`.
 
-This is the key difference from `S1InteropNamespace` alone: `S1InteropType` opts the type into member discovery, so the `Handle` gains named accessors in addition to the generic `HasValue`/`Instance`/`Value` members. When the discovered member type is backend-neutral today, the accessor uses a concrete signature, for example `vehicle.VehicleName` as `string?` or `vehicle.CurrentThrottle` as `float?`. Members whose types are game wrappers, collections, by-ref values, generic methods, overloaded methods, or otherwise unsafe stay on the object/generic fallback helpers. Generated backing fields are skipped; use the real public field or property instead. If you only have an `S1InteropNamespace` declaration for `ScheduleOne`, the `Player` type's `Handle` will only have generic members - you will not see `player.Money` or similar named accessors until you add an `S1InteropType` declaration for that specific type.
+This is the key difference from `S1InteropNamespace` alone: `S1InteropType` opts the type into member discovery, so the `Handle` gains named accessors in addition to the generic `HasValue`/`Instance`/`Value` members. When the discovered member type is backend-neutral today, the accessor uses a concrete signature, for example `vehicle.VehicleName` as `string?`, `vehicle.CurrentThrottle` as `float?`, or `vehicle.AssignedDriver` as `S1Interop.ScheduleOne.PlayerScripts.Player.Handle` when `Player` is also declared as a facade. Members whose types are undeclared game wrappers, collections, by-ref values, generic methods, overloaded methods, or otherwise unsafe stay on the object/generic fallback helpers. Generated backing fields are skipped; use the real public field or property instead. If you only have an `S1InteropNamespace` declaration for `ScheduleOne`, the `Player` type's `Handle` will only have generic members - you will not see `player.Money` or similar named accessors until you add an `S1InteropType` declaration for that specific type.
 
 If the referenced assemblies do not contain the requested type, the generator reports `S1I001`. Declaration diagnostics are quiet when no game reference surface is available, so package-restore and docs-only builds do not fail.
 

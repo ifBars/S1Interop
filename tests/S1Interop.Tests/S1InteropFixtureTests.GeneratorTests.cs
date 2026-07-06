@@ -312,10 +312,23 @@ internal sealed partial class S1InteropFixtureTests
                     public string vehicleName = "";
                     public float CurrentThrottle { get; set; }
                     public int HealthBackingField;
+                    public ScheduleOne.PlayerScripts.Player? AssignedDriver { get; set; }
                     public static LandVehicle? Instance { get; set; }
                     internal string InternalName = "";
                     public string this[int index] => index.ToString();
                     public const string StableKind = "vehicle";
+
+                    public LandVehicle()
+                    {
+                    }
+
+                    public LandVehicle(string name, float currentThrottle, ScheduleOne.PlayerScripts.Player player)
+                    {
+                        vehicleName = name;
+                        CurrentThrottle = currentThrottle;
+                        AssignedDriver = player;
+                    }
+
                     public string StartEngine()
                     {
                         return "started";
@@ -323,7 +336,13 @@ internal sealed partial class S1InteropFixtureTests
 
                     public string AssignDriver(ScheduleOne.PlayerScripts.Player player)
                     {
+                        AssignedDriver = player;
                         return player.Name;
+                    }
+
+                    public ScheduleOne.PlayerScripts.Player? FindAssignedDriver()
+                    {
+                        return AssignedDriver;
                     }
 
                     public string Rename(string name)
@@ -338,6 +357,11 @@ internal sealed partial class S1InteropFixtureTests
                     public static int ClampSpeed(int value)
                     {
                         return value;
+                    }
+
+                    public int KeywordParameter(int @class)
+                    {
+                        return @class;
                     }
 
                     public void Overloaded()
@@ -359,6 +383,10 @@ internal sealed partial class S1InteropFixtureTests
                 public sealed class Player
                 {
                     public string Name = "";
+
+                    public Player()
+                    {
+                    }
                 }
             }
             """);
@@ -372,8 +400,21 @@ internal sealed partial class S1InteropFixtureTests
                     public string vehicleName { get; set; } = "";
                     public float CurrentThrottle;
                     public int HealthBackingField;
+                    public Il2CppScheduleOne.PlayerScripts.Player? AssignedDriver { get; set; }
                     public static LandVehicle? Instance { get; set; }
                     public string Il2CppOnly { get; set; } = "";
+
+                    public LandVehicle()
+                    {
+                    }
+
+                    public LandVehicle(string name, float currentThrottle, Il2CppScheduleOne.PlayerScripts.Player player)
+                    {
+                        vehicleName = name;
+                        CurrentThrottle = currentThrottle;
+                        AssignedDriver = player;
+                    }
+
                     public string StartEngine()
                     {
                         return "started";
@@ -381,7 +422,13 @@ internal sealed partial class S1InteropFixtureTests
 
                     public string AssignDriver(Il2CppScheduleOne.PlayerScripts.Player player)
                     {
+                        AssignedDriver = player;
                         return player.Name;
+                    }
+
+                    public Il2CppScheduleOne.PlayerScripts.Player? FindAssignedDriver()
+                    {
+                        return AssignedDriver;
                     }
 
                     public string Rename(string name)
@@ -396,6 +443,11 @@ internal sealed partial class S1InteropFixtureTests
                     public static int ClampSpeed(int value)
                     {
                         return value;
+                    }
+
+                    public int KeywordParameter(int @class)
+                    {
+                        return @class;
                     }
 
                     public void Overloaded()
@@ -421,12 +473,17 @@ internal sealed partial class S1InteropFixtureTests
                 public sealed class Player
                 {
                     public string Name = "";
+
+                    public Player()
+                    {
+                    }
                 }
             }
             """);
         const string source =
             """
             [assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle", Alias = "LandVehicle")]
+            [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.Player", Alias = "Player")]
             [assembly: S1Interop.S1InteropType("FishNet.Runtime.NetworkManager", Alias = "NetworkManager")]
 
             namespace SyntheticMod
@@ -441,19 +498,31 @@ internal sealed partial class S1InteropFixtureTests
             source,
             [monoGameReference, il2CppGameReference],
             "IL2CPP");
+        const string untypedCreateHandle = "public static Handle CreateHandle(params object?[] args) => As(Create(args));";
+        const string typedCreateHandle = "public static Handle CreateHandle(string? name, float currentThrottle, S1Interop.ScheduleOne.PlayerScripts.Player.Handle player) => As(Create(name, currentThrottle, player.Value.Instance));";
 
         Assert(
             generated.Contains("public const string LandVehicleVehicleNameName = \"vehicleName\";", StringComparison.Ordinal) &&
             generated.Contains("public const string LandVehicleCurrentThrottleName = \"CurrentThrottle\";", StringComparison.Ordinal) &&
+            generated.Contains("public const string LandVehicleAssignedDriverName = \"AssignedDriver\";", StringComparison.Ordinal) &&
             generated.Contains("public const string LandVehicleInstanceName = \"Instance\";", StringComparison.Ordinal),
             $"Declaring an interop type should discover compatible public fields and properties. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public static string? GetVehicleName(Handle instance)", StringComparison.Ordinal) &&
             generated.Contains("public static float? GetCurrentThrottle(Handle instance)", StringComparison.Ordinal) &&
-            generated.Contains("public static object? GetInstance()", StringComparison.Ordinal) &&
+            generated.Contains("public static S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle GetInstance()", StringComparison.Ordinal) &&
+            generated.Contains("public static Handle CreateHandle(params object?[] args) => As(Create(args));", StringComparison.Ordinal) &&
+            generated.Contains("public static bool TryCreate(out Handle value, params object?[] args)", StringComparison.Ordinal) &&
+            generated.Contains("public static Handle CreateHandle(string? name, float currentThrottle, S1Interop.ScheduleOne.PlayerScripts.Player.Handle player) => As(Create(name, currentThrottle, player.Value.Instance));", StringComparison.Ordinal) &&
+            generated.Contains("public static bool TryCreate(out Handle value, string? name, float currentThrottle, S1Interop.ScheduleOne.PlayerScripts.Player.Handle player)", StringComparison.Ordinal) &&
             generated.Contains("public static object? StartEngine(Handle instance, params object?[] args)", StringComparison.Ordinal) &&
             generated.Contains("public static object? AssignDriver(Handle instance, params object?[] args)", StringComparison.Ordinal),
             $"Type facades should expose discovered members and unambiguous public methods without explicit S1InteropMember declarations. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.IndexOf(untypedCreateHandle, StringComparison.Ordinal) >= 0 &&
+            generated.IndexOf(typedCreateHandle, StringComparison.Ordinal) > generated.IndexOf(untypedCreateHandle, StringComparison.Ordinal) &&
+            CountOccurrences(generated, typedCreateHandle) == 1,
+            $"Typed constructor helpers should be deterministic, deduplicated, and emitted after the object-params fallback. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("namespace S1Interop.ScheduleOne.Vehicles", StringComparison.Ordinal) &&
             !generated.Contains("namespace S1Interop.Vehicles", StringComparison.Ordinal),
@@ -469,18 +538,25 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             generated.Contains("public string? VehicleName => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName<string>(value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public float? CurrentThrottle => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleCurrentThrottleValue<float>(value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public S1Interop.ScheduleOne.PlayerScripts.Player.Handle AssignedDriver => S1Interop.ScheduleOne.PlayerScripts.Player.As(S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleAssignedDriver(value.Instance));", StringComparison.Ordinal) &&
             generated.Contains("public T? GetVehicleName<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleVehicleName<T>(value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public T? GetCurrentThrottleValue<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.GetLandVehicleCurrentThrottleValue<T>(value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public bool TrySetVehicleName(string? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleVehicleName(value.Instance, memberValue);", StringComparison.Ordinal) &&
             generated.Contains("public bool TrySetCurrentThrottle(float memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleCurrentThrottle(value.Instance, memberValue);", StringComparison.Ordinal) &&
+            generated.Contains("public bool TrySetAssignedDriver(S1Interop.ScheduleOne.PlayerScripts.Player.Handle memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleAssignedDriver(value.Instance, memberValue.Value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public bool TrySetCurrentThrottle(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySetLandVehicleCurrentThrottle(value.Instance, memberValue);", StringComparison.Ordinal),
             $"Type facade handles should expose native-like instance accessors for discovered field/property members. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public static string? StartEngine(Handle instance) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleStartEngine<string>(instance.Value.Instance);", StringComparison.Ordinal) &&
-            generated.Contains("public static string? Rename(Handle instance, string? arg0) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleRename<string>(instance.Value.Instance, arg0);", StringComparison.Ordinal) &&
+            generated.Contains("public static string? AssignDriver(Handle instance, S1Interop.ScheduleOne.PlayerScripts.Player.Handle player) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleAssignDriver<string>(instance.Value.Instance, player.Value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public static S1Interop.ScheduleOne.PlayerScripts.Player.Handle FindAssignedDriver(Handle instance) => S1Interop.ScheduleOne.PlayerScripts.Player.As(S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleFindAssignedDriver(instance.Value.Instance));", StringComparison.Ordinal) &&
+            generated.Contains("public static string? Rename(Handle instance, string? name) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleRename<string>(instance.Value.Instance, name);", StringComparison.Ordinal) &&
             generated.Contains("public static void StopEngine(Handle instance) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleStopEngine(instance.Value.Instance);", StringComparison.Ordinal) &&
-            generated.Contains("public static int? ClampSpeed(int arg0) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleClampSpeed<int>(arg0);", StringComparison.Ordinal),
+            generated.Contains("public static int? ClampSpeed(int value) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleClampSpeed<int>(value);", StringComparison.Ordinal),
             $"Type facades should add typed method overloads when return and parameter metadata are backend-neutral. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public static int? KeywordParameter(Handle instance, int @class) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleKeywordParameter<int>(instance.Value.Instance, @class);", StringComparison.Ordinal),
+            $"Type facades should preserve valid metadata parameter names and escape C# keywords. Generated source:{Environment.NewLine}{generated}");
         Assert(
             !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value.Instance);", StringComparison.Ordinal),
             $"Type facade handles should not generate accessors that collide with built-in handle members. Generated source:{Environment.NewLine}{generated}");

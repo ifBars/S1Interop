@@ -36,10 +36,9 @@ The current generated facade is intentionally conservative. `Handle`, `As`, `Try
 
 Near-term SDK quality should prioritize:
 
-- typed property and method facades where Mono and IL2CPP metadata agree, starting with backend-neutral scalar, string, object, and void method shapes;
-- facade-handle returns for discovered game-object members once handle-return naming and conversion rules are strong enough;
+- typed property and method facades where Mono and IL2CPP metadata agree, including backend-neutral scalar, string, object, void method shapes, and declared facade handles for game-object members;
 - clear diagnostics or generated reports for members skipped because they are overloaded, generic, ambiguous, missing, or incompatible across backends;
-- constructor helpers and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
+- broader constructor and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
 - keeping `S1Interop.Generated.S1InteropMemberRegistry` and other registry types as implementation details in docs, examples, and migration rewrites whenever a type facade can express the same operation.
 
 ## Target Experience
@@ -52,28 +51,35 @@ S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle =
 
 string? name = vehicle.VehicleName;
 float? throttle = vehicle.CurrentThrottle;
+S1Interop.ScheduleOne.PlayerScripts.Player.Handle driver = vehicle.AssignedDriver;
 ```
 
 The generated SDK should preserve the original runtime namespace root under `S1Interop`:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
+using S1Interop.ScheduleOne.PlayerScripts;
 
 LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
+LandVehicle.Handle created = LandVehicle.CreateHandle();
 
 string? name = vehicle.VehicleName;
 float? throttle = vehicle.CurrentThrottle;
+Player.Handle driver = vehicle.AssignedDriver;
 ```
 
 or, when a static facade is the safer shape:
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
+using S1Interop.ScheduleOne.PlayerScripts;
 
 var vehicle = LandVehicle.As(rawVehicle);
+LandVehicle.Handle created = LandVehicle.CreateHandle();
 
 string? name = LandVehicle.GetVehicleName(vehicle);
 float? throttle = LandVehicle.GetCurrentThrottle(vehicle);
+Player.Handle driver = LandVehicle.GetAssignedDriver(vehicle);
 ```
 
 `S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API. Do not emit both shortened and root-preserving namespaces for the same game type. Schedule One facades belong under `S1Interop.ScheduleOne.*`; future supported surfaces should preserve their own roots, such as `S1Interop.FishNet.Runtime.*`.
@@ -106,7 +112,7 @@ now starts generating:
 
 It should continue toward:
 
-- Constructor helpers and broader method coverage where overload and conversion rules are explicit enough.
+- Broader method and constructor coverage where overload and conversion rules are explicit enough.
 - Backend-specific conversions for common wrapper differences such as arrays, `Il2CppSystem.Guid`, and IL2CPP collection types.
 - Diagnostics for missing, ambiguous, or incompatible members across Mono and IL2CPP.
 - Extending the same root-preserving facade rule to additional supported surfaces when needed, such as FishNet, Unity, or other common modding dependencies.

@@ -9,6 +9,39 @@ namespace S1Interop.Generators.Discovery;
 
 internal static class PublicMemberCatalog
 {
+    public static ImmutableArray<S1InteropConstructorEntry> DiscoverConstructorEntries(
+        Compilation compilation,
+        ImmutableArray<S1InteropTypeEntry> entries)
+    {
+        if (entries.IsDefaultOrEmpty)
+        {
+            return ImmutableArray<S1InteropConstructorEntry>.Empty;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<S1InteropConstructorEntry>();
+        foreach (S1InteropTypeEntry entry in entries)
+        {
+            if (!entry.DiscoverMembers)
+            {
+                continue;
+            }
+
+            INamedTypeSymbol? monoType = compilation.GetTypeByMetadataName(entry.MonoTypeName);
+            INamedTypeSymbol? il2CppType = compilation.GetTypeByMetadataName(entry.Il2CppTypeName);
+            foreach (DiscoveredConstructor constructor in DiscoverCompatiblePublicConstructors(monoType, il2CppType))
+            {
+                builder.Add(new S1InteropConstructorEntry(
+                    entry.Alias,
+                    constructor.ParameterTypeNames,
+                    constructor.ParameterNames));
+            }
+        }
+
+        return builder
+            .Distinct(S1InteropConstructorEntryComparer.Instance)
+            .ToImmutableArray();
+    }
+
     public static ImmutableArray<S1InteropMemberEntry> DiscoverMemberEntries(
         Compilation compilation,
         ImmutableArray<S1InteropTypeEntry> entries)
@@ -297,7 +330,7 @@ internal static class PublicMemberCatalog
                     method.IsStatic,
                     method.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
                     GetTypeName(method.ReturnType),
-                    CreateParameterNames(method.Parameters.Length)));
+                    CreateParameterNames(method.Parameters)));
         }
 
         return members;
@@ -327,21 +360,54 @@ internal static class PublicMemberCatalog
     private static string GetTypeName(ITypeSymbol type) =>
         NormalizeComparableTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
 
-    private static ImmutableArray<string> CreateParameterNames(int count)
+    private static ImmutableArray<string> CreateParameterNames(ImmutableArray<IParameterSymbol> parameters)
     {
-        if (count == 0)
+        if (parameters.Length == 0)
         {
             return ImmutableArray<string>.Empty;
         }
 
-        var names = ImmutableArray.CreateBuilder<string>(count);
-        for (int index = 0; index < count; index++)
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        var names = ImmutableArray.CreateBuilder<string>(parameters.Length);
+        for (int index = 0; index < parameters.Length; index++)
         {
-            names.Add("arg" + index.ToString(CultureInfo.InvariantCulture));
+            string fallbackName = "arg" + index.ToString(CultureInfo.InvariantCulture);
+            string baseName = string.IsNullOrWhiteSpace(parameters[index].Name)
+                ? fallbackName
+                : SanitizeIdentifier(parameters[index].Name);
+            string name = IsCSharpKeyword(baseName) ? "@" + baseName : baseName;
+            if (usedNames.Add(name))
+            {
+                names.Add(name);
+                continue;
+            }
+
+            string uniqueName;
+            int suffix = 1;
+            do
+            {
+                uniqueName = name + suffix.ToString(CultureInfo.InvariantCulture);
+                suffix++;
+            }
+            while (!usedNames.Add(uniqueName));
+
+            names.Add(uniqueName);
         }
 
         return names.ToImmutable();
     }
+
+    private static bool IsCSharpKeyword(string name) =>
+        name is "abstract" or "as" or "base" or "bool" or "break" or "byte" or "case" or "catch" or "char" or
+            "checked" or "class" or "const" or "continue" or "decimal" or "default" or "delegate" or "do" or
+            "double" or "else" or "enum" or "event" or "explicit" or "extern" or "false" or "finally" or
+            "fixed" or "float" or "for" or "foreach" or "goto" or "if" or "implicit" or "in" or "int" or
+            "interface" or "internal" or "is" or "lock" or "long" or "namespace" or "new" or "null" or
+            "object" or "operator" or "out" or "override" or "params" or "private" or "protected" or
+            "public" or "readonly" or "ref" or "return" or "sbyte" or "sealed" or "short" or "sizeof" or
+            "stackalloc" or "static" or "string" or "struct" or "switch" or "this" or "throw" or "true" or
+            "try" or "typeof" or "uint" or "ulong" or "unchecked" or "unsafe" or "ushort" or "using" or
+            "virtual" or "void" or "volatile" or "while";
 
     private static bool TryCreateDiscoveredMember(ISymbol symbol, out DiscoveredMember member)
     {
@@ -377,6 +443,61 @@ internal static class PublicMemberCatalog
                 return false;
         }
     }
+
+    private static IEnumerable<DiscoveredConstructor> DiscoverCompatiblePublicConstructors(
+        INamedTypeSymbol? monoType,
+        INamedTypeSymbol? il2CppType)
+    {
+        IReadOnlyDictionary<string, DiscoveredConstructor> monoConstructors = DiscoverPublicConstructors(monoType);
+        IReadOnlyDictionary<string, DiscoveredConstructor> il2CppConstructors = DiscoverPublicConstructors(il2CppType);
+        if (monoConstructors.Count > 0 && il2CppConstructors.Count > 0)
+        {
+            foreach (DiscoveredConstructor monoConstructor in monoConstructors.Values.OrderBy(constructor => GetConstructorDeclarationKey(constructor), StringComparer.Ordinal))
+            {
+                if (il2CppConstructors.TryGetValue(GetConstructorDeclarationKey(monoConstructor), out DiscoveredConstructor il2CppConstructor) &&
+                    AreParameterTypeNamesCompatible(monoConstructor.ParameterTypeNames, il2CppConstructor.ParameterTypeNames))
+                {
+                    yield return monoConstructor;
+                }
+            }
+
+            yield break;
+        }
+
+        IReadOnlyDictionary<string, DiscoveredConstructor> availableConstructors = monoConstructors.Count > 0 ? monoConstructors : il2CppConstructors;
+        foreach (DiscoveredConstructor constructor in availableConstructors.Values.OrderBy(constructor => GetConstructorDeclarationKey(constructor), StringComparer.Ordinal))
+        {
+            yield return constructor;
+        }
+    }
+
+    private static IReadOnlyDictionary<string, DiscoveredConstructor> DiscoverPublicConstructors(INamedTypeSymbol? type)
+    {
+        var constructors = new Dictionary<string, DiscoveredConstructor>(StringComparer.Ordinal);
+        if (type is null)
+        {
+            return constructors;
+        }
+
+        foreach (IMethodSymbol constructor in type.InstanceConstructors)
+        {
+            if (constructor.DeclaredAccessibility != Accessibility.Public ||
+                constructor.IsImplicitlyDeclared)
+            {
+                continue;
+            }
+
+            var discoveredConstructor = new DiscoveredConstructor(
+                constructor.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
+                CreateParameterNames(constructor.Parameters));
+            constructors[GetConstructorDeclarationKey(discoveredConstructor)] = discoveredConstructor;
+        }
+
+        return constructors;
+    }
+
+    private static string GetConstructorDeclarationKey(DiscoveredConstructor constructor) =>
+        string.Join("|", constructor.ParameterTypeNames.Select(NormalizeBackendNeutralParameterTypeName));
 
     private static bool IsBackingFieldCandidate(IFieldSymbol field)
     {

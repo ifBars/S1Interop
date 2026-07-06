@@ -65,7 +65,7 @@ When reference metadata is available, that type declaration can generate:
 
 The current facade layer intentionally favors correctness over pretending every game API is already a normal C# wrapper. You will still see `Handle`, `As`, `TryAs`, `Get<T>`, `Get...Value<T>`, `TrySet...`, and `Invoke` patterns in generated output.
 
-Use named facade members first when they are generated. Discovered public fields, properties, and methods use concrete signatures when the metadata is safe for both backends today: scalar values, `string`, `object`, and `void` method returns. Examples include `vehicle.VehicleName`, `vehicle.CurrentThrottle`, or `LandVehicle.GetCurrentThrottle(vehicle)`.
+Use named facade members first when they are generated. Discovered public fields, properties, and methods use concrete signatures when the metadata is safe for both backends today: scalar values, `string`, `object`, `void` method returns, and game-object values whose types are also declared as S1Interop facades. Examples include `vehicle.VehicleName`, `vehicle.CurrentThrottle`, `vehicle.AssignedDriver`, or `LandVehicle.GetCurrentThrottle(vehicle)`.
 
 Fall back to string-based `Get`, `TrySet`, or `Invoke` only when the member is not yet safe to expose as a typed facade member. If a public member is missing, the usual reasons are overload ambiguity, generic method shape, generated backing-field metadata, incompatible Mono/IL2CPP signatures, or a conversion rule S1Interop does not know yet.
 
