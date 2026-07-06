@@ -359,6 +359,8 @@ internal static class InteropDeclarationReader
             memberName,
             kind,
             isStatic,
-            parameterTypeNames);
+            parameterTypeNames,
+            null,
+            ImmutableArray<string>.Empty);
     }
 }

@@ -73,8 +73,8 @@ LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
 
 if (vehicle.HasValue)
 {
-    string? name = vehicle.VehicleName?.ToString();
-    float? throttle = vehicle.GetCurrentThrottleValue<float>();
+    string? name = vehicle.VehicleName;
+    float? throttle = vehicle.CurrentThrottle;
 }
 ```
 

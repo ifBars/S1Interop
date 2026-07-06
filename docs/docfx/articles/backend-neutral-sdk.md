@@ -13,8 +13,8 @@ LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
 
 if (vehicle.HasValue)
 {
-    string? name = vehicle.VehicleName?.ToString();
-    float? throttle = vehicle.GetCurrentThrottleValue<float>();
+    string? name = vehicle.VehicleName;
+    float? throttle = vehicle.CurrentThrottle;
 }
 ```
 
@@ -65,6 +65,8 @@ When reference metadata is available, that type declaration can generate:
 
 The current facade layer intentionally favors correctness over pretending every game API is already a normal C# wrapper. You will still see `Handle`, `As`, `TryAs`, `Get<T>`, `Get...Value<T>`, `TrySet...`, and `Invoke` patterns in generated output.
 
-Use named facade members first when they are generated. Fall back to string-based `Get`, `TrySet`, or `Invoke` only when the member is not yet safe to expose as a typed facade member. If a public member is missing, the usual reasons are overload ambiguity, generic method shape, incompatible Mono/IL2CPP signatures, or a conversion rule S1Interop does not know yet.
+Use named facade members first when they are generated. Discovered public fields, properties, and methods use concrete signatures when the metadata is safe for both backends today: scalar values, `string`, `object`, and `void` method returns. Examples include `vehicle.VehicleName`, `vehicle.CurrentThrottle`, or `LandVehicle.GetCurrentThrottle(vehicle)`.
+
+Fall back to string-based `Get`, `TrySet`, or `Invoke` only when the member is not yet safe to expose as a typed facade member. If a public member is missing, the usual reasons are overload ambiguity, generic method shape, generated backing-field metadata, incompatible Mono/IL2CPP signatures, or a conversion rule S1Interop does not know yet.
 
 Future SDK work should keep moving ordinary public members toward native-feeling facade access while leaving the registry and reflection helpers as implementation details or explicit escape hatches.

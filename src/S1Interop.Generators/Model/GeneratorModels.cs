@@ -86,7 +86,9 @@ internal readonly struct S1InteropMemberEntry
         string memberName,
         S1InteropMemberKind kind,
         bool isStatic,
-        ImmutableArray<string> parameterTypeNames)
+        ImmutableArray<string> parameterTypeNames,
+        string? valueTypeName,
+        ImmutableArray<string> parameterNames)
     {
         Alias = alias;
         OwnerAlias = ownerAlias;
@@ -94,6 +96,8 @@ internal readonly struct S1InteropMemberEntry
         Kind = kind;
         IsStatic = isStatic;
         ParameterTypeNames = parameterTypeNames;
+        ValueTypeName = valueTypeName;
+        ParameterNames = parameterNames;
     }
 
     public string Alias { get; }
@@ -107,6 +111,10 @@ internal readonly struct S1InteropMemberEntry
     public bool IsStatic { get; }
 
     public ImmutableArray<string> ParameterTypeNames { get; }
+
+    public string? ValueTypeName { get; }
+
+    public ImmutableArray<string> ParameterNames { get; }
 }
 
 internal readonly struct DiscoveredMember
@@ -115,12 +123,16 @@ internal readonly struct DiscoveredMember
         string name,
         S1InteropMemberKind kind,
         bool isStatic,
-        ImmutableArray<string> parameterTypeNames)
+        ImmutableArray<string> parameterTypeNames,
+        string? valueTypeName,
+        ImmutableArray<string> parameterNames)
     {
         Name = name;
         Kind = kind;
         IsStatic = isStatic;
         ParameterTypeNames = parameterTypeNames;
+        ValueTypeName = valueTypeName;
+        ParameterNames = parameterNames;
     }
 
     public string Name { get; }
@@ -130,6 +142,10 @@ internal readonly struct DiscoveredMember
     public bool IsStatic { get; }
 
     public ImmutableArray<string> ParameterTypeNames { get; }
+
+    public string? ValueTypeName { get; }
+
+    public ImmutableArray<string> ParameterNames { get; }
 }
 
 internal readonly struct S1InteropTypeDiagnosticTarget
@@ -203,7 +219,9 @@ internal sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1Interop
         string.Equals(x.MemberName, y.MemberName, StringComparison.Ordinal) &&
         x.Kind == y.Kind &&
         x.IsStatic == y.IsStatic &&
-        x.ParameterTypeNames.SequenceEqual(y.ParameterTypeNames, StringComparer.Ordinal);
+        string.Equals(x.ValueTypeName, y.ValueTypeName, StringComparison.Ordinal) &&
+        x.ParameterTypeNames.SequenceEqual(y.ParameterTypeNames, StringComparer.Ordinal) &&
+        x.ParameterNames.SequenceEqual(y.ParameterNames, StringComparer.Ordinal);
 
     public int GetHashCode(S1InteropMemberEntry obj)
     {
@@ -215,9 +233,15 @@ internal sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1Interop
             hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.MemberName);
             hash = (hash * 31) + (int)obj.Kind;
             hash = (hash * 31) + (obj.IsStatic ? 1 : 0);
+            hash = (hash * 31) + (obj.ValueTypeName is null ? 0 : StringComparer.Ordinal.GetHashCode(obj.ValueTypeName));
             foreach (string parameterTypeName in obj.ParameterTypeNames)
             {
                 hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(parameterTypeName);
+            }
+
+            foreach (string parameterName in obj.ParameterNames)
+            {
+                hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(parameterName);
             }
 
             return hash;

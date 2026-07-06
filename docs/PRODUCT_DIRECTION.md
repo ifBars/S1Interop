@@ -36,7 +36,8 @@ The current generated facade is intentionally conservative. `Handle`, `As`, `Try
 
 Near-term SDK quality should prioritize:
 
-- typed property and method facades where Mono and IL2CPP metadata agree;
+- typed property and method facades where Mono and IL2CPP metadata agree, starting with backend-neutral scalar, string, object, and void method shapes;
+- facade-handle returns for discovered game-object members once handle-return naming and conversion rules are strong enough;
 - clear diagnostics or generated reports for members skipped because they are overloaded, generic, ambiguous, missing, or incompatible across backends;
 - constructor helpers and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
 - keeping `S1Interop.Generated.S1InteropMemberRegistry` and other registry types as implementation details in docs, examples, and migration rewrites whenever a type facade can express the same operation.
@@ -49,8 +50,8 @@ Today, backend-neutral code can use generated type handles:
 S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle vehicle =
     S1Interop.ScheduleOne.Vehicles.LandVehicle.As(rawVehicle);
 
-string? name = vehicle.VehicleName?.ToString();
-float? throttle = vehicle.GetCurrentThrottleValue<float>();
+string? name = vehicle.VehicleName;
+float? throttle = vehicle.CurrentThrottle;
 ```
 
 The generated SDK should preserve the original runtime namespace root under `S1Interop`:
@@ -58,10 +59,10 @@ The generated SDK should preserve the original runtime namespace root under `S1I
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
 
-LandVehicle vehicle = LandVehicle.As(rawVehicle);
+LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
 
 string? name = vehicle.VehicleName;
-float throttle = vehicle.CurrentThrottle;
+float? throttle = vehicle.CurrentThrottle;
 ```
 
 or, when a static facade is the safer shape:
@@ -72,7 +73,7 @@ using S1Interop.ScheduleOne.Vehicles;
 var vehicle = LandVehicle.As(rawVehicle);
 
 string? name = LandVehicle.GetVehicleName(vehicle);
-float throttle = LandVehicle.GetCurrentThrottle<float>(vehicle);
+float? throttle = LandVehicle.GetCurrentThrottle(vehicle);
 ```
 
 `S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API. Do not emit both shortened and root-preserving namespaces for the same game type. Schedule One facades belong under `S1Interop.ScheduleOne.*`; future supported surfaces should preserve their own roots, such as `S1Interop.FishNet.Runtime.*`.

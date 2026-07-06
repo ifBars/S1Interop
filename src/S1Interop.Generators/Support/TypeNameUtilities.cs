@@ -145,6 +145,7 @@ internal static class TypeNameUtilities
             .Replace("System.UInt16", "ushort")
             .Replace("System.UInt32", "uint")
             .Replace("System.UInt64", "ulong")
+            .Replace("System.Void", "void")
             .Replace(" ", string.Empty)
             .Trim();
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 
@@ -43,7 +44,9 @@ internal static class PublicMemberCatalog
                     member.Name,
                     member.Kind,
                     member.IsStatic,
-                    member.ParameterTypeNames));
+                    member.ParameterTypeNames,
+                    member.ValueTypeName,
+                    member.ParameterNames));
             }
         }
 
@@ -180,7 +183,21 @@ internal static class PublicMemberCatalog
     private static bool AreDiscoveredMembersCompatible(DiscoveredMember monoMember, DiscoveredMember il2CppMember) =>
         monoMember.Kind == il2CppMember.Kind &&
         monoMember.IsStatic == il2CppMember.IsStatic &&
+        AreBackendNeutralTypeNamesCompatible(monoMember.ValueTypeName, il2CppMember.ValueTypeName) &&
         AreParameterTypeNamesCompatible(monoMember.ParameterTypeNames, il2CppMember.ParameterTypeNames);
+
+    private static bool AreBackendNeutralTypeNamesCompatible(string? monoTypeName, string? il2CppTypeName)
+    {
+        if (monoTypeName is null || il2CppTypeName is null)
+        {
+            return monoTypeName is null && il2CppTypeName is null;
+        }
+
+        return string.Equals(
+            NormalizeBackendNeutralParameterTypeName(monoTypeName),
+            NormalizeBackendNeutralParameterTypeName(il2CppTypeName),
+            StringComparison.Ordinal);
+    }
 
     private static bool AreParameterTypeNamesCompatible(
         ImmutableArray<string> monoParameterTypeNames,
@@ -278,7 +295,9 @@ internal static class PublicMemberCatalog
                     method.Name,
                     S1InteropMemberKind.Method,
                     method.IsStatic,
-                    method.Parameters.Select(GetParameterTypeName).ToImmutableArray()));
+                    method.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
+                    GetTypeName(method.ReturnType),
+                    CreateParameterNames(method.Parameters.Length)));
         }
 
         return members;
@@ -301,8 +320,27 @@ internal static class PublicMemberCatalog
 
     private static string GetParameterTypeName(IParameterSymbol parameter)
     {
-        string typeName = NormalizeComparableTypeName(parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        string typeName = GetTypeName(parameter.Type);
         return parameter.RefKind == RefKind.None ? typeName : typeName + "&";
+    }
+
+    private static string GetTypeName(ITypeSymbol type) =>
+        NormalizeComparableTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+
+    private static ImmutableArray<string> CreateParameterNames(int count)
+    {
+        if (count == 0)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        var names = ImmutableArray.CreateBuilder<string>(count);
+        for (int index = 0; index < count; index++)
+        {
+            names.Add("arg" + index.ToString(CultureInfo.InvariantCulture));
+        }
+
+        return names.ToImmutable();
     }
 
     private static bool TryCreateDiscoveredMember(ISymbol symbol, out DiscoveredMember member)
@@ -317,16 +355,46 @@ internal static class PublicMemberCatalog
 
         switch (symbol)
         {
-            case IFieldSymbol field when !field.IsConst:
-                member = new DiscoveredMember(field.Name, S1InteropMemberKind.FieldOrProperty, field.IsStatic, ImmutableArray<string>.Empty);
+            case IFieldSymbol field when !field.IsConst && !IsBackingFieldCandidate(field):
+                member = new DiscoveredMember(
+                    field.Name,
+                    S1InteropMemberKind.FieldOrProperty,
+                    field.IsStatic,
+                    ImmutableArray<string>.Empty,
+                    GetTypeName(field.Type),
+                    ImmutableArray<string>.Empty);
                 return true;
             case IPropertySymbol property when property.Parameters.Length == 0:
-                member = new DiscoveredMember(property.Name, S1InteropMemberKind.FieldOrProperty, property.IsStatic, ImmutableArray<string>.Empty);
+                member = new DiscoveredMember(
+                    property.Name,
+                    S1InteropMemberKind.FieldOrProperty,
+                    property.IsStatic,
+                    ImmutableArray<string>.Empty,
+                    GetTypeName(property.Type),
+                    ImmutableArray<string>.Empty);
                 return true;
             default:
                 return false;
         }
     }
+
+    private static bool IsBackingFieldCandidate(IFieldSymbol field)
+    {
+        if (field.AssociatedSymbol is IPropertySymbol)
+        {
+            return true;
+        }
+
+        return field.Name.Contains("BackingField", StringComparison.Ordinal) ||
+            (HasCompilerGeneratedAttribute(field) && field.Name.Contains("Backing", StringComparison.Ordinal));
+    }
+
+    private static bool HasCompilerGeneratedAttribute(IFieldSymbol field) =>
+        field.GetAttributes().Any(attribute =>
+            string.Equals(
+                attribute.AttributeClass?.ToDisplayString(),
+                "System.Runtime.CompilerServices.CompilerGeneratedAttribute",
+                StringComparison.Ordinal));
 
     private static bool IsInteropSafeMemberName(string name) =>
         !string.IsNullOrWhiteSpace(name) &&
