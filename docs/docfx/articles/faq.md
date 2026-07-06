@@ -47,6 +47,16 @@ Never. S1Interop generates facades from local reference metadata you already hav
 
 The `local.build.props` file that holds your install paths is gitignored precisely to keep those machine-specific paths out of source control.
 
+## Does S1Interop replace S1API or other helper libraries?
+
+No. S1Interop is a generated interop layer, not a gameplay API.
+
+Use S1API when you want item, NPC, shop, saveable, or UI workflows. Use MAPI when you want building/model construction. Use SteamNetworkLib when you want Steam lobby or P2P helpers. Use DedicatedServerMod APIs for headless server/client extension points.
+
+Use S1Interop when your mod or helper library still needs direct access to `ScheduleOne.*` or `Il2CppScheduleOne.*` types and you do not want every consumer to hand-maintain Mono and IL2CPP conditionals.
+
+The longer version is in [S1API and S1Interop](s1api-and-s1interop.md).
+
 ## Why are my declaration diagnostics (S1I001-S1I003) silent?
 
 Declaration diagnostics only fire when Mono or IL2CPP reference assemblies are present in the compilation. When `MonoGamePath` and `Il2CppGamePath` are not configured, the generator has no game assembly surface to validate against and stays quiet so package-restore and docs-only builds do not fail.

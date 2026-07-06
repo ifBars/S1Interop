@@ -4,6 +4,8 @@ Use this path when you want an existing Mono mod to build separate Mono and IL2C
 
 Dual-runtime migration keeps the familiar two-configuration model. It is useful when a mod still needs runtime-specific code or when you want a lower-risk bridge before moving toward backend-neutral facades.
 
+This path matches many existing Schedule One mods: one source tree, runtime-specific build configurations, local game paths, and release DLLs that match the user's Steam branch. It is also the safer first stop for mods with Harmony transpilers, server/client splits, Steam networking, injected IL2CPP components, or helper dependencies that already ship separate Mono and IL2CPP builds.
+
 ## 1. Analyze the mod
 
 ```powershell
@@ -77,3 +79,5 @@ s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ## Current limits
 
 Dual-runtime migration can automate project shape, references, solution configuration, safe source patterns, and some generated helper declarations. It does not promise that every mod becomes IL2CPP-ready without review. Runtime-specific behavior, missing third-party dependencies, and unsupported IL2CPP wrapper differences can still need manual work.
+
+Keep the first migration boring: get project references, solution configurations, and path props correct, then build both runtimes. Move direct game access to generated facades after the two runtime builds are honest about what still fails.

@@ -6,6 +6,10 @@ The alpha is already useful for real project analysis, SDK facade generation, ro
 
 Think of S1Interop as the generated interop layer for direct game-wrapper work. It is not trying to replace higher-level modding APIs such as S1API. Those APIs can still own gameplay-oriented builders and workflows; S1Interop's job is to make the Mono/IL2CPP boundary, generated wrapper drift, type lookup, member binding, casts, delegates, and validation paths easier to handle.
 
+In a real mod, that usually means S1Interop sits beside the tools you already use. A content mod can still use S1API. A building mod can still use MAPI. A multiplayer mod can still use SteamNetworkLib or FishNet patterns. A dedicated server addon can still follow the server API. S1Interop is for the direct Schedule One calls that remain after those higher-level tools have done their job.
+
+If you are already using S1API, start with [S1API and S1Interop](s1api-and-s1interop.md). S1API is the curated gameplay API. S1Interop is the generated low-level interop surface for direct game access and migration work.
+
 ## Two packages, one workflow
 
 S1Interop ships as two separate NuGet packages. Understanding which one does what is the key to using the toolchain well.

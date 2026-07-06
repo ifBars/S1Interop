@@ -77,7 +77,7 @@ Each facade exposes:
 - `Get(handle, memberName)` and `Get(instance, memberName)`: reflection get.
 - `TrySet(handle, memberName, value)` and `TrySet(instance, memberName, value)`: reflection set.
 - `Invoke(handle, methodName, ...)`, `Invoke(instance, methodName, ...)`, and `Invoke<T>(...)` overloads: reflection invocation.
-- Named member accessors discovered from reference metadata or declared via `S1InteropMember`. Metadata-discovered scalar, string, object, void method shapes, and game-object values with declared facades get concrete signatures; undeclared game wrapper types, collections, by-ref parameters, generated backing fields, ambiguous overloads, and explicit member declarations stay on object/generic fallback helpers.
+- Named member accessors discovered from reference metadata or declared via `S1InteropMember`. Metadata-backed scalar, string, object, void method shapes, declared enum mirrors, and game-object values with declared facades get concrete signatures, including explicit member declarations when the referenced Mono and IL2CPP metadata resolve one compatible target. Read-only discovered values get getters without named `TrySet...` helpers; undeclared game wrapper types, collections, by-ref parameters, generated backing fields, ambiguous overloads, and unresolved explicit declarations stay on object/generic fallback helpers.
 
 Generated facades are `internal` by default. The generator does not shorten namespaces: `ScheduleOne.Vehicles.LandVehicle` always becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`, never `S1Interop.Vehicles.LandVehicle`.
 
@@ -86,13 +86,13 @@ Generated facades are `internal` by default. The generator does not shorten name
 | Declaration | What the generator emits |
 | --- | --- |
 | `[assembly: S1InteropNamespace(...)]` | Registry entries and a basic facade with `Handle` for every matching public type. The `Handle` only has generic members (`HasValue`, `Instance`, `Value`). No named member accessors unless `IncludeMembers = true` opts matching types into member facade discovery. |
-| `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. The `Handle` gains named accessors from referenced Mono and IL2CPP metadata, with concrete signatures where the metadata is backend-neutral. Also emits the matching registry `Tag` and resolution entries. |
-| `[assembly: S1InteropMember(...)]` | A named fallback accessor on the owner facade and, for instance fields/properties, on `Handle` with the chosen alias. Used for private members, ambiguous overloads, and pinned bindings. |
+| `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. The `Handle` gains named accessors from referenced Mono and IL2CPP metadata, with concrete signatures where the metadata is backend-neutral. Enum declarations instead emit S1Interop-owned enum mirrors when backend values agree. Also emits the matching registry `Tag` and resolution entries. |
+| `[assembly: S1InteropMember(...)]` | A named accessor on the owner facade and, for instance fields/properties, on `Handle` with the chosen alias. Used for private members, ambiguous overloads, pinned bindings, and migration-inferred reflection access. It uses concrete signatures when local metadata proves the member shape; otherwise it keeps object/generic fallback helpers. |
 | `[assembly: S1InteropGenerateUnityEventBridge]` | `S1InteropUnityEventBridge` in `S1Interop.Generated` with `Add`/`Remove` overloads. |
 | `[assembly: S1InteropGenerateDelegateEventBridge]` | `S1InteropDelegateEventBridge` in `S1Interop.Generated` with `Combine`/`Remove` helpers. |
 
 > [!IMPORTANT]
-> `S1InteropNamespace` and `S1InteropType` produce different `Handle` surfaces. A namespace-only `Handle` gives you `HasValue`, `Instance`, `Value`, and reflection-style `Get`/`TrySet`/`Invoke`. Adding `S1InteropType` for the same type triggers member discovery and adds named accessors like `vehicle.VehicleName`; scalar/string members use concrete signatures when metadata is safe. The transition happens after the next build completes - see below.
+> `S1InteropNamespace` and `S1InteropType` produce different `Handle` surfaces. A namespace-only `Handle` gives you `HasValue`, `Instance`, `Value`, and reflection-style `Get`/`TrySet`/`Invoke`. Adding `S1InteropType` for the same type triggers member discovery and adds named accessors like `vehicle.VehicleName`; scalar/string/enum members use concrete signatures when metadata is safe. The transition happens after the next build completes - see below.
 
 ## Build and IDE timing
 

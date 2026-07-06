@@ -600,6 +600,11 @@ internal sealed partial class S1InteropFixtureTests
                 """
                 using ScheduleOne.Vehicles;
                 using ScheduleOne.DevUtilities;
+                #if IL2CPPMELON
+                using S1Calling = Il2CppScheduleOne.Calling;
+                #else
+                using S1Calling = ScheduleOne.Calling;
+                #endif
 
                 namespace ReflectionFallbackMod;
 
@@ -615,6 +620,16 @@ internal sealed partial class S1InteropFixtureTests
                     public static void CutThrottle(LandVehicle vehicle)
                     {
                         ReflectionUtils.TrySetFieldOrProperty(vehicle, "currentThrottle", 0f);
+                    }
+
+                    public object? ReadQueuedCall(S1Calling.CallManager manager)
+                    {
+                        return ReflectionUtils.TryGetFieldOrProperty(manager, "QueuedCallData");
+                    }
+
+                    public static void ClearQueuedCall(S1Calling.CallManager manager)
+                    {
+                        ReflectionUtils.TrySetFieldOrProperty(manager, "QueuedCallData", null);
                     }
                 }
                 """);
@@ -639,15 +654,27 @@ internal sealed partial class S1InteropFixtureTests
                     target.Kind == MemberAccessKind.FieldOrProperty &&
                     !target.IsStatic),
                 "Member-access discovery should infer typed ReflectionUtils.TrySetFieldOrProperty targets from ScheduleOne method parameters.");
+            Assert(
+                targets.Any(target =>
+                    target.OwnerAlias == "CallManager" &&
+                    target.OwnerTypeName == "ScheduleOne.Calling.CallManager" &&
+                    target.MemberName == "QueuedCallData" &&
+                    target.Kind == MemberAccessKind.FieldOrProperty &&
+                    !target.IsStatic),
+                "Member-access discovery should infer S1API-style alias-qualified ScheduleOne parameter types.");
 
             string source = File.ReadAllText(tempSource);
-        string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
-        Assert(
+            string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
+            Assert(
                 rewritten.Contains("return S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(_landVehicle);", StringComparison.Ordinal),
                 "Member-access fallback rewriter should replace typed helper getter calls with type-scoped facade getters.");
-        Assert(
+            Assert(
                 rewritten.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.TrySetCurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
                 "Member-access fallback rewriter should replace typed helper setter calls with type-scoped facade setters.");
+            Assert(
+                rewritten.Contains("return S1Interop.ScheduleOne.Calling.CallManager.GetQueuedCallData(manager);", StringComparison.Ordinal) &&
+                rewritten.Contains("S1Interop.ScheduleOne.Calling.CallManager.TrySetQueuedCallData(manager, null);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace S1API-style alias-qualified helper calls with type-scoped facade calls.");
         }
         finally
         {
@@ -1954,6 +1981,7 @@ internal sealed partial class S1InteropFixtureTests
             string localPropsExamplePath = Path.Combine(targetDirectory, "local.build.props.example");
             string localPropsPath = Path.Combine(targetDirectory, "local.build.props");
             string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
+            string readmePath = Path.Combine(targetDirectory, "README.md");
 
             ProcessResult dryRun = RunCli("new", targetDirectory);
             Assert(dryRun.ExitCode == 0, $"s1interop new dry-run should succeed. Output: {dryRun.Output}");
@@ -1972,6 +2000,7 @@ internal sealed partial class S1InteropFixtureTests
             Assert(File.Exists(starterPath), "s1interop new should create the backend-neutral starter file.");
             Assert(File.Exists(localPropsExamplePath), "s1interop new should create a local build props example.");
             Assert(File.Exists(gitignorePath), "s1interop new should create a gitignore for local machine paths and build output.");
+            Assert(File.Exists(readmePath), "s1interop new should create beginner-facing local setup guidance.");
 
             string solutionSource = File.ReadAllText(solutionPath);
             string projectSource = File.ReadAllText(projectPath);
@@ -1979,6 +2008,7 @@ internal sealed partial class S1InteropFixtureTests
             string starterSource = File.ReadAllText(starterPath);
             string localPropsExampleSource = File.ReadAllText(localPropsExamplePath);
             string gitignoreSource = File.ReadAllText(gitignorePath);
+            string readmeSource = File.ReadAllText(readmePath);
             Assert(
                 solutionSource.Contains("Debug|Any CPU = Debug|Any CPU", StringComparison.Ordinal) &&
                 solutionSource.Contains("Release|Any CPU = Release|Any CPU", StringComparison.Ordinal) &&
@@ -2024,6 +2054,12 @@ internal sealed partial class S1InteropFixtureTests
                 localPropsExampleSource.Contains($"<{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition=\"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''\">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>", StringComparison.Ordinal) &&
                 gitignoreSource.Contains("local.build.props", StringComparison.Ordinal),
                 "Generated local path scaffolding should show both runtime game paths and the optional local generator package feed while keeping local.build.props ignored.");
+            Assert(
+                readmeSource.Contains("## First local setup", StringComparison.Ordinal) &&
+                readmeSource.Contains("Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.", StringComparison.Ordinal) &&
+                readmeSource.Contains("These configurations are validation targets for the same source.", StringComparison.Ordinal) &&
+                readmeSource.Contains("s1interop sdkgen . --apply", StringComparison.Ordinal),
+                "Generated README should guide first-time modders through local setup, safety boundaries, validation targets, and SDK generation.");
 
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
             File.WriteAllText(

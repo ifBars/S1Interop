@@ -55,6 +55,8 @@ To scaffold a new backend-neutral mod project:
 
 Always review the dry-run output before adding `--apply`. Run `s1interop new .\MyMod --dry-run` to preview what the scaffold will create without writing any files.
 
+If you are not sure which command fits your situation, use the [Adoption guide](adoption-guide.md) before applying changes.
+
 ## Next steps
 
 You now have a working `s1interop` installation. Choose your path based on whether you are starting a new mod or migrating an existing one.

@@ -8,6 +8,8 @@ Use these docs when you are building, migrating, or validating a Schedule One mo
 | --- | --- |
 | [Introduction](introduction.md) | You want the short version of what S1Interop is, including the CLI vs generator split. |
 | [Core concepts](core-concepts.md) | You want the vocabulary (`S1InteropObject<TTag>`, facade, `Handle`, declarations, registry) defined once before reading the workflow pages. |
+| [Adoption guide](adoption-guide.md) | You need to choose between a first-time mod scaffold, existing mod migration, SDK generation, or sandbox verification. |
+| [S1API and S1Interop](s1api-and-s1interop.md) | You know S1API and want to understand why S1Interop exists, where the overlap is, and which layer should own your modding work. |
 | [Installation](getting-started.md) | You need the first commands for building and running the CLI, or packing the local alpha packages. |
 | [Local game paths](local-paths.md) | You are setting up Mono and IL2CPP game references on your machine. |
 

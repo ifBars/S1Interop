@@ -207,9 +207,14 @@ public sealed class BackendNeutralProjectScaffolder
 
         Backend-neutral Schedule One mod scaffold created by S1Interop.
 
-        Before building locally, copy `local.build.props.example` to `local.build.props` and set your own game paths.
-        If you are using an unpublished/local build of S1Interop, set `{S1InteropPackageInfo.GeneratorsPackageSourceProperty}` to the folder containing `{S1InteropPackageInfo.GeneratorsPackageId}.*.nupkg`.
-        `local.build.props` is ignored so machine-specific paths do not get committed.
+        ## First local setup
+
+        1. Copy `local.build.props.example` to `local.build.props`.
+        2. Set `MonoGamePath` to your Mono `alternate` or `alternate-beta` Schedule I install.
+        3. Set `Il2CppGamePath` to your IL2CPP public `none` or `beta` Schedule I install.
+        4. If you are using an unpublished/local build of S1Interop, set `{S1InteropPackageInfo.GeneratorsPackageSourceProperty}` to the folder containing `{S1InteropPackageInfo.GeneratorsPackageId}.*.nupkg`.
+
+        `local.build.props` is ignored so machine-specific paths do not get committed. Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.
 
         Open `{{projectName}}.sln` in Visual Studio or Rider. `Debug` and `Release` use Mono references.
         `Debug Il2Cpp` and `Release Il2Cpp` use IL2CPP references while keeping the same source and output assembly logic.
@@ -218,6 +223,12 @@ public sealed class BackendNeutralProjectScaffolder
         dotnet build .\{{projectName}}.sln -c Debug
         dotnet build .\{{projectName}}.sln -c "Debug Il2Cpp"
         ```
+
+        These configurations are validation targets for the same source. You should not need separate Mono and IL2CPP implementations for ordinary backend-neutral code.
+
+        This is still a normal MelonLoader mod. Add S1API, MAPI, SteamNetworkLib, bGUI, or dedicated server references when those libraries fit your mod. Use S1Interop for the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` calls that would otherwise need backend-specific conditionals.
+
+        ## Writing your first game-facing code
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
         Prefer `S1InteropType` declarations and generated SDK output. Use explicit member declarations only for private members, ambiguous overloads, or migration-specific overrides.
@@ -233,6 +244,16 @@ public sealed class BackendNeutralProjectScaffolder
         ```
 
         Use generated facades under `S1Interop.ScheduleOne.*` when you want one assembly to resolve Mono or IL2CPP game types at runtime.
+
+        ## Useful next commands
+
+        ```powershell
+        s1interop analyze .
+        s1interop sdkgen . --apply
+        s1interop sdkgen . --full-sdk --apply
+        ```
+
+        Use `sdkgen . --apply` once your source references the game types it needs. Use `--full-sdk` for an exploratory blank project, then keep type/member declarations narrow as the mod settles.
         """;
 
     private static string SanitizeIdentifier(string value)

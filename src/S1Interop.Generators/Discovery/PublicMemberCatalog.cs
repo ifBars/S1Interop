@@ -77,6 +77,7 @@ internal static class PublicMemberCatalog
                     member.Name,
                     member.Kind,
                     member.IsStatic,
+                    member.CanWrite,
                     member.ParameterTypeNames,
                     member.ValueTypeName,
                     member.ParameterNames));
@@ -84,6 +85,236 @@ internal static class PublicMemberCatalog
         }
 
         return builder.ToImmutable();
+    }
+
+    public static ImmutableArray<S1InteropMemberEntry> EnrichMemberEntries(
+        Compilation compilation,
+        ImmutableArray<S1InteropTypeEntry> entries,
+        ImmutableArray<S1InteropMemberEntry> explicitMembers)
+    {
+        if (explicitMembers.IsDefaultOrEmpty || entries.IsDefaultOrEmpty)
+        {
+            return explicitMembers;
+        }
+
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias = entries
+            .GroupBy(entry => entry.Alias, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        return explicitMembers
+            .Select(member => EnrichMemberEntry(compilation, entriesByAlias, member))
+            .ToImmutableArray();
+    }
+
+    private static S1InteropMemberEntry EnrichMemberEntry(
+        Compilation compilation,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        S1InteropMemberEntry member)
+    {
+        if (!entriesByAlias.TryGetValue(member.OwnerAlias, out S1InteropTypeEntry ownerEntry))
+        {
+            return member;
+        }
+
+        INamedTypeSymbol? monoType = compilation.GetTypeByMetadataName(ownerEntry.MonoTypeName);
+        INamedTypeSymbol? il2CppType = compilation.GetTypeByMetadataName(ownerEntry.Il2CppTypeName);
+        if (!TryDiscoverExplicitCompatibleMember(monoType, il2CppType, member, entriesByAlias, out DiscoveredMember discovered))
+        {
+            return member;
+        }
+
+        return new S1InteropMemberEntry(
+            member.Alias,
+            member.OwnerAlias,
+            member.MemberName,
+            member.Kind,
+            member.IsStatic,
+            member.CanWrite && discovered.CanWrite,
+            discovered.ParameterTypeNames,
+            discovered.ValueTypeName,
+            discovered.ParameterNames);
+    }
+
+    private static bool TryDiscoverExplicitCompatibleMember(
+        INamedTypeSymbol? monoType,
+        INamedTypeSymbol? il2CppType,
+        S1InteropMemberEntry member,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        out DiscoveredMember discovered)
+    {
+        bool hasMonoMember = TryDiscoverExplicitMember(monoType, member, RuntimeBackend.Mono, entriesByAlias, out DiscoveredMember monoMember);
+        bool hasIl2CppMember = TryDiscoverExplicitMember(il2CppType, member, RuntimeBackend.Il2Cpp, entriesByAlias, out DiscoveredMember il2CppMember);
+        if (hasMonoMember && hasIl2CppMember)
+        {
+            if (!AreDiscoveredMembersCompatible(monoMember, il2CppMember))
+            {
+                discovered = default;
+                return false;
+            }
+
+            discovered = CreateBackendNeutralMember(monoMember, il2CppMember);
+            return true;
+        }
+
+        if (hasMonoMember || hasIl2CppMember)
+        {
+            discovered = hasMonoMember ? monoMember : il2CppMember;
+            return true;
+        }
+
+        discovered = default;
+        return false;
+    }
+
+    private static bool TryDiscoverExplicitMember(
+        INamedTypeSymbol? ownerType,
+        S1InteropMemberEntry member,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        out DiscoveredMember discovered)
+    {
+        if (ownerType is null)
+        {
+            discovered = default;
+            return false;
+        }
+
+        return member.Kind == S1InteropMemberKind.Method
+            ? TryDiscoverExplicitMethod(ownerType, member, runtime, entriesByAlias, out discovered)
+            : TryDiscoverExplicitFieldOrProperty(ownerType, member, out discovered);
+    }
+
+    private static bool TryDiscoverExplicitFieldOrProperty(
+        INamedTypeSymbol ownerType,
+        S1InteropMemberEntry member,
+        out DiscoveredMember discovered)
+    {
+        foreach (ISymbol symbol in ownerType.GetMembers(member.MemberName).Where(symbol => symbol.IsStatic == member.IsStatic))
+        {
+            switch (symbol)
+            {
+                case IFieldSymbol field when member.Kind is S1InteropMemberKind.Field or S1InteropMemberKind.FieldOrProperty:
+                    discovered = new DiscoveredMember(
+                        member.MemberName,
+                        member.Kind,
+                        field.IsStatic,
+                        !field.IsReadOnly,
+                        ImmutableArray<string>.Empty,
+                        GetTypeName(field.Type),
+                        ImmutableArray<string>.Empty);
+                    return true;
+                case IPropertySymbol property when
+                    member.Kind is S1InteropMemberKind.Property or S1InteropMemberKind.FieldOrProperty &&
+                    property.Parameters.Length == 0:
+                    discovered = new DiscoveredMember(
+                        member.MemberName,
+                        member.Kind,
+                        property.IsStatic,
+                        property.SetMethod is not null,
+                        ImmutableArray<string>.Empty,
+                        GetTypeName(property.Type),
+                        ImmutableArray<string>.Empty);
+                    return true;
+            }
+        }
+
+        discovered = default;
+        return false;
+    }
+
+    private static bool TryDiscoverExplicitMethod(
+        INamedTypeSymbol ownerType,
+        S1InteropMemberEntry member,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        out DiscoveredMember discovered)
+    {
+        IMethodSymbol[] methods = ownerType
+            .GetMembers(member.MemberName)
+            .OfType<IMethodSymbol>()
+            .Where(method =>
+                method.IsStatic == member.IsStatic &&
+                method.MethodKind == MethodKind.Ordinary &&
+                !method.IsImplicitlyDeclared &&
+                !method.IsGenericMethod &&
+                ExplicitParameterTypesMatch(method, member, runtime, entriesByAlias))
+            .ToArray();
+        if (methods.Length != 1)
+        {
+            discovered = default;
+            return false;
+        }
+
+        IMethodSymbol method = methods[0];
+        discovered = new DiscoveredMember(
+            member.MemberName,
+            S1InteropMemberKind.Method,
+            method.IsStatic,
+            canWrite: false,
+            method.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
+            GetTypeName(method.ReturnType),
+            CreateParameterNames(method.Parameters));
+        return true;
+    }
+
+    private static bool ExplicitParameterTypesMatch(
+        IMethodSymbol method,
+        S1InteropMemberEntry member,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
+    {
+        if (member.ParameterTypeNames.IsDefaultOrEmpty)
+        {
+            return true;
+        }
+
+        if (method.Parameters.Length != member.ParameterTypeNames.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < method.Parameters.Length; index++)
+        {
+            if (!ExplicitParameterTypeMatches(method.Parameters[index], member.ParameterTypeNames[index], runtime, entriesByAlias))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ExplicitParameterTypeMatches(
+        IParameterSymbol parameter,
+        string declaredTypeName,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
+    {
+        bool declaredByRef = declaredTypeName.EndsWith("&", StringComparison.Ordinal);
+        bool actualByRef = parameter.RefKind != RefKind.None;
+        if (declaredByRef != actualByRef)
+        {
+            return false;
+        }
+
+        string expected = NormalizeComparableTypeName(ResolveDeclaredParameterTypeName(declaredTypeName, runtime, entriesByAlias));
+        string actual = NormalizeComparableTypeName(GetTypeName(parameter.Type));
+        return string.Equals(expected, actual, StringComparison.Ordinal);
+    }
+
+    private static string ResolveDeclaredParameterTypeName(
+        string declaredTypeName,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
+    {
+        bool byRef = declaredTypeName.EndsWith("&", StringComparison.Ordinal);
+        string normalized = byRef ? declaredTypeName.Substring(0, declaredTypeName.Length - 1) : declaredTypeName;
+        string sanitized = SanitizeIdentifier(normalized);
+        if (entriesByAlias.TryGetValue(sanitized, out S1InteropTypeEntry entry))
+        {
+            return runtime == RuntimeBackend.Il2Cpp ? entry.Il2CppTypeName : entry.MonoTypeName;
+        }
+
+        return runtime == RuntimeBackend.Il2Cpp ? ToIl2CppTypeName(normalized) : normalized;
     }
 
     private static string GetDiscoveredMemberAlias(S1InteropTypeEntry entry, DiscoveredMember member) =>
@@ -152,6 +383,15 @@ internal static class PublicMemberCatalog
             return [$"Invoke{member.Alias}"];
         }
 
+        if (!member.CanWrite)
+        {
+            return
+            [
+                $"Get{member.Alias}",
+                $"Get{member.Alias}Value"
+            ];
+        }
+
         return
         [
             $"Get{member.Alias}",
@@ -199,7 +439,7 @@ internal static class PublicMemberCatalog
                 if (il2CppMembers.TryGetValue(monoMember.Name, out DiscoveredMember il2CppMember) &&
                     AreDiscoveredMembersCompatible(monoMember, il2CppMember))
                 {
-                    yield return monoMember;
+                    yield return CreateBackendNeutralMember(monoMember, il2CppMember);
                 }
             }
 
@@ -218,6 +458,16 @@ internal static class PublicMemberCatalog
         monoMember.IsStatic == il2CppMember.IsStatic &&
         AreBackendNeutralTypeNamesCompatible(monoMember.ValueTypeName, il2CppMember.ValueTypeName) &&
         AreParameterTypeNamesCompatible(monoMember.ParameterTypeNames, il2CppMember.ParameterTypeNames);
+
+    private static DiscoveredMember CreateBackendNeutralMember(DiscoveredMember monoMember, DiscoveredMember il2CppMember) =>
+        new(
+            monoMember.Name,
+            monoMember.Kind,
+            monoMember.IsStatic,
+            monoMember.CanWrite && il2CppMember.CanWrite,
+            monoMember.ParameterTypeNames,
+            monoMember.ValueTypeName,
+            monoMember.ParameterNames);
 
     private static bool AreBackendNeutralTypeNamesCompatible(string? monoTypeName, string? il2CppTypeName)
     {
@@ -328,6 +578,7 @@ internal static class PublicMemberCatalog
                     method.Name,
                     S1InteropMemberKind.Method,
                     method.IsStatic,
+                    canWrite: false,
                     method.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
                     GetTypeName(method.ReturnType),
                     CreateParameterNames(method.Parameters)));
@@ -426,6 +677,7 @@ internal static class PublicMemberCatalog
                     field.Name,
                     S1InteropMemberKind.FieldOrProperty,
                     field.IsStatic,
+                    !field.IsReadOnly,
                     ImmutableArray<string>.Empty,
                     GetTypeName(field.Type),
                     ImmutableArray<string>.Empty);
@@ -435,6 +687,7 @@ internal static class PublicMemberCatalog
                     property.Name,
                     S1InteropMemberKind.FieldOrProperty,
                     property.IsStatic,
+                    property.SetMethod is { DeclaredAccessibility: Accessibility.Public },
                     ImmutableArray<string>.Empty,
                     GetTypeName(property.Type),
                     ImmutableArray<string>.Empty);

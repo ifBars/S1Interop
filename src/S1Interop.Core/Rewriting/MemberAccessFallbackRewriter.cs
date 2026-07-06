@@ -111,6 +111,11 @@ public sealed class MemberAccessFallbackRewriter
             changed = true;
         }
 
+        for (int index = rewrittenLines.Count - 1; index >= 0; index--)
+        {
+            changed |= TryRewriteTypedHelperCall(rewrittenLines, index, sourceTargets);
+        }
+
         changed |= TryRewriteDynamicHelperMethods(rewrittenLines);
         changed |= TryRewriteDynamicInstanceFallbacks(rewrittenLines);
 
@@ -174,6 +179,46 @@ public sealed class MemberAccessFallbackRewriter
             return false;
         }
 
+        string replacement = match.Groups["operation"].Value.Equals("Set", StringComparison.Ordinal)
+            ? BuildTypedHelperSetterReplacement(match, target)
+            : BuildTypedHelperGetterReplacement(match, target);
+        if (replacement.Length == 0)
+        {
+            return false;
+        }
+
+        lines[lineIndex] = line[..match.Groups["call"].Index] + replacement + line[(match.Groups["call"].Index + match.Groups["call"].Length)..];
+        return true;
+    }
+
+    private static bool TryRewriteTypedHelperCall(List<string> lines, int lineIndex, IReadOnlyList<MemberAccessTarget> targets)
+    {
+        if (lineIndex < 0 || lineIndex >= lines.Count)
+        {
+            return false;
+        }
+
+        string line = lines[lineIndex];
+        Match match = TypedHelperLookupPattern.Match(line);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string memberName = match.Groups["member"].Value;
+        MemberAccessTarget[] candidates = targets
+            .Where(target =>
+                !target.IsStatic &&
+                target.MemberName.Equals(memberName, StringComparison.Ordinal))
+            .GroupBy(target => (target.OwnerTypeName, target.MemberName, target.IsStatic))
+            .Select(group => group.First())
+            .ToArray();
+        if (candidates.Length != 1)
+        {
+            return false;
+        }
+
+        MemberAccessTarget target = candidates[0];
         string replacement = match.Groups["operation"].Value.Equals("Set", StringComparison.Ordinal)
             ? BuildTypedHelperSetterReplacement(match, target)
             : BuildTypedHelperGetterReplacement(match, target);

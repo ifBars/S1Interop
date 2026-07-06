@@ -7,10 +7,11 @@ _layout: landing
   <h1>Move Mono mods toward IL2CPP without turning every source file into runtime glue.</h1>
   <p class="s1interop-lead">S1Interop analyzes Schedule One mod projects, generates backend-neutral SDK facades, migrates safe source patterns, and verifies the result in disposable sandboxes.</p>
   <div class="s1interop-actions">
-    <a class="s1interop-action s1interop-action-primary" href="articles/getting-started.md">Get started</a>
+    <a class="s1interop-action s1interop-action-primary" href="articles/adoption-guide.md">Choose your path</a>
+    <a class="s1interop-action" href="articles/s1api-and-s1interop.md">S1API comparison</a>
+    <a class="s1interop-action" href="articles/getting-started.md">Install</a>
     <a class="s1interop-action" href="articles/core-concepts.md">Core concepts</a>
     <a class="s1interop-action" href="articles/backend-neutral-sdk.md">Backend-neutral SDK</a>
-    <a class="s1interop-action" href="articles/migrating-mono-mods.md">Choose migration path</a>
   </div>
 </section>
 
@@ -21,6 +22,14 @@ _layout: landing
   </div>
 
   <div class="s1interop-card-grid">
+    <a class="s1interop-card" href="articles/adoption-guide.md">
+      <h3>Choose the right first command</h3>
+      <p>Separate first-time mod scaffolds, existing mod migration, SDK generation, and sandbox verification before editing a project.</p>
+    </a>
+    <a class="s1interop-card" href="articles/s1api-and-s1interop.md">
+      <h3>Use the right layer</h3>
+      <p>Keep S1API for curated content workflows. Use S1Interop for generated direct game access, migration, and low-level backend glue.</p>
+    </a>
     <a class="s1interop-card" href="articles/new-projects.md">
       <h3>Start backend-neutral</h3>
       <p>Create a new project with Mono and IL2CPP configurations, local path props, and generated SDK declarations from the start.</p>

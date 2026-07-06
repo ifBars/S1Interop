@@ -139,6 +139,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
         count++;
+        S1InteropTypeRegistryGeneratorEnrichesExplicitMembersFromMetadata();
+        count++;
         S1InteropTypeRegistryGeneratorExpandsNamespaceDeclarations();
         count++;
         S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases();
@@ -324,6 +326,8 @@ internal sealed partial class S1InteropFixtureTests
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
+        count++;
+        S1InteropTypeRegistryGeneratorEnrichesExplicitMembersFromMetadata();
         count++;
         S1InteropTypeRegistryGeneratorOwnerQualifiesDiscoveredMemberAliases();
         count++;

@@ -6,6 +6,10 @@
       href: introduction.md
     - name: Core concepts
       href: core-concepts.md
+    - name: Adoption guide
+      href: adoption-guide.md
+    - name: S1API and S1Interop
+      href: s1api-and-s1interop.md
     - name: Installation
       href: getting-started.md
     - name: Local game paths

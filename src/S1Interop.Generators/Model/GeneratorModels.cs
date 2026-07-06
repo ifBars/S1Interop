@@ -57,6 +57,46 @@ internal readonly struct TypeFacadeName
     public string TypeName { get; }
 }
 
+internal readonly struct S1InteropEnumEntry
+{
+    public S1InteropEnumEntry(
+        string ownerAlias,
+        string monoTypeName,
+        string il2CppTypeName,
+        string underlyingTypeName,
+        ImmutableArray<S1InteropEnumValueEntry> values)
+    {
+        OwnerAlias = ownerAlias;
+        MonoTypeName = monoTypeName;
+        Il2CppTypeName = il2CppTypeName;
+        UnderlyingTypeName = underlyingTypeName;
+        Values = values;
+    }
+
+    public string OwnerAlias { get; }
+
+    public string MonoTypeName { get; }
+
+    public string Il2CppTypeName { get; }
+
+    public string UnderlyingTypeName { get; }
+
+    public ImmutableArray<S1InteropEnumValueEntry> Values { get; }
+}
+
+internal readonly struct S1InteropEnumValueEntry
+{
+    public S1InteropEnumValueEntry(string name, string valueLiteral)
+    {
+        Name = name;
+        ValueLiteral = valueLiteral;
+    }
+
+    public string Name { get; }
+
+    public string ValueLiteral { get; }
+}
+
 internal enum S1InteropMemberKind
 {
     FieldOrProperty,
@@ -86,6 +126,7 @@ internal readonly struct S1InteropMemberEntry
         string memberName,
         S1InteropMemberKind kind,
         bool isStatic,
+        bool canWrite,
         ImmutableArray<string> parameterTypeNames,
         string? valueTypeName,
         ImmutableArray<string> parameterNames)
@@ -95,6 +136,7 @@ internal readonly struct S1InteropMemberEntry
         MemberName = memberName;
         Kind = kind;
         IsStatic = isStatic;
+        CanWrite = canWrite;
         ParameterTypeNames = parameterTypeNames;
         ValueTypeName = valueTypeName;
         ParameterNames = parameterNames;
@@ -109,6 +151,8 @@ internal readonly struct S1InteropMemberEntry
     public S1InteropMemberKind Kind { get; }
 
     public bool IsStatic { get; }
+
+    public bool CanWrite { get; }
 
     public ImmutableArray<string> ParameterTypeNames { get; }
 
@@ -142,6 +186,7 @@ internal readonly struct DiscoveredMember
         string name,
         S1InteropMemberKind kind,
         bool isStatic,
+        bool canWrite,
         ImmutableArray<string> parameterTypeNames,
         string? valueTypeName,
         ImmutableArray<string> parameterNames)
@@ -149,6 +194,7 @@ internal readonly struct DiscoveredMember
         Name = name;
         Kind = kind;
         IsStatic = isStatic;
+        CanWrite = canWrite;
         ParameterTypeNames = parameterTypeNames;
         ValueTypeName = valueTypeName;
         ParameterNames = parameterNames;
@@ -159,6 +205,8 @@ internal readonly struct DiscoveredMember
     public S1InteropMemberKind Kind { get; }
 
     public bool IsStatic { get; }
+
+    public bool CanWrite { get; }
 
     public ImmutableArray<string> ParameterTypeNames { get; }
 
@@ -253,6 +301,7 @@ internal sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1Interop
         string.Equals(x.MemberName, y.MemberName, StringComparison.Ordinal) &&
         x.Kind == y.Kind &&
         x.IsStatic == y.IsStatic &&
+        x.CanWrite == y.CanWrite &&
         string.Equals(x.ValueTypeName, y.ValueTypeName, StringComparison.Ordinal) &&
         x.ParameterTypeNames.SequenceEqual(y.ParameterTypeNames, StringComparer.Ordinal) &&
         x.ParameterNames.SequenceEqual(y.ParameterNames, StringComparer.Ordinal);
@@ -267,6 +316,7 @@ internal sealed class S1InteropMemberEntryComparer : IEqualityComparer<S1Interop
             hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(obj.MemberName);
             hash = (hash * 31) + (int)obj.Kind;
             hash = (hash * 31) + (obj.IsStatic ? 1 : 0);
+            hash = (hash * 31) + (obj.CanWrite ? 1 : 0);
             hash = (hash * 31) + (obj.ValueTypeName is null ? 0 : StringComparer.Ordinal.GetHashCode(obj.ValueTypeName));
             foreach (string parameterTypeName in obj.ParameterTypeNames)
             {

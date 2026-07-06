@@ -22,6 +22,8 @@ s1interop analyze .
 
 Analysis tells you which runtime the project currently targets, which game paths or references it can see, and which source patterns are likely to fail on IL2CPP.
 
+For real mods, this is usually more useful than starting with a migration command. A typical Mono project already has a MelonLoader entry point, Harmony patches, local deployment events, helper libraries, and maybe S1API or MAPI references. `analyze` lets you separate normal mod structure from the small set of direct game calls that actually need interop work.
+
 ## Safety model
 
 Commands that write files have a dry-run mode. Review that plan before applying. Depending on the path you choose, S1Interop may:
@@ -59,3 +61,16 @@ s1interop verify-migration . --dual-runtime --build `
 ```
 
 For backend-neutral projects, the usual verification path is a normal build plus the generator diagnostics described in [Diagnostics](diagnostics.md). The generator surface itself is documented in [Generated output](generator-package.md).
+
+## What to migrate first
+
+Do not try to move an entire mature mod in one pass. Start with the direct game-wrapper code that creates build friction:
+
+- `using ScheduleOne.*` paired with `using Il2CppScheduleOne.*` under conditionals;
+- casts between `object`, Unity objects, and generated IL2CPP wrappers;
+- public fields or properties that are read from both backends;
+- enum names used in Harmony patches or configuration;
+- constructor calls where Mono and IL2CPP wrappers differ;
+- string-held type names used for Harmony targets or reflection.
+
+Leave higher-level mod code alone at first. S1API item builders, MAPI model construction, SteamNetworkLib DTOs, bGUI menus, logging, config files, and packaging scripts should only change when they directly depend on a runtime-specific game type.

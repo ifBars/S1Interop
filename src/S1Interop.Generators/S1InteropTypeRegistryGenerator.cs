@@ -55,18 +55,22 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Combine(allEntries)
             .Combine(memberEntries)
             .Select(static (input, _) => PublicMemberCatalog.MergeMemberEntries(
-                input.Right,
+                PublicMemberCatalog.EnrichMemberEntries(input.Left.Left, input.Left.Right, input.Right),
                 PublicMemberCatalog.DiscoverMemberEntries(input.Left.Left, input.Left.Right)));
 
         IncrementalValueProvider<ImmutableArray<S1InteropConstructorEntry>> allConstructorEntries = context.CompilationProvider
             .Combine(allEntries)
             .Select(static (input, _) => PublicMemberCatalog.DiscoverConstructorEntries(input.Left, input.Right));
 
-        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries).Combine(allConstructorEntries), static (sourceContext, input) =>
+        IncrementalValueProvider<ImmutableArray<S1InteropEnumEntry>> allEnumEntries = context.CompilationProvider
+            .Combine(allEntries)
+            .Select(static (input, _) => PublicEnumCatalog.DiscoverEnumEntries(input.Left, input.Right));
+
+        context.RegisterSourceOutput(runtimeProvider.Combine(allEntries).Combine(allMemberEntries).Combine(allConstructorEntries).Combine(allEnumEntries), static (sourceContext, input) =>
         {
             sourceContext.AddSource(
                 "S1Interop.TypeRegistry.g.cs",
-                SourceText.From(GenerateRegistrySource(input.Left.Left.Left, input.Left.Left.Right, input.Left.Right, input.Right), Encoding.UTF8));
+                SourceText.From(GenerateRegistrySource(input.Left.Left.Left.Left, input.Left.Left.Left.Right, input.Left.Left.Right, input.Left.Right, input.Right), Encoding.UTF8));
         });
         context.RegisterSourceOutput(bridgeRequests, static (sourceContext, requests) =>
         {

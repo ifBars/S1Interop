@@ -4,6 +4,8 @@ S1Interop is an alpha toolchain for Schedule One mod developers who want to move
 
 The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop sits underneath that kind of API and reduces the Mono/IL2CPP maintenance burden.
 
+That matters for real Schedule One projects because most mods are not blank SDK samples. A small Harmony patch mod, an S1API content mod, a MAPI building mod, a SteamNetworkLib multiplayer mod, and a dedicated server addon all have different owners for gameplay, networking, assets, and packaging. S1Interop should only take over the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` interop seams that make those projects hard to keep portable.
+
 The main product direction is a generated backend-neutral SDK:
 
 - `s1interop new` starts a backend-neutral mod project.
@@ -21,6 +23,8 @@ The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
 - [Core concepts](docs/docfx/articles/core-concepts.md)
+- [Adoption guide](docs/docfx/articles/adoption-guide.md)
+- [S1API and S1Interop](docs/docfx/articles/s1api-and-s1interop.md)
 - [Getting started](docs/docfx/articles/getting-started.md)
 - [Commands](docs/docfx/articles/commands.md)
 - [Generated output](docs/docfx/articles/generator-package.md)
@@ -46,6 +50,17 @@ docfx .\docs\docfx\docfx.json
 The generated site is written to `docs/docfx/_site`. The GitHub Pages workflow in [`.github/workflows/docs.yml`](.github/workflows/docs.yml) builds and publishes the same site from `main`.
 
 ## Quick start
+
+Choose the workflow first:
+
+| You are... | First command after install |
+| --- | --- |
+| New to Schedule One modding | `s1interop new .\MyFirstMod --apply` |
+| Bringing an existing Mono mod | `s1interop analyze .` |
+| Exploring local game API coverage | `s1interop sdkgen . --full-sdk --apply` |
+| Unsure whether migration is safe | `s1interop verify-migration . --dual-runtime --include-source-migrations` |
+
+See the [adoption guide](docs/docfx/articles/adoption-guide.md) for the beginner path, existing-mod path, and safety model.
 
 Build from source:
 

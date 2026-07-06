@@ -36,7 +36,7 @@ The current generated facade is intentionally conservative. `Handle`, `As`, `Try
 
 Near-term SDK quality should prioritize:
 
-- typed property and method facades where Mono and IL2CPP metadata agree, including backend-neutral scalar, string, object, void method shapes, and declared facade handles for game-object members;
+- typed property and method facades where Mono and IL2CPP metadata agree, including backend-neutral scalar, string, object, void method shapes, declared enum mirrors, and declared facade handles for game-object members;
 - clear diagnostics or generated reports for members skipped because they are overloaded, generic, ambiguous, missing, or incompatible across backends;
 - broader constructor and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
 - keeping `S1Interop.Generated.S1InteropMemberRegistry` and other registry types as implementation details in docs, examples, and migration rewrites whenever a type facade can express the same operation.
@@ -132,7 +132,7 @@ Use explicit member declarations when:
 - Mono and IL2CPP surfaces disagree and the developer wants to pin a specific binding.
 - Migration inferred a reflection pattern that cannot be represented by the automatic type facade yet.
 
-Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. Overloaded methods and constructors are still moving in that direction, but explicit declarations remain the safer alpha path until overload and conversion rules are strong enough.
+Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. Explicit declarations remain the safer alpha path for aliases, private members, pinned bindings, and ambiguous overloads, but they should still be enriched from metadata whenever one compatible member can be identified. The escape hatch should not permanently downgrade a mod back to object-only helpers.
 
 ## SDK Generation Modes
 

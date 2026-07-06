@@ -13,14 +13,16 @@ The scaffold includes:
 - `local.build.props.example` for machine-specific game paths;
 - a starter `S1Interop.Generated/S1Interop.BackendNeutral.cs` declaration file;
 - package references needed by the generated helpers.
+- a normal MelonLoader entry point with `[MelonInfo]`, `[MelonGame]`, and a `MelonMod` class.
 
 After creating the project:
 
 1. Copy `local.build.props.example` to `local.build.props`.
-2. Set `MonoGamePath` and `Il2CppGamePath`.
-3. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
-4. Open the `.sln` in Visual Studio or Rider.
-5. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
+2. Set `MonoGamePath` to an `alternate` or `alternate-beta` branch install.
+3. Set `Il2CppGamePath` to a public `none` or `beta` branch install.
+4. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
+5. Open the `.sln` in Visual Studio or Rider.
+6. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
 
 Those two configurations are not meant to make you maintain two source implementations. They are validation targets. Your mod code should still prefer generated `S1Interop.ScheduleOne.*` facades and shared source wherever S1Interop can express the backend difference safely.
 
@@ -34,4 +36,17 @@ That generates declarations from local metadata. Full SDK mode adds broad type r
 
 Use [Backend-neutral declarations](backend-neutral-declarations.md) when you need to review or hand-edit the generated declaration file. See [Generated output](generator-package.md) for what the generator emits from those declarations and when symbols appear after a build.
 
-It does not commit game assemblies, wrapper dumps, or decompiled source.
+## Working with other S1 modding libraries
+
+S1Interop does not replace S1API, MAPI, SteamNetworkLib, bGUI, or dedicated server APIs. Add those dependencies the same way you would in a normal MelonLoader project, usually from release DLLs or NuGet packages that match the runtime you are validating.
+
+Use S1Interop for direct game access:
+
+- generated facades for `ScheduleOne.*` / `Il2CppScheduleOne.*` types;
+- type/member lookup that should survive backend differences;
+- simple public fields, properties, constructors, enum mirrors, and methods when metadata is safe;
+- explicit `S1InteropMember` declarations for private, ambiguous, or migration-specific seams.
+
+Use domain libraries for their domains. S1API should still own item/NPC/shop/saveable workflows. MAPI should still own building and model construction. SteamNetworkLib should still own Steam lobby/P2P helpers. S1Interop is the lower-level interop surface those libraries and mods can lean on when they need direct game-wrapper access.
+
+It does not commit game assemblies, wrapper dumps, decompiled source, prefabs, scenes, textures, or exported Unity projects.

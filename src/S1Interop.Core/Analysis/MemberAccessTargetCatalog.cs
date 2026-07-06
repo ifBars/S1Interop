@@ -399,6 +399,7 @@ public sealed class MemberAccessTargetCatalog
 
         return typeName.StartsWith("ScheduleOne.", StringComparison.Ordinal) ||
                typeName.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal) ||
+               TryResolveAliasQualifiedTypeName(typeName, scheduleOneUsings, out _) ||
                scheduleOneUsings.ContainsKey(typeName) ||
                scheduleOneUsings.Count == 1 ||
                TryInferNamespaceByLeaf(typeName, scheduleOneUsings.Values, out _);
@@ -424,6 +425,11 @@ public sealed class MemberAccessTargetCatalog
             return sourceType;
         }
 
+        if (TryResolveAliasQualifiedTypeName(sourceType, scheduleOneUsings, out string? aliasQualifiedTypeName))
+        {
+            return aliasQualifiedTypeName!;
+        }
+
         if (sourceType.Contains('.', StringComparison.Ordinal))
         {
             return sourceType;
@@ -438,6 +444,29 @@ public sealed class MemberAccessTargetCatalog
         }
 
         return sourceType;
+    }
+
+    private static bool TryResolveAliasQualifiedTypeName(
+        string sourceType,
+        IReadOnlyDictionary<string, string> scheduleOneUsings,
+        out string? resolvedTypeName)
+    {
+        resolvedTypeName = null;
+        int separator = sourceType.IndexOf('.');
+        if (separator <= 0 || separator == sourceType.Length - 1)
+        {
+            return false;
+        }
+
+        string alias = sourceType[..separator];
+        if (!scheduleOneUsings.TryGetValue(alias, out string? namespaceOrTypeName))
+        {
+            return false;
+        }
+
+        string suffix = sourceType[(separator + 1)..];
+        resolvedTypeName = namespaceOrTypeName + "." + suffix;
+        return true;
     }
 
     private static string ResolveHelperTargetTypeName(

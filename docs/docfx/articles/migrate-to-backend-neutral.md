@@ -14,6 +14,8 @@ s1interop analyze .
 
 Fix missing local paths or package restore problems first. The generator needs game reference metadata to validate requested types and produce useful facades.
 
+If the mod already uses S1API, MAPI, SteamNetworkLib, bGUI, or a dedicated server API, keep those dependencies in place. Backend-neutral migration is about the direct Schedule One seams that still require runtime-specific references. It is not a reason to replace a working item builder, networking helper, UI library, or server lifecycle API.
+
 ## 2. Add backend-neutral support
 
 Run a dry-run first:
@@ -79,6 +81,8 @@ if (vehicle.HasValue)
 ```
 
 The goal is to keep mod code close to normal game API usage while moving backend differences into generated code.
+
+For a real patch mod, that usually means replacing code like "read the vehicle/player/UI object differently on Mono and IL2CPP" before touching unrelated systems. Keep Harmony patch methods small and let services use generated facades behind them.
 
 ## 5. Build and review diagnostics
 
