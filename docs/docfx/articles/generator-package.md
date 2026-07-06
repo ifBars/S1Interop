@@ -84,18 +84,22 @@ Generated facades are `internal` by default. The generator does not shorten name
 
 | Declaration | What the generator emits |
 | --- | --- |
-| `[assembly: S1InteropNamespace(...)]` | Registry entries for every matching public type in the referenced assemblies. Type-only by default; `IncludeMembers = true` opts the matching types into member facade discovery. |
-| `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. Also emits the matching registry `Tag` and resolution entries. |
+| `[assembly: S1InteropNamespace(...)]` | Registry entries and a basic facade with `Handle` for every matching public type. The `Handle` only has generic members (`HasValue`, `Instance`, `Value`). No typed member accessors. `IncludeMembers = true` opts matching types into member facade discovery. |
+| `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. The `Handle` gains typed named accessors (fields, properties, methods) from referenced Mono and IL2CPP metadata. Also emits the matching registry `Tag` and resolution entries. |
 | `[assembly: S1InteropMember(...)]` | A typed accessor on the owner facade and `Handle` (property, field, or method) with the chosen alias. Used for private members, ambiguous overloads, and pinned bindings. |
 | `[assembly: S1InteropGenerateUnityEventBridge]` | `S1InteropUnityEventBridge` in `S1Interop.Generated` with `Add`/`Remove` overloads. |
 | `[assembly: S1InteropGenerateDelegateEventBridge]` | `S1InteropDelegateEventBridge` in `S1Interop.Generated` with `Combine`/`Remove` helpers. |
+
+> [!IMPORTANT]
+> `S1InteropNamespace` and `S1InteropType` produce different `Handle` surfaces. A namespace-only `Handle` gives you `HasValue`, `Instance`, `Value`, and reflection-style `Get`/`TrySet`/`Invoke`. Adding `S1InteropType` for the same type triggers member discovery and adds typed named accessors (like `vehicle.VehicleName`) to the `Handle`. The transition happens after the next build completes — see below.
 
 ## Build and IDE timing
 
 A few practical notes that prevent the most common confusion:
 
 - **Attributes are generated too.** You never need to define `S1InteropTypeAttribute` or its siblings. The generator emits them on first generation via `RegisterPostInitializationOutput`. If you see "type or namespace 'S1InteropType' could not be found", the project does not reference `S1Interop.Generators`.
-- **Rebuild after editing declarations.** Generated symbols are only visible after a build or design-time build runs. If you add a new `S1InteropType` and immediately try to call `LandVehicle.As(...)` in the same file, IntelliSense may not resolve it until you build.
+- **There is a delay after saving.** The Roslyn generator runs as part of compilation, which is not instantaneous. After you save a declaration file, the IDE triggers a design-time build in the background. There is a short delay before IntelliSense reflects the new or changed symbols. The delay depends on project size, available game reference assemblies, and IDE load. If symbols are missing immediately after editing, wait a moment or run `dotnet build`.
+- **Namespace-only vs type-declared handles.** If you have an `S1InteropNamespace` declaration for `ScheduleOne`, every matching type gets a `Handle` with generic members only. Adding an `S1InteropType` for a specific type (like `ScheduleOne.PlayerScripts.Player`) triggers member discovery for that type. After the next build completes, the `Handle` gains typed named accessors. Before the build, the `Handle` still only has generic members.
 - **Declarations are assembly-level.** Put them in a single generated or S1Interop-owned file such as `S1Interop.Generated/S1Interop.BackendNeutral.cs`. Keeping them in one place makes rollback and regeneration reviewable.
 - **Diagnostics are quiet without game references.** `S1I001`-`S1I003` only fire when the relevant Mono or IL2CPP reference surface is available in the compilation. Docs-only or package-restore builds do not fail because local game paths are missing.
 - **Source-boundary diagnostics are IL2CPP-only.** `S1I004`-`S1I007` only fire when the compilation targets IL2CPP (preprocessor symbol or runtime surface). They never fire on Mono-only builds.

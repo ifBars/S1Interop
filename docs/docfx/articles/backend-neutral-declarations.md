@@ -40,9 +40,14 @@ Registers every public type in a namespace for runtime type resolution without r
 
 - One registry entry per matching public, non-generic, top-level type in referenced Mono/IL2CPP assemblies.
 - Per-type `*Name`, `*MonoName`, `*Il2CppName`, `Resolve`, `Create`, `As*`, `TryAs*`, `Is*`, `Get*`, `TrySet*`, and `Invoke*` members on `S1Interop.Generated.S1InteropTypeRegistry`.
-- A `S1Interop.ScheduleOne.*` facade per matching type when `IncludeMembers = true` (member discovery) or when the same type is also declared via `S1InteropType`.
+- A `S1Interop.ScheduleOne.*` facade and `Handle` struct for every matching type. When `IncludeMembers` is `false` (the default), the `Handle` only exposes generic members: `HasValue`, `Instance`, `Value`, and `ToString`. No typed member accessors are generated. This is useful for runtime type checks, `As`/`TryAs`/`Is` wrapping, and reflection-style `Get`/`TrySet`/`Invoke` calls, but it does not give you named properties or methods on the `Handle`.
+
+To get typed member accessors (named fields, properties, and methods on the `Handle`), either set `IncludeMembers = true` on the namespace declaration or add a separate `S1InteropType` declaration for the specific types where you want member facades. `S1InteropType` is preferred for individual types because it keeps member discovery scoped and reviewable.
 
 Namespace declarations are the practical way to seed broad SDK coverage from `sdkgen --full-sdk` without emitting thousands of per-type attributes.
+
+> [!IMPORTANT]
+> Adding or changing declarations triggers a design-time build, but the update is not instantaneous. After saving the declaration file, there is a short delay before the IDE regenerates the source and IntelliSense reflects the new symbols. See [Build timing](#build-timing) below.
 
 ## `S1InteropType`
 
@@ -72,6 +77,8 @@ A `S1Interop.ScheduleOne.Vehicles.LandVehicle` facade with:
 - `Get`/`TrySet`/`Invoke`/`Invoke<T>` reflection helpers for both `Handle` and raw `object?` receivers;
 - accessors for compatible public fields, properties, and unambiguous public methods, discovered from the referenced Mono and IL2CPP metadata;
 - the underlying registry `Tag` and resolution entries in `S1Interop.Generated.S1InteropTypeRegistry`.
+
+This is the key difference from `S1InteropNamespace` alone: `S1InteropType` opts the type into member discovery, so the `Handle` gains typed named accessors (for example `vehicle.VehicleName`, `vehicle.GetCurrentThrottleValue<T>()`) in addition to the generic `HasValue`/`Instance`/`Value` members. If you only have an `S1InteropNamespace` declaration for `ScheduleOne`, the `Player` type's `Handle` will only have generic members — you will not see `player.Money` or similar typed accessors until you add an `S1InteropType` declaration for that specific type.
 
 If the referenced assemblies do not contain the requested type, the generator reports `S1I001`. Declaration diagnostics are quiet when no game reference surface is available, so package-restore and docs-only builds do not fail.
 
@@ -144,10 +151,15 @@ The declarations and the `S1Interop.Generators` package are a compile-time unit.
 Declarations are read by the generator during compilation. After you edit the declaration file:
 
 1. Save the file.
-2. Build the project (or let the IDE run a design-time build).
+2. The IDE triggers a design-time build in the background, or you run `dotnet build` manually.
 3. The new or changed generated symbols appear in IntelliSense and are compiled into the assembly.
 
-If a generated symbol is missing immediately after editing a declaration, build once. The most common cause of "generated type not found" is that no design-time build has run since the declaration was added.
+There is a short delay between saving and the generated symbols updating. The Roslyn generator runs as part of the compilation, which is not instantaneous — the IDE needs to re-parse, re-bind, and re-emit before IntelliSense reflects the new state. The delay depends on project size, available game reference assemblies, and IDE load. If a generated symbol is missing immediately after editing a declaration, wait a moment or trigger a full build (`dotnet build`).
+
+The most common cause of "generated type not found" is that no design-time build has completed since the declaration was added. If the symbol still does not appear after a full build, check that the project references `S1Interop.Generators` and that the declaration file is included in the compilation.
+
+> [!IMPORTANT]
+> When you start with an `S1InteropNamespace` declaration and later add an `S1InteropType` for a specific type, the `Handle` for that type gains typed member accessors after the next build completes. Before the build runs, the `Handle` still only exposes generic members (`HasValue`, `Instance`, `Value`). This is expected — the generator has not yet re-discovered members for the newly declared type.
 
 Generated symbols are emitted into the same compilation as the rest of the project. They are not separate assemblies and are not referenced from a package at runtime. The `S1Interop.Generators` package only ships the generator DLL under `analyzers/dotnet/cs`; it does not add a runtime DLL reference.
 

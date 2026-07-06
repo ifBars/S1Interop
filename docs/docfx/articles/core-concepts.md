@@ -102,13 +102,25 @@ A per-type empty `readonly struct` (for example `LandVehicleTag`) generated for 
 
 ### Type facade
 
-A `static internal class` emitted under `S1Interop.ScheduleOne.*` for each declared `S1InteropType`. Preserves the original runtime namespace root under `S1Interop`: `ScheduleOne.Vehicles.LandVehicle` becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`. The generator never emits shortened duplicate namespaces.
+A `static internal class` emitted under `S1Interop.ScheduleOne.*` for each declared type (whether from `S1InteropNamespace` or `S1InteropType`). Preserves the original runtime namespace root under `S1Interop`: `ScheduleOne.Vehicles.LandVehicle` becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`. The generator never emits shortened duplicate namespaces.
 
-A facade exposes `Handle`, `Type`, `TypeName`, `Create(...)`, `Is(...)`, `TryAs(...)`, `As(...)`, `Get(...)`, `TrySet(...)`, `Invoke(...)`, plus discovered or declared typed member accessors. Prefer named facade members when they exist; the string-based helpers are fallback and migration support.
+A facade always exposes `Handle`, `Type`, `TypeName`, `Create(...)`, `Is(...)`, `TryAs(...)`, `As(...)`, `Get(...)`, `TrySet(...)`, `Invoke(...)`. Whether it also exposes typed named member accessors depends on how the type was declared:
+
+- `S1InteropNamespace` with default `IncludeMembers = false`: facade and `Handle` exist, but no typed member accessors. Only generic and reflection-style members.
+- `S1InteropType` (or `S1InteropNamespace` with `IncludeMembers = true`): the generator discovers compatible public fields, properties, and unambiguous public methods from referenced Mono and IL2CPP metadata and emits them as named accessors on the facade and `Handle`.
+
+Prefer named facade members when they exist; the string-based helpers are fallback and migration support.
 
 ### Handle
 
-A `readonly struct` nested on each type facade. Wraps `S1InteropObject<AliasTag>` and is the primary value type mod code holds for a backend-neutral game object. Exposes `HasValue`, `Instance` (the raw `object?`), `Value` (the underlying `S1InteropObject<...>`), typed member accessors, and an implicit conversion to the underlying handle. Obtained from `Facade.As(rawInstance)` or `Facade.TryAs(rawInstance, out var handle)`.
+A `readonly struct` nested on each type facade. Wraps `S1InteropObject<AliasTag>` and is the primary value type mod code holds for a backend-neutral game object. Obtained from `Facade.As(rawInstance)` or `Facade.TryAs(rawInstance, out var handle)`.
+
+The members available on a `Handle` depend on how the type was declared:
+
+- **Namespace-only** (via `S1InteropNamespace` with default `IncludeMembers = false`): the `Handle` exposes only generic members — `HasValue`, `Instance` (the raw `object?`), `Value` (the underlying `S1InteropObject<...>`), and `ToString`. You can still use `As`/`TryAs`/`Is` on the facade and call reflection-style `Get`/`TrySet`/`Invoke` on the registry, but there are no typed named accessors on the `Handle` itself.
+- **Type-declared** (via `S1InteropType`, or `S1InteropNamespace` with `IncludeMembers = true`): the `Handle` gains typed named accessors for compatible public fields, properties, and unambiguous public methods discovered from referenced Mono and IL2CPP metadata. For example, `vehicle.VehicleName` or `vehicle.GetCurrentThrottleValue<float>()`.
+
+The transition from generic-only to typed accessors happens after the next build completes. There is a short delay between saving a declaration file and the IDE regenerating the source — the Roslyn generator runs as part of compilation, which is not instantaneous. See [Build timing](backend-neutral-declarations.md#build-timing) for details.
 
 ### `S1InteropTypeRegistry`
 
