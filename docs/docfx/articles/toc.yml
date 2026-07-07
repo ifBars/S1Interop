@@ -6,6 +6,8 @@
       href: introduction.md
     - name: Core concepts
       href: core-concepts.md
+    - name: Architecture
+      href: architecture.md
     - name: Use cases
       href: use-cases.md
     - name: Adoption guide

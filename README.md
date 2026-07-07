@@ -18,11 +18,31 @@ It is not a finished "convert every mod with one command" tool yet. The current 
 
 Backend-neutral authoring means one source model and generated `S1Interop.ScheduleOne.*` facades. It does not mean developers should never build against Mono and IL2CPP references. Per-runtime build configurations remain useful validation targets so generator diagnostics can catch missing types, wrapper drift, and IL2CPP boundary failures before runtime.
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    Source["Mod source"] --> SdkGen["s1interop sdkgen"]
+    Refs["Local Mono and IL2CPP references"] --> SdkGen
+    SdkGen --> Declarations["S1Interop declarations"]
+    Declarations --> Generator["S1Interop.Generators"]
+    Generator --> Generated["Runtime registry, facades,\nhandles, diagnostics, helpers"]
+    Generated --> Build["Build"]
+    Source --> Build
+    Build --> Dll["One mod DLL"]
+    Dll --> Runtime["Runtime backend detection"]
+    Runtime --> Mono["Mono ScheduleOne.*"]
+    Runtime --> Il2Cpp["IL2CPP Il2CppScheduleOne.*"]
+```
+
+See [Architecture](docs/docfx/articles/architecture.md) for the full SDK generation and single-assembly flow.
+
 ## Documentation
 
 The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
+- [Architecture](docs/docfx/articles/architecture.md)
 - [Use cases](docs/docfx/articles/use-cases.md)
 - [Core concepts](docs/docfx/articles/core-concepts.md)
 - [Adoption guide](docs/docfx/articles/adoption-guide.md)

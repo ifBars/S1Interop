@@ -10,6 +10,7 @@ S1Interop is modular. You can use diagnostics only, add dual-runtime build suppo
 | --- | --- |
 | [Introduction](introduction.md) | What S1Interop is and where it fits beside S1API, MAPI, and other modding libraries. |
 | [Core concepts](core-concepts.md) | The vocabulary: facade, `Handle`, declarations, registry, and `S1InteropObject<TTag>`. |
+| [Architecture](architecture.md) | How `sdkgen`, declarations, the generator, and the single DLL runtime flow fit together. |
 | [Use cases](use-cases.md) | Pick the parts of S1Interop you actually need. |
 | [Adoption guide](adoption-guide.md) | Pick a path for a new mod, existing Mono mod, S1API mod, or mixed Mono/IL2CPP project. |
 | [S1API and S1Interop](s1api-and-s1interop.md) | Decide what stays in S1API and what should move behind generated interop. |
