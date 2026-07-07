@@ -55,15 +55,15 @@ That is the overlap: both care about Mono and IL2CPP. The difference is where th
 | "I want one player-facing dependency with content helpers and loader behavior." | Yes. S1API has runtime packages and `S1APILoader`. | No. The generator package is a build-time tool, not a gameplay framework. |
 | "I want a backend-neutral direct game SDK for types S1API does not wrap." | No, unless S1API adds that domain. | Yes. Declare the type and let the generator emit facades where metadata is safe. |
 
-## How this should feel for modders
+## How this should feel as a mod author
 
-New modders should not have to pick a side.
+You do not need to pick a side before you know what your mod actually needs.
 
-If they are building content that S1API supports, point them to S1API first. It is friendlier and has the domain concepts they need. If they hit a direct game type that S1API does not expose, S1Interop can cover that narrow gap without forcing the whole mod into hand-written backend branches.
+If you are building content that S1API already supports, start there. It gives you the gameplay concepts you probably want: item registration, NPC setup, lifecycle events, save data, UI helpers, and loader behavior. If your mod later needs a direct Schedule One type that S1API does not expose, use S1Interop for that specific gap instead of turning the whole project into hand-written Mono/IL2CPP branches.
 
-Existing mod authors should start with `s1interop analyze .`. They can keep their MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game seam, not the whole project.
+If you already have a mod, start with `s1interop analyze .`. Keep your MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game access point, not the whole project.
 
-For native Mono/IL2CPP mods, a good first target is a branch that only exists to read or invoke the same game member on both backends. For S1API-specific mods, a good first target is the code outside the S1API workflow: a Harmony target lookup, a cached `FieldInfo`, a local `ReflectionUtils.TryGetFieldOrProperty(...)`, or a direct cast to a game wrapper. For hybrid mods, do both in small pieces and keep using both runtime builds as the proof.
+For native Mono/IL2CPP mods, look for a branch that only exists to read or invoke the same game member on both backends. For S1API-specific mods, look outside the S1API workflow first: a Harmony target lookup, a cached `FieldInfo`, a local `ReflectionUtils.TryGetFieldOrProperty(...)`, or a direct cast to a game wrapper. For hybrid mods, move in small pieces and keep both runtime builds as your proof that the abstraction is working.
 
 ## Boundary to keep clear
 

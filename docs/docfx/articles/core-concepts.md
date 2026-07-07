@@ -1,6 +1,6 @@
 # Core concepts
 
-This page defines the terms you will see throughout the S1Interop docs. Read it once before the workflow pages so the vocabulary is settled.
+Start here for the terms used throughout the S1Interop docs. Read it once before the workflow pages so the vocabulary is settled.
 
 For the high-level "what is S1Interop" pitch, see [Introduction](introduction.md). For the full generated-symbol reference, see [Generated output](generator-package.md).
 

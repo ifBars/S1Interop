@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This page covers the most common issues you will run into when using S1Interop and how to resolve them. If something is silently wrong — no generated symbols, failed restores, stale IDE state — start here.
+Start here when something is silently wrong: no generated symbols, failed restores, stale IDE state, or migration rollback trouble.
 
 ## "type or namespace 'S1InteropType' could not be found"
 

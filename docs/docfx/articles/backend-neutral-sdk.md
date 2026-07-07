@@ -4,7 +4,7 @@ The backend-neutral SDK is the main S1Interop product direction.
 
 For what the generator emits at build time and when those symbols appear, see [Generated output](generator-package.md). For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md).
 
-Instead of writing code against `ScheduleOne.*` in Mono and `Il2CppScheduleOne.*` in IL2CPP, a mod can use generated facades under `S1Interop.ScheduleOne.*`.
+Instead of writing code against `ScheduleOne.*` in Mono and `Il2CppScheduleOne.*` in IL2CPP, use generated facades under `S1Interop.ScheduleOne.*`.
 
 ```csharp
 using S1Interop.ScheduleOne.Vehicles;
@@ -30,9 +30,9 @@ S1Interop does not emit shortened duplicate namespaces such as `S1Interop.Vehicl
 
 ## Authoring model and validation targets
 
-Backend-neutral is about the source code a mod author writes. The goal is one source surface with generated facades, not one pile of `#if MONO` / `#if IL2CPP` branches.
+Backend-neutral is about the source code you write. The goal is one source surface with generated facades, not one pile of `#if MONO` / `#if IL2CPP` branches.
 
-Projects can still keep Mono and IL2CPP build configurations. Those configurations validate the same backend-neutral source against both local reference surfaces and give the generator enough context to report missing types, missing members, or IL2CPP-only boundary problems. Treat them as validation targets rather than separate implementation tracks.
+Your project can still keep Mono and IL2CPP build configurations. Those configurations validate the same backend-neutral source against both local reference surfaces and give the generator enough context to report missing types, missing members, or IL2CPP-only boundary problems. Treat them as validation targets rather than separate implementation tracks.
 
 ## Type-first coverage
 
@@ -72,4 +72,4 @@ Explicit `S1InteropMember` declarations follow the same direction when metadata 
 
 Fall back to string-based `Get`, `TrySet`, or `Invoke` only when the member is not yet safe to expose as a typed facade member. If a public member is missing, the usual reasons are overload ambiguity, generic method shape, generated backing-field metadata, incompatible Mono/IL2CPP signatures, or a conversion rule S1Interop does not know yet.
 
-Future SDK work should keep moving ordinary public members toward native-feeling facade access while leaving the registry and reflection helpers as implementation details or explicit escape hatches.
+As the SDK surface grows, ordinary public members should keep moving toward native-feeling facade access. The registry and reflection helpers should feel like escape hatches, not the normal way to write mod code.

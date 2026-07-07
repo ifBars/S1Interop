@@ -4,7 +4,7 @@ Use this path when an existing mod should build separate Mono and IL2CPP assembl
 
 Dual-runtime migration keeps the familiar two-configuration model. It is useful when a mod still needs runtime-specific code or when you want a lower-risk bridge before moving toward backend-neutral facades.
 
-This path matches many existing Schedule One mods: one source tree, runtime-specific build configurations, local game paths, and release DLLs that match the user's Steam branch. Some start as plain Mono mods. Some already have native Mono/IL2CPP configurations. Some depend on S1API for content workflows but still patch vanilla game methods directly. Some are hybrids of all three.
+This path matches many existing Schedule One mods: one source tree, runtime-specific build configurations, local game paths, and release DLLs that match the Steam branch you are targeting. Some start as plain Mono mods. Some already have native Mono/IL2CPP configurations. Some depend on S1API for content workflows but still patch vanilla game methods directly. Some are hybrids of all three.
 
 Treat those pieces separately. Keep S1API, MAPI, SteamNetworkLib, dedicated-server helpers, and other domain APIs where they own the workflow. Use S1Interop for the direct Schedule One seams that make the project hard to keep portable: runtime-specific `ScheduleOne.*` / `Il2CppScheduleOne.*` references, cached reflection bindings, Harmony method targets, and small field/property reads around patches.
 

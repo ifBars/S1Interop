@@ -13,7 +13,7 @@ S1Interop uses ignored local props files for developer-specific paths:
 </Project>
 ```
 
-Use the branch names modders already use:
+Use the branch names already common in Schedule One modding:
 
 | Steam branch | Usual backend | Typical path property |
 | --- | --- | --- |

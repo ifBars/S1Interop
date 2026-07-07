@@ -47,6 +47,6 @@ Use S1Interop for direct game access:
 - simple public fields, properties, constructors, enum mirrors, and methods when metadata is safe;
 - explicit `S1InteropMember` declarations for private, ambiguous, or migration-specific seams.
 
-Use domain libraries for their domains. S1API should still own item/NPC/shop/saveable workflows. MAPI should still own building and model construction. SteamNetworkLib should still own Steam lobby/P2P helpers. S1Interop is the lower-level interop surface those libraries and mods can lean on when they need direct game-wrapper access.
+Use domain libraries for the work they already handle well. Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for Steam lobby and P2P helpers. Use S1Interop when your mod still needs direct game-wrapper access underneath those libraries.
 
 It does not commit game assemblies, wrapper dumps, decompiled source, prefabs, scenes, textures, or exported Unity projects.

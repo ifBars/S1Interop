@@ -1,11 +1,11 @@
 # Adoption guide
 
-Use this page to pick the right first command. S1Interop has a few workflows, and choosing the wrong one early can make a simple setup feel harder than it is.
+Use this page to pick the right first command for your mod. S1Interop has a few workflows, and choosing the wrong one early can make a simple setup feel harder than it is.
 
-Most users fall into one of two groups:
+You are usually in one of two places:
 
-- existing Schedule One mod developers who already have a Mono mod and want IL2CPP or backend-neutral support without maintaining two source trees;
-- first-time modders who want to start from a project shape that already understands Mono, IL2CPP, local game paths, and generated SDK facades.
+- you already have a Schedule One mod and want IL2CPP or backend-neutral support without maintaining two source trees;
+- you are starting your first mod and want a project shape that already understands Mono, IL2CPP, local game paths, and generated SDK facades.
 
 S1Interop does not ship game assemblies, generated IL2CPP wrappers, decompiled source, prefabs, scenes, textures, or exported Unity projects. It works from your local game install and writes mod source/project files.
 
@@ -26,7 +26,7 @@ Most Schedule One projects already fall into a few familiar shapes. S1Interop sh
 
 Use the helper API that owns your domain. If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already gives you the right workflow, keep it. S1Interop is the generated interop layer for the lower-level game-wrapper calls that still leak through. See [S1API and S1Interop](s1api-and-s1interop.md) for the deeper comparison.
 
-For direct Harmony patches whose target type changes between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md). The mod author writes S1Interop patch attributes; generated code resolves and applies the native target method once.
+For direct Harmony patches whose target type changes between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md). You write S1Interop patch attributes against the Mono type name; generated code resolves and applies the native target method once.
 
 ## Which path should I use?
 

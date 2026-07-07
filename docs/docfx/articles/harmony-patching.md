@@ -45,7 +45,7 @@ Do not call `PatchAll` for S1Interop patch attributes.
 
 When a project contains `[S1InteropPatch]`, the generator emits an internal `S1Interop.Generated.S1InteropHarmonyPatcher` and a module initializer. That generated initializer applies S1Interop patches once when the mod assembly loads. It also has an internal guard so an accidental second internal apply call does not patch the same handlers twice.
 
-This avoids a common MelonLoader/Harmony mistake: authors write patch attributes, then also call `PatchAll` during startup and end up running every patch twice. With S1Interop, the author-facing API is the attributes. The generated registrar is implementation detail.
+This avoids a common MelonLoader/Harmony mistake: writing patch attributes, then also calling `PatchAll` during startup and ending up with every patch running twice. With S1Interop, your API is the attributes. The generated registrar is implementation detail.
 
 If your mod also has ordinary `[HarmonyPatch]` or MelonLoader patch attributes, keep treating those as ordinary Harmony/MelonLoader patches. S1Interop patch attributes are only for backend-neutral Schedule One target resolution.
 

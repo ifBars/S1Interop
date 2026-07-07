@@ -1,6 +1,6 @@
 # S1Interop docs
 
-Use these docs when you are building, migrating, or validating a Schedule One mod with S1Interop.
+Use these docs when you are building, migrating, or validating your Schedule One mod with S1Interop.
 
 ## Start here
 
@@ -15,7 +15,7 @@ Use these docs when you are building, migrating, or validating a Schedule One mo
 
 ## CLI reference
 
-The `s1interop` command and its project-level workflows. These pages cover what the CLI inspects, plans, writes, and verifies on disk.
+The `s1interop` command handles project-level work: analysis, scaffolding, migration plans, file edits, and sandbox verification.
 
 | Page | Use it when |
 | --- | --- |
@@ -24,7 +24,7 @@ The `s1interop` command and its project-level workflows. These pages cover what 
 
 ## Generator package
 
-The `S1Interop.Generators` Roslyn package and the symbols it emits during compilation. These pages cover what is generated, when, and how to drive it through declarations.
+The `S1Interop.Generators` package runs during compilation. Use these pages when you need to know which generated symbols should appear in your mod and which declarations control them.
 
 | Page | Use it when |
 | --- | --- |
@@ -46,7 +46,7 @@ End-to-end paths that combine CLI commands and the generator package.
 
 ## API reference
 
-The generated API reference is limited to stable `S1Interop.Core` models and library entry points. Use [API reference](api-reference.md) when you are embedding S1Interop in another tool or reading its result contracts.
+The generated API reference is limited to stable `S1Interop.Core` models and library entry points. Use [API reference](api-reference.md) when you are embedding S1Interop in another tool or reading result contracts.
 
 ## Troubleshooting
 

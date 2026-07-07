@@ -1,6 +1,6 @@
 # Generated output
 
-This page describes what the `S1Interop.Generators` package emits, when it runs, and how declarations map to generated code. It is the reference for mod authors who need to know which symbols appear after a build and why.
+Use this page to understand what the `S1Interop.Generators` package emits, when it runs, and how declarations map to generated code. It is the place to check when you need to know which symbols should appear in your mod after a build and why.
 
 For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md). For the conceptual facade model, see [Backend-neutral SDK](backend-neutral-sdk.md).
 
@@ -21,13 +21,13 @@ The generator package is the compile-time half of S1Interop. It does not parse c
 
 | Responsibility | Owner |
 | --- | --- |
-| Write declaration files (`S1InteropType`, `S1InteropNamespace`, `S1InteropMember`) | CLI (`sdkgen`, `init`, `migrate`) or the mod author by hand. |
+| Write declaration files (`S1InteropType`, `S1InteropNamespace`, `S1InteropMember`) | CLI (`sdkgen`, `init`, `migrate`) or you, if you author declarations by hand. |
 | Rewrite call sites to generated facades | CLI (`migrate`) before compilation. |
 | Emit `S1Interop.Generated` registry, facades, and bridge helpers | Generator package, during compilation. |
 | Report `S1I001`-`S1I007` diagnostics | Generator package, during compilation. |
 | Resolve Mono/IL2CPP type names at runtime | Generated `S1Interop.Generated.S1InteropRuntime` and `S1InteropTypeRegistry`. |
 
-A mod project that references only the generator package can author declarations by hand and still get the full generated SDK surface. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
+If your mod references only the generator package, you can author declarations by hand and still get the full generated SDK surface. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
 
 ## Generated source files
 
@@ -113,6 +113,6 @@ A few practical notes that prevent the most common confusion:
 - It cannot rewrite existing user source. Roslyn source generators are additive only. Any call-site transformation happens through CLI migration before compilation, not inside the generator.
 - It cannot ship game assemblies or a static catalog of Schedule One APIs. Generated member coverage comes from the Mono and IL2CPP reference assemblies already referenced by the project.
 - It does not generate shortened duplicate namespaces. One canonical namespace per game type.
-- It does not expose a public patching startup API. S1Interop patch declarations are applied by generated internal code so authors do not accidentally double-apply patches.
+- It does not expose a public patching startup API. S1Interop patch declarations are applied by generated internal code so you do not accidentally double-apply patches.
 
 For the full attribute reference, continue to [Declarations](backend-neutral-declarations.md). For patch authoring, see [Backend-neutral Harmony patching](harmony-patching.md).
