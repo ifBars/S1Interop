@@ -24,7 +24,7 @@ The generator is compile-time only. It reads declarations already in the compila
 | Write declaration files (`S1InteropType`, `S1InteropNamespace`, `S1InteropMember`) | CLI (`sdkgen`, `init`, `migrate`) or you, if you author declarations by hand. |
 | Rewrite call sites to generated facades | CLI (`migrate`) before compilation. |
 | Emit `S1Interop.Generated` registry, facades, and bridge helpers | Generator package, during compilation. |
-| Report `S1I001`-`S1I007` diagnostics | Generator package, during compilation. |
+| Report `S1I001`-`S1I008` diagnostics | Generator package, during compilation. |
 | Resolve Mono/IL2CPP type names at runtime | Generated `S1Interop.Generated.S1InteropRuntime` and `S1InteropTypeRegistry`. |
 
 If your mod references only the generator package, you can author declarations by hand. The CLI is helpful, but not required at runtime.
@@ -105,6 +105,7 @@ Watch these details:
 - **Declarations are assembly-level.** Put them in a single generated or S1Interop-owned file such as `S1Interop.Generated/S1Interop.BackendNeutral.cs`. Keeping them in one place makes rollback and regeneration reviewable.
 - **Diagnostics are quiet without game references.** `S1I001`-`S1I003` only fire when the relevant Mono or IL2CPP reference surface is available in the compilation. Docs-only or package-restore builds do not fail because local game paths are missing.
 - **Source-boundary diagnostics are IL2CPP-only.** `S1I004`-`S1I007` only fire when the compilation targets IL2CPP (preprocessor symbol or runtime surface). They never fire on Mono-only builds.
+- **Patch-target review warnings need references.** `S1I008` fires when referenced metadata shows an overloaded, accessor-like, operator-like, or aggressively inlined S1Interop patch target. Treat it as a review warning, not proof that the patch cannot work.
 
 ## What the generator does not do
 

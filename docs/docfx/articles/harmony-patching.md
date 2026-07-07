@@ -67,6 +67,8 @@ Missing and failed optional patches are logged. Required patches throw after rec
 
 `Applied` only means the method body was patched. It does not prove the game still calls that method on IL2CPP. If the method is tiny, accessor-like, or only used from hot paths, IL2CPP may inline callers so your handler never runs. Patch a higher-level method when possible and validate on the actual IL2CPP branch you support.
 
+`S1I008` warns when a patch target needs review before IL2CPP use: overloaded targets without `ParameterTypeNames`, property/event accessors, operator methods, and methods marked for aggressive inlining or optimization. Treat it as a prompt to choose a safer target or prove the handler fires in-game.
+
 ## Attribute reference
 
 `S1InteropPatch` goes on the patch class.

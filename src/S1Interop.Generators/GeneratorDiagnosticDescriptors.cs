@@ -28,5 +28,13 @@ internal static class GeneratorDiagnosticDescriptors
         "S1Interop",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor PatchTargetRiskDiagnostic = new(
+        "S1I008",
+        "S1Interop patch target needs IL2CPP review",
+        "S1Interop patch target '{0}.{1}' needs IL2CPP review: {2}",
+        "S1Interop",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 #pragma warning restore RS2008
 }

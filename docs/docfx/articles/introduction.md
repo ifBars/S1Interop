@@ -40,7 +40,7 @@ The generator runs during compilation. Once a project references `S1Interop.Gene
 - reads `S1InteropType`, `S1InteropNamespace`, `S1InteropMember`, and bridge attributes from assembly-level declarations;
 - emits the `S1Interop.Generated` runtime registry, type handles, member accessors, and bridge helpers;
 - emits `S1Interop.ScheduleOne.*` type facades with `Handle`, `As`, `TryAs`, `Is`, `Create`, and member accessors;
-- reports `S1I001`-`S1I003` declaration diagnostics and `S1I004`-`S1I007` IL2CPP boundary diagnostics.
+- reports `S1I001`-`S1I003` declaration diagnostics, `S1I004`-`S1I007` IL2CPP boundary diagnostics, and `S1I008` patch-target review warnings.
 
 Generated symbols appear after a build or IDE design-time build. See [Generated output](generator-package.md) for the full surface and build timing.
 

@@ -1511,6 +1511,133 @@ internal sealed partial class S1InteropFixtureTests
             $"S1InteropPatch declarations should report S1I003 when a method exists on Mono but is absent from the IL2CPP reference surface. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
+    private void S1InteropPatchTargetsWarnForAmbiguousOverloadsWithoutParameterTypes()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    public void StartMoving()
+                    {
+                    }
+
+                    public void StartMoving(int priority)
+                    {
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "StartMoving",
+                    MethodAlias = "MoveItemBehaviourStartMoving")]
+                internal static class MoveItemPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+            }
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I008" &&
+                diagnostic.GetMessage().Contains("StartMoving", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("ParameterTypeNames", StringComparison.Ordinal)),
+            $"S1InteropPatch declarations should warn when an overloaded target omits ParameterTypeNames. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropPatchTargetsWarnForAccessorAndAggressiveInliningRisk()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            using System.Runtime.CompilerServices;
+
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.PlayerScripts
+            {
+                public sealed class Player
+                {
+                    public int Health { get; private set; }
+
+                    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                    public bool IsReady()
+                    {
+                        return true;
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.PlayerScripts.Player",
+                    "get_Health",
+                    MethodAlias = "PlayerGetHealth")]
+                internal static class HealthPatch
+                {
+                    [S1Interop.S1InteropPostfix]
+                    private static void Postfix()
+                    {
+                    }
+                }
+
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.PlayerScripts.Player",
+                    "IsReady",
+                    MethodAlias = "PlayerIsReady")]
+                internal static class ReadyPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+            }
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I008" &&
+                diagnostic.GetMessage().Contains("get_Health", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("accessor", StringComparison.Ordinal)) &&
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I008" &&
+                diagnostic.GetMessage().Contains("IsReady", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("aggressive", StringComparison.Ordinal)) &&
+            diagnostics.All(diagnostic => diagnostic.Id != "S1I003"),
+            $"S1InteropPatch declarations should warn, not fail, for accessor and aggressive-inline patch targets. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
     private void S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies()
     {
         MetadataReference monoGameReference = CreateMetadataReferenceFromSource(

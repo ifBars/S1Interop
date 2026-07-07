@@ -20,7 +20,7 @@ Schedule One ships both a Mono build and an IL2CPP build, and players may run ei
 | **Object casts** | Standard `as` / `is` | Must route through `TryCast<T>` on proxy |
 
 > [!NOTE]
-> S1Interop diagnostic codes `S1I004`-`S1I007` catch known IL2CPP boundary failures at compile time: Harmony transpiler misuse, managed collection callbacks, managed byte buffers at native boundaries, and plain object casts. They only fire when the compilation targets IL2CPP.
+> S1Interop diagnostic codes `S1I004`-`S1I007` catch known IL2CPP boundary failures at compile time: Harmony transpiler misuse, managed collection callbacks, managed byte buffers at native boundaries, and plain object casts. `S1I008` warns when a backend-neutral patch target needs IL2CPP review.
 
 ### How S1Interop resolves the backend
 
@@ -189,6 +189,7 @@ Compile-time diagnostics reported by the generator, grouped into:
 
 - **Declaration diagnostics** `S1I001`-`S1I003`: validate `S1InteropType` and `S1InteropMember` against referenced Mono/IL2CPP assemblies. Quiet when no game reference surface is available.
 - **IL2CPP source-boundary diagnostics** `S1I004`-`S1I007`: catch known IL2CPP runtime failures (Harmony transpilers, managed collection callback signatures, managed byte buffers at native boundaries, plain object/proxy casts). Fire only when the compilation targets IL2CPP.
+- **Patch-target review diagnostics** `S1I008`: warn when referenced metadata shows an overloaded, accessor-like, operator-like, or aggressively inlined backend-neutral patch target.
 
 See [Diagnostics](diagnostics.md) for the full table.
 

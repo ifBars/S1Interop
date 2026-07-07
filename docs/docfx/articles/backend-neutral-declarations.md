@@ -174,7 +174,7 @@ Patch declarations generate normal type/member registry entries for the target a
 
 `Required = true` makes target resolution or patch-application failure throw during generated startup. Leave it `false` for optional compatibility patches that can safely skip on one backend.
 
-When Mono or IL2CPP references are available during compilation, patch targets validate like explicit method members. Missing target types report `S1I001`; missing target methods report `S1I003`. Runtime reports still matter because IL2CPP can expose metadata for a method that Harmony cannot patch safely.
+When Mono or IL2CPP references are available during compilation, patch targets validate like explicit method members. Missing target types report `S1I001`; missing target methods report `S1I003`. `S1I008` warns on patch targets that need IL2CPP review, such as overloaded methods without `ParameterTypeNames`, accessor-like targets, operators, or methods marked for aggressive inlining/optimization. Runtime reports still matter because IL2CPP can expose metadata for a method that Harmony cannot patch safely.
 
 See [Backend-neutral Harmony patching](harmony-patching.md) for the full workflow.
 

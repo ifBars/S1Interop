@@ -84,6 +84,8 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 ReportMissingMemberDiagnostic(context, compilation, target, ownerEntry.Il2CppTypeName, RuntimeBackend.Il2Cpp, entriesByAlias, "IL2CPP");
             }
         }
+
+        ReportPatchTargetRiskDiagnostics(context, compilation, patchTargets, entriesByAlias, hasMonoSurface, hasIl2CppSurface);
     }
 
     private static ImmutableArray<S1InteropTypeDiagnosticTarget> GetDeclaredTypeDiagnosticTargets(Compilation compilation)
@@ -204,15 +206,21 @@ public sealed partial class S1InteropTypeRegistryGenerator
             members = members.Where(member => member.IsStatic);
         }
 
+        IEnumerable<IMethodSymbol> methodMembers = GetPatchMethods(ownerType, entry.MemberName);
+        if (entry.IsStatic)
+        {
+            methodMembers = methodMembers.Where(member => member.IsStatic);
+        }
+
         return entry.Kind switch
         {
             S1InteropMemberKind.Field => members.Any(member => member.Kind == SymbolKind.Field),
             S1InteropMemberKind.Property => members.Any(member => member.Kind == SymbolKind.Property),
-            S1InteropMemberKind.Method => members.OfType<IMethodSymbol>().Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias)),
+            S1InteropMemberKind.Method => methodMembers.Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias)),
             _ => members.Any(member =>
                 member.Kind == SymbolKind.Field ||
-                member.Kind == SymbolKind.Property ||
-                (member is IMethodSymbol method && ParameterTypesMatch(method, entry, runtime, entriesByAlias)))
+                member.Kind == SymbolKind.Property) ||
+                methodMembers.Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias))
         };
     }
 
@@ -241,6 +249,179 @@ public sealed partial class S1InteropTypeRegistryGenerator
         }
 
         return true;
+    }
+
+    private static void ReportPatchTargetRiskDiagnostics(
+        SourceProductionContext context,
+        Compilation compilation,
+        ImmutableArray<S1InteropPatchEntry> patches,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        bool hasMonoSurface,
+        bool hasIl2CppSurface)
+    {
+        foreach (S1InteropPatchEntry patch in patches)
+        {
+            if (!entriesByAlias.TryGetValue(patch.TargetMemberEntry.OwnerAlias, out S1InteropTypeEntry ownerEntry))
+            {
+                continue;
+            }
+
+            var reasons = new List<string>();
+            if (hasMonoSurface)
+            {
+                AddPatchTargetRiskReasons(compilation, patch, ownerEntry.MonoTypeName, RuntimeBackend.Mono, entriesByAlias, "Mono", reasons);
+            }
+
+            if (hasIl2CppSurface)
+            {
+                AddPatchTargetRiskReasons(compilation, patch, ownerEntry.Il2CppTypeName, RuntimeBackend.Il2Cpp, entriesByAlias, "IL2CPP", reasons);
+            }
+
+            string[] distinctReasons = reasons
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (distinctReasons.Length == 0)
+            {
+                continue;
+            }
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                PatchTargetRiskDiagnostic,
+                patch.Location,
+                patch.OwnerEntry.MonoTypeName,
+                patch.TargetMemberEntry.MemberName,
+                string.Join("; ", distinctReasons)));
+        }
+    }
+
+    private static void AddPatchTargetRiskReasons(
+        Compilation compilation,
+        S1InteropPatchEntry patch,
+        string runtimeTypeName,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        string runtimeName,
+        List<string> reasons)
+    {
+        INamedTypeSymbol? ownerType = compilation.GetTypeByMetadataName(runtimeTypeName);
+        if (ownerType is null)
+        {
+            return;
+        }
+
+        IMethodSymbol[] methods = GetMatchingPatchMethods(ownerType, patch.TargetMemberEntry, runtime, entriesByAlias).ToArray();
+        if (methods.Length == 0)
+        {
+            return;
+        }
+
+        if (patch.TargetMemberEntry.ParameterTypeNames.IsDefaultOrEmpty && methods.Length > 1)
+        {
+            reasons.Add($"{runtimeName} target has {methods.Length} overloads and no ParameterTypeNames; set ParameterTypeNames so the generated patcher binds one method");
+        }
+
+        if (methods.Any(IsAccessorLikePatchTarget))
+        {
+            reasons.Add($"{runtimeName} target is an accessor, event accessor, or operator; IL2CPP may inline or redirect callers, so prefer a higher-level patch target when possible");
+        }
+
+        if (methods.Any(HasAggressiveInliningOrOptimization))
+        {
+            reasons.Add($"{runtimeName} target is marked for aggressive inlining or optimization; IL2CPP may inline callers, so verify the handler fires on the IL2CPP branch");
+        }
+    }
+
+    private static IEnumerable<IMethodSymbol> GetMatchingPatchMethods(
+        INamedTypeSymbol ownerType,
+        S1InteropMemberEntry entry,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
+    {
+        IEnumerable<IMethodSymbol> methods = GetPatchMethods(ownerType, entry.MemberName);
+        if (entry.IsStatic)
+        {
+            methods = methods.Where(method => method.IsStatic);
+        }
+
+        return methods.Where(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias));
+    }
+
+    private static IEnumerable<IMethodSymbol> GetPatchMethods(INamedTypeSymbol ownerType, string memberName)
+    {
+        var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (IMethodSymbol method in ownerType.GetMembers(memberName).OfType<IMethodSymbol>())
+        {
+            if (seen.Add(method))
+            {
+                yield return method;
+            }
+        }
+
+        foreach (IPropertySymbol property in ownerType.GetMembers().OfType<IPropertySymbol>())
+        {
+            if (property.GetMethod is IMethodSymbol getter &&
+                string.Equals(getter.Name, memberName, StringComparison.Ordinal) &&
+                seen.Add(getter))
+            {
+                yield return getter;
+            }
+
+            if (property.SetMethod is IMethodSymbol setter &&
+                string.Equals(setter.Name, memberName, StringComparison.Ordinal) &&
+                seen.Add(setter))
+            {
+                yield return setter;
+            }
+        }
+
+        foreach (IEventSymbol eventSymbol in ownerType.GetMembers().OfType<IEventSymbol>())
+        {
+            if (eventSymbol.AddMethod is IMethodSymbol addMethod &&
+                string.Equals(addMethod.Name, memberName, StringComparison.Ordinal) &&
+                seen.Add(addMethod))
+            {
+                yield return addMethod;
+            }
+
+            if (eventSymbol.RemoveMethod is IMethodSymbol removeMethod &&
+                string.Equals(removeMethod.Name, memberName, StringComparison.Ordinal) &&
+                seen.Add(removeMethod))
+            {
+                yield return removeMethod;
+            }
+        }
+    }
+
+    private static bool IsAccessorLikePatchTarget(IMethodSymbol method) =>
+        method.MethodKind is MethodKind.PropertyGet or
+            MethodKind.PropertySet or
+            MethodKind.EventAdd or
+            MethodKind.EventRemove or
+            MethodKind.UserDefinedOperator or
+            MethodKind.Conversion ||
+        method.Name.StartsWith("get_", StringComparison.Ordinal) ||
+        method.Name.StartsWith("set_", StringComparison.Ordinal) ||
+        method.Name.StartsWith("add_", StringComparison.Ordinal) ||
+        method.Name.StartsWith("remove_", StringComparison.Ordinal) ||
+        method.Name.StartsWith("op_", StringComparison.Ordinal);
+
+    private static bool HasAggressiveInliningOrOptimization(IMethodSymbol method) =>
+        method.GetAttributes().Any(attribute =>
+            string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.Runtime.CompilerServices.MethodImplAttribute", StringComparison.Ordinal) &&
+            attribute.ConstructorArguments.Any(IsAggressiveMethodImplOption));
+
+    private static bool IsAggressiveMethodImplOption(TypedConstant constant)
+    {
+        if (constant.Value is int value)
+        {
+            const int aggressiveInlining = 256;
+            const int aggressiveOptimization = 512;
+            return (value & aggressiveInlining) != 0 || (value & aggressiveOptimization) != 0;
+        }
+
+        string text = constant.Value?.ToString() ?? constant.ToString();
+        return text.Contains("AggressiveInlining", StringComparison.Ordinal) ||
+               text.Contains("AggressiveOptimization", StringComparison.Ordinal);
     }
 
     private static bool ParameterTypeMatches(

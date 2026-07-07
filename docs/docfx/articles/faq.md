@@ -31,7 +31,7 @@ If your project already has declarations and only needs the generated SDK surfac
 No. If S1Interop cannot prove a rewrite is safe, it produces a source-risk report instead of guessing.
 
 - Advanced mods that use Harmony transpilers, reflection, or tightly coupled IL2CPP patterns may still need explicit `S1InteropMember` declarations or small manual source edits.
-- Unsupported patterns surface as diagnostics (`S1I004`-`S1I007`) or source-risk entries.
+- Unsupported patterns surface as diagnostics (`S1I004`-`S1I008`) or source-risk entries.
 
 
 ## Does S1Interop redistribute Schedule One game files?

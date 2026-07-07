@@ -122,6 +122,39 @@ var component = S1Interop.Generated.S1InteropObjectCast.As<MyMonoBehaviour>(rawV
 > [!NOTE]
 > `S1I007` is a **warning**, not an error. The cast may work in many cases; the diagnostic flags it because silent failure under IL2CPP is common enough to warrant review at every occurrence.
 
+## Patch target diagnostics (S1I008)
+
+Patch target diagnostics fire when a backend-neutral `S1InteropPatch` target resolves to a method shape that needs IL2CPP review.
+
+| Diagnostic | Severity | Meaning |
+| --- | --- | --- |
+| `S1I008` | Warning | A backend-neutral patch target is overloaded without `ParameterTypeNames`, accessor-like, operator-like, or marked for aggressive inlining/optimization. |
+
+### S1I008 - Patch target needs IL2CPP review
+
+You get `S1I008` when S1Interop can resolve the patch target but the declaration is likely to be brittle on IL2CPP. Common causes:
+
+- the target method has overloads and the patch declaration omitted `ParameterTypeNames`;
+- the target is a property accessor such as `get_Health` or `set_Health`;
+- the target is an event accessor or operator method;
+- the target method is marked with `MethodImplOptions.AggressiveInlining` or `AggressiveOptimization`.
+
+```csharp
+// S1I008: overloaded patch target should declare ParameterTypeNames.
+[S1InteropPatch(
+    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+    "StartMoving")]
+internal static class MoveItemPatch
+{
+    [S1InteropPrefix]
+    private static void Prefix()
+    {
+    }
+}
+```
+
+**Fix:** Add `ParameterTypeNames` for overloaded targets. For accessor-like or aggressively inlined targets, prefer a higher-level method that still runs on IL2CPP. If you intentionally keep the target, validate that the handler fires on the actual IL2CPP branch you support.
+
 ## Related pages
 
 - [Troubleshooting](troubleshooting.md)
