@@ -1254,7 +1254,7 @@ internal sealed partial class S1InteropFixtureTests
             Assert(File.Exists(targetSource), "Harmony method target source was not generated.");
             string generated = File.ReadAllText(targetSource);
             Assert(
-                generated.Contains("[assembly: S1Interop.S1InteropType(\"MoveItemBehaviour\", Alias = \"MoveItemBehaviour\")]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.NPCs.Behaviour.MoveItemBehaviour\", Alias = \"MoveItemBehaviour\")]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Vehicles.LandVehicle\", Alias = \"LandVehicle\")]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\" })]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"MarkLoadedFromSave\", Alias = \"MarkLoadedFromSave\", Kind = S1Interop.S1InteropMemberKind.Method)]", StringComparison.Ordinal) &&

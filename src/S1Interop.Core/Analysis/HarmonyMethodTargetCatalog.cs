@@ -291,7 +291,55 @@ public sealed class HarmonyMethodTargetCatalog
             return typeName;
         }
 
-        return simpleName;
+        return TryInferNamespaceByLeaf(sourceType, scheduleOneUsings.Values, out string? inferredNamespaceName)
+            ? $"{inferredNamespaceName}.{sourceType}"
+            : simpleName;
+    }
+
+    private static bool TryInferNamespaceByLeaf(
+        string typeName,
+        IEnumerable<string> namespaceNames,
+        out string? namespaceName)
+    {
+        namespaceName = null;
+        string[] matches = namespaceNames
+            .Where(candidate => NamespaceLeafMatchesType(candidate, typeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        namespaceName = matches[0];
+        return true;
+    }
+
+    private static bool NamespaceLeafMatchesType(string namespaceName, string typeName)
+    {
+        string leaf = namespaceName[(namespaceName.LastIndexOf('.') + 1)..];
+        if (typeName.StartsWith(leaf, StringComparison.Ordinal) ||
+            typeName.EndsWith(leaf, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (leaf.EndsWith("s", StringComparison.Ordinal))
+        {
+            string singular = leaf[..^1];
+            return singular.Length > 2 &&
+                   (typeName.StartsWith(singular, StringComparison.Ordinal) ||
+                    typeName.EndsWith(singular, StringComparison.Ordinal));
+        }
+
+        const string scriptsSuffix = "Scripts";
+        if (leaf.EndsWith(scriptsSuffix, StringComparison.Ordinal))
+        {
+            string prefix = leaf[..^scriptsSuffix.Length];
+            return prefix.Length > 2 && typeName.StartsWith(prefix, StringComparison.Ordinal);
+        }
+
+        return false;
     }
 
     private static string GetSimpleTypeName(string typeName) =>
