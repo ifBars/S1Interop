@@ -239,7 +239,7 @@ public sealed class MemberAccessFallbackRewriter
         }
 
         string instance = match.Groups["target"].Value;
-        return $"{GetTypeFacadeName(target)}.Get{ToPascalIdentifier(target.MemberName)}({instance})";
+        return $"{GetTypeFacadeName(target)}.As({instance}).{ToPascalIdentifier(target.MemberName)}";
     }
 
     private static string BuildTypedHelperSetterReplacement(Match match, MemberAccessTarget target)
@@ -256,7 +256,7 @@ public sealed class MemberAccessFallbackRewriter
         }
 
         string instance = match.Groups["target"].Value;
-        return $"{GetTypeFacadeName(target)}.TrySet{ToPascalIdentifier(target.MemberName)}({instance}, {value})";
+        return $"{GetTypeFacadeName(target)}.As({instance}).TrySet{ToPascalIdentifier(target.MemberName)}({value})";
     }
 
     private static string BuildTypeFacadeAccessor(MemberAccessTarget target, string accessor, string instance)

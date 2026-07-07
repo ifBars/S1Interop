@@ -1201,9 +1201,9 @@ internal sealed partial class S1InteropFixtureTests
                 "Migration should add exactly one HideFromIl2Cpp attribute to FuelVehicleData.");
             string migratedVehicleFuelSystem = File.ReadAllText(tempVehicleFuelSystem);
             Assert(
-                migratedVehicleFuelSystem.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(_landVehicle)?.ToString()", StringComparison.Ordinal) &&
+                migratedVehicleFuelSystem.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.As(_landVehicle).VehicleName?.ToString()", StringComparison.Ordinal) &&
                 !migratedVehicleFuelSystem.Contains("ReflectionUtils.TryGetFieldOrProperty(_landVehicle, \"vehicleName\")", StringComparison.Ordinal),
-                "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated type-scoped facade helpers.");
+                "S1FuelMod migration should rewrite typed ReflectionUtils.TryGetFieldOrProperty call sites through generated Handle members.");
             string generatedMemberTargets = File.ReadAllText(Path.Combine(tempRoot, "S1Interop.Generated", "S1Interop.MemberAccessTargets.g.cs"));
             Assert(
                 generatedMemberTargets.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"vehicleName\")]", StringComparison.Ordinal),

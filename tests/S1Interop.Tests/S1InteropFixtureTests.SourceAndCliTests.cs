@@ -682,15 +682,15 @@ internal sealed partial class S1InteropFixtureTests
             string source = File.ReadAllText(tempSource);
             string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
             Assert(
-                rewritten.Contains("return S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(_landVehicle);", StringComparison.Ordinal),
-                "Member-access fallback rewriter should replace typed helper getter calls with type-scoped facade getters.");
+                rewritten.Contains("return S1Interop.ScheduleOne.Vehicles.LandVehicle.As(_landVehicle).VehicleName;", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper getter calls with native-like Handle properties.");
             Assert(
-                rewritten.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.TrySetCurrentThrottle(vehicle, 0f);", StringComparison.Ordinal),
-                "Member-access fallback rewriter should replace typed helper setter calls with type-scoped facade setters.");
+                rewritten.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.As(vehicle).TrySetCurrentThrottle(0f);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace typed helper setter calls with native-like Handle setters.");
             Assert(
-                rewritten.Contains("return S1Interop.ScheduleOne.Calling.CallManager.GetQueuedCallData(manager);", StringComparison.Ordinal) &&
-                rewritten.Contains("S1Interop.ScheduleOne.Calling.CallManager.TrySetQueuedCallData(manager, null);", StringComparison.Ordinal),
-                "Member-access fallback rewriter should replace S1API-style alias-qualified helper calls with type-scoped facade calls.");
+                rewritten.Contains("return S1Interop.ScheduleOne.Calling.CallManager.As(manager).QueuedCallData;", StringComparison.Ordinal) &&
+                rewritten.Contains("S1Interop.ScheduleOne.Calling.CallManager.As(manager).TrySetQueuedCallData(null);", StringComparison.Ordinal),
+                "Member-access fallback rewriter should replace S1API-style alias-qualified helper calls with Handle member calls.");
         }
         finally
         {
