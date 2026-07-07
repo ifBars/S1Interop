@@ -1,6 +1,6 @@
 # Generated output
 
-Use this page to understand what the `S1Interop.Generators` package emits, when it runs, and how declarations map to generated code. It is the place to check when you need to know which symbols should appear in your mod after a build and why.
+Check this page when generated symbols are missing or you need to know what a declaration emits.
 
 For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md). For the conceptual facade model, see [Backend-neutral SDK](backend-neutral-sdk.md).
 
@@ -11,13 +11,13 @@ For the attribute reference that drives generation, see [Declarations](backend-n
 - **Design-time builds**: triggered by Visual Studio, Rider, and OmniSharp when files or project state change. This is what makes generated symbols show up in IntelliSense, Go-to-Definition, and completion.
 - **Full builds**: triggered by `dotnet build`, `dotnet rebuild`, MSBuild, or IDE build commands. This is what produces the generated source that ends up in the output assembly.
 
-After you add, edit, or remove a declaration, rebuild the project (or let the IDE regenerate) before you can call the new generated symbols. If a generated type or member is missing from IntelliSense, the most common cause is that no design-time build has run yet. Build the project once to refresh.
+After adding, editing, or removing a declaration, rebuild the project or let the IDE regenerate before calling the new symbols. If a generated type or member is missing from IntelliSense, run `dotnet build` once.
 
 The generator does not run at runtime. It only emits C# source that the compiler turns into IL alongside the rest of the project.
 
 ## Two surfaces, one package
 
-The generator package is the compile-time half of S1Interop. It does not parse command-line arguments, write project files, or migrate source. Those are the CLI's job. The generator only reads declarations that already exist in the compilation and emits source plus diagnostics.
+The generator is compile-time only. It reads declarations already in the compilation and emits source plus diagnostics. The CLI handles commands, project edits, and source migration.
 
 | Responsibility | Owner |
 | --- | --- |
@@ -27,11 +27,11 @@ The generator package is the compile-time half of S1Interop. It does not parse c
 | Report `S1I001`-`S1I007` diagnostics | Generator package, during compilation. |
 | Resolve Mono/IL2CPP type names at runtime | Generated `S1Interop.Generated.S1InteropRuntime` and `S1InteropTypeRegistry`. |
 
-If your mod references only the generator package, you can author declarations by hand and still get the full generated SDK surface. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
+If your mod references only the generator package, you can author declarations by hand. The CLI is helpful, but not required at runtime.
 
 ## Generated source files
 
-The generator emits source under stable file names so IDEs can display them in the Solution Explorer under "Dependencies" / "Analyzers" / "Source files". The exact set depends on which declarations are present, but the file names are stable:
+The generator emits stable file names under "Dependencies" / "Analyzers" / "Source files":
 
 | File | Emitted when | Contains |
 | --- | --- | --- |
@@ -44,8 +44,6 @@ The generator emits source under stable file names so IDEs can display them in t
 Type facades under `S1Interop.ScheduleOne.*` are emitted as part of `S1Interop.TypeRegistry.g.cs` (one file) rather than one file per facade, so the generated file count stays small even for broad SDK generation.
 
 ## Generated namespaces and symbols
-
-The generator emits two categories of generated symbols.
 
 ### `S1Interop.Generated`
 
@@ -99,10 +97,10 @@ Generated facades are `internal` by default. The generator does not shorten name
 
 ## Build and IDE timing
 
-A few practical notes that prevent the most common confusion:
+Watch these details:
 
 - **Attributes are generated too.** You never need to define `S1InteropTypeAttribute` or its siblings. The generator emits them on first generation via `RegisterPostInitializationOutput`. If you see "type or namespace 'S1InteropType' could not be found", the project does not reference `S1Interop.Generators`.
-- **There is a delay after saving.** The Roslyn generator runs as part of compilation, which is not instantaneous. After you save a declaration file, the IDE triggers a design-time build in the background. There is a short delay before IntelliSense reflects the new or changed symbols. The delay depends on project size, available game reference assemblies, and IDE load. If symbols are missing immediately after editing, wait a moment or run `dotnet build`.
+- **There is a delay after saving.** The IDE has to run a design-time build before IntelliSense sees new generated symbols. If symbols are missing immediately after editing, wait a moment or run `dotnet build`.
 - **Namespace-only vs type-declared handles.** If you have an `S1InteropNamespace` declaration for `ScheduleOne`, every matching type gets a `Handle` with generic members only. Adding an `S1InteropType` for a specific type (like `ScheduleOne.PlayerScripts.Player`) triggers member discovery for that type. After the next build completes, the `Handle` gains named accessors, with concrete signatures where member metadata is backend-neutral. Before the build, the `Handle` still only has generic members.
 - **Declarations are assembly-level.** Put them in a single generated or S1Interop-owned file such as `S1Interop.Generated/S1Interop.BackendNeutral.cs`. Keeping them in one place makes rollback and regeneration reviewable.
 - **Diagnostics are quiet without game references.** `S1I001`-`S1I003` only fire when the relevant Mono or IL2CPP reference surface is available in the compilation. Docs-only or package-restore builds do not fail because local game paths are missing.
@@ -110,7 +108,7 @@ A few practical notes that prevent the most common confusion:
 
 ## What the generator does not do
 
-- It cannot rewrite existing user source. Roslyn source generators are additive only. Any call-site transformation happens through CLI migration before compilation, not inside the generator.
+- It cannot rewrite existing source. Roslyn source generators are additive only. Call-site transformation happens through CLI migration before compilation.
 - It cannot ship game assemblies or a static catalog of Schedule One APIs. Generated member coverage comes from the Mono and IL2CPP reference assemblies already referenced by the project.
 - It does not generate shortened duplicate namespaces. One canonical namespace per game type.
 - It does not expose a public patching startup API. S1Interop patch declarations are applied by generated internal code so you do not accidentally double-apply patches.

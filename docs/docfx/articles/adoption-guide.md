@@ -1,17 +1,17 @@
 # Adoption guide
 
-Use this page to pick the right first command for your mod. S1Interop has a few workflows, and choosing the wrong one early can make a simple setup feel harder than it is.
+Pick the workflow that matches your mod.
 
-You are usually in one of two places:
+Start from one of two places:
 
 - you already have a Schedule One mod and want IL2CPP or backend-neutral support without maintaining two source trees;
 - you are starting your first mod and want a project shape that already understands Mono, IL2CPP, local game paths, and generated SDK facades.
 
-S1Interop does not ship game assemblies, generated IL2CPP wrappers, decompiled source, prefabs, scenes, textures, or exported Unity projects. It works from your local game install and writes mod source/project files.
+S1Interop works from your local game install. It does not ship game assemblies, generated IL2CPP wrappers, decompiled source, prefabs, scenes, textures, or exported Unity projects.
 
-## Where it fits in real Schedule One mods
+## Where S1Interop fits
 
-Most Schedule One projects already fall into a few familiar shapes. S1Interop should fit into those shapes instead of making every mod look like a sample project.
+Keep your mod shape. Move only the direct game access that causes Mono/IL2CPP friction.
 
 | Project shape | Common today | S1Interop role |
 | --- | --- | --- |
@@ -24,9 +24,9 @@ Most Schedule One projects already fall into a few familiar shapes. S1Interop sh
 | Dedicated server addon | Headless safety, server/client splits, command permissions, and persistence hooks. | Treat server and client surfaces separately. S1Interop can reduce wrapper differences, but it does not replace server authority or lifecycle design. |
 | Performance or UI tuning mod | Direct patches against managers, UI screens, camera/player systems, graphics settings, or bGUI/uGUI surfaces. | Use type facades for stable direct game access. Keep Harmony patches thin and still validate on the actual public IL2CPP branch. |
 
-Use the helper API that owns your domain. If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already gives you the right workflow, keep it. S1Interop is the generated interop layer for the lower-level game-wrapper calls that still leak through. See [S1API and S1Interop](s1api-and-s1interop.md) for the deeper comparison.
+If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already owns the workflow, keep it. Use S1Interop for lower-level game-wrapper calls that still leak through. See [S1API and S1Interop](s1api-and-s1interop.md) for the comparison.
 
-For direct Harmony patches whose target type changes between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md). You write S1Interop patch attributes against the Mono type name; generated code resolves and applies the native target method once.
+For Harmony targets that change between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md).
 
 ## Which path should I use?
 
@@ -63,9 +63,9 @@ dotnet build .\MyFirstScheduleOneMod.sln -c "Debug Il2Cpp"
 s1interop sdkgen . --apply
 ```
 
-For a blank exploratory project, use `--full-sdk` once to seed broad type registration. After that, keep declarations narrow. Add member facades for the types your mod actually touches.
+For an exploratory project, use `--full-sdk` once to seed broad type registration. After that, keep declarations narrow.
 
-The scaffold is still a normal MelonLoader mod. You get `ModCore.cs`, `[MelonInfo]`, `[MelonGame]`, Harmony references, a `.sln`, and local path props. The difference is that the generated `S1Interop.ScheduleOne.*` surface is available from the start, so your first direct game call does not have to become a pair of `#if MONO` / `#if IL2CPP` branches.
+The scaffold is still a normal MelonLoader mod: `ModCore.cs`, `[MelonInfo]`, `[MelonGame]`, Harmony references, a `.sln`, and local path props. It also has `S1Interop.ScheduleOne.*` available from the start.
 
 ## Existing mod developer path
 
@@ -82,11 +82,7 @@ Then choose the smallest next step that matches the project:
 - `s1interop migrate . --dual-runtime --dry-run`: previews project/configuration edits for separate Mono and IL2CPP builds.
 - `s1interop verify-migration . --dual-runtime --include-source-migrations`: tests the migration in a temporary copy.
 
-When testing unpublished S1Interop changes against a real mod, use a temporary copy of the mod. Pack the current `S1Interop.Generators` package into a temporary local feed and point the copy at that feed. Otherwise the mod may restore an older generator package and reproduce bugs that are already fixed in source.
-
-Existing mods usually have a mix of concerns: MelonLoader lifecycle wiring, Harmony patches, helper APIs, local deployment scripts, and direct game references. Start by moving only the direct game references that cause backend friction. Leave content builders, packaging, logging, and deployment scripts alone unless the analyzer reports a concrete problem.
-
-Do not assume the project has only one identity. A mod can already have native Mono/IL2CPP configs, require S1API for content workflows, and still contain its own direct Schedule One patch code. S1Interop should follow those boundaries instead of flattening the project into one migration story.
+Existing mods often mix MelonLoader lifecycle wiring, Harmony patches, helper APIs, deployment scripts, and direct game references. Start with the direct game references. Leave content builders, packaging, logging, and deployment scripts alone unless the analyzer reports a concrete problem.
 
 ## What to avoid at first
 
@@ -95,9 +91,7 @@ Do not assume the project has only one identity. A mod can already have native M
 - Do not start with explicit `S1InteropMember` declarations for every public member. Add `S1InteropType` coverage first and let the generator discover safe public fields, properties, constructors, enum mirrors, and simple methods.
 - Do not treat Mono build success as proof of IL2CPP runtime safety. Build both validation targets when local references are available.
 
-## A healthy first pass
-
-The first pass is in good shape when:
+## First pass checklist
 
 - `s1interop analyze .` runs without unexpected project discovery failures;
 - `local.build.props` exists locally and is ignored by git;

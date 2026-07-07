@@ -55,4 +55,4 @@ The generated API reference is limited to stable `S1Interop.Core` models and lib
 | [Common issues](troubleshooting.md) | Something is silently wrong — missing generated symbols, failed restores, stale IDE state, migration rollback. |
 | [FAQ](faq.md) | You have questions about migration paths, package usage, alpha limitations, or the safety model. |
 
-For architecture, product direction, real-mod evidence, testing, publishing, and contributing, see [Contributors](../contributors/index.md).
+For architecture, testing, publishing, and contributing, see [Contributors](../contributors/index.md).

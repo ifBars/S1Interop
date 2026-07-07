@@ -1,15 +1,13 @@
 # FAQ
 
-Answers to the most common questions about S1Interop: migration paths, alpha limitations, safety model, and when to use each package.
-
-If you are unsure which migration path to take, what the tool will and won't do automatically, or how the two packages fit together, start here.
+Short answers for migration paths, package usage, safety, and scope.
 
 ## Which migration path should I choose: backend-neutral or dual-runtime?
 
-It depends on how much of your mod uses runtime-specific behaviour:
+Choose based on how much runtime-specific code your mod has:
 
-- **Backend-neutral** produces a single assembly that compiles and runs against either Mono or IL2CPP using generated `S1Interop.ScheduleOne.*` facades. This is the preferred long-term direction and the one the tool is most actively built around.
-- **Dual-runtime** produces two separate assemblies — one targeting Mono, one targeting IL2CPP — and keeps your runtime-specific code paths intact. It is a lower-risk bridge step because it does not require rewriting runtime-specific logic immediately.
+- **Backend-neutral**: one assembly uses generated `S1Interop.ScheduleOne.*` facades on Mono or IL2CPP.
+- **Dual-runtime**: two assemblies, one for Mono and one for IL2CPP, keep runtime-specific code paths intact.
 
 > [!TIP]
 > Start with dual-runtime if your mod relies on Harmony transpilers, managed collection callbacks at IL2CPP boundaries, or other patterns that are hard to abstract away. Move toward backend-neutral as those surfaces are covered and the tool matures.
@@ -18,28 +16,27 @@ Both paths produce a rollback manifest so you can undo the migration if you chan
 
 ## Do I need both the CLI and the generator package?
 
-You usually need both:
+Most mods use both:
 
 - The **CLI** (`S1Interop`) writes declaration files, migrates source, updates project files, and verifies results in sandboxes. It runs on demand from a terminal and never runs during compilation.
 - The **generator package** (`S1Interop.Generators`) reads those declarations and emits facades, runtime helpers, and diagnostics during every build and IDE design-time compilation of your mod project.
 
-The exception: if your project already has declarations and you only want the generated SDK surface, you can reference just `S1Interop.Generators` and author declarations by hand. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
+If your project already has declarations and only needs the generated SDK surface, reference just `S1Interop.Generators` and author declarations by hand.
 
 > [!NOTE]
 > The `S1Interop.Generators` package ships only a Roslyn analyzer DLL under `analyzers/dotnet/cs`. It does not add a runtime assembly to your mod's output.
 
 ## Will S1Interop convert my entire mod automatically?
 
-No, and that is by design. S1Interop is intentionally conservative: if it cannot prove a rewrite is safe, it produces a source-risk report instead of guessing. This means:
+No. If S1Interop cannot prove a rewrite is safe, it produces a source-risk report instead of guessing.
 
 - Advanced mods that use Harmony transpilers, reflection, or tightly coupled IL2CPP patterns may still need explicit `S1InteropMember` declarations or small manual source edits.
-- Unsupported patterns surface as diagnostics (`S1I004`-`S1I007`) or entries in the source-risk report — never as silent, incorrect rewrites.
+- Unsupported patterns surface as diagnostics (`S1I004`-`S1I007`) or source-risk entries.
 
-Think of S1Interop as a tool that handles the mechanical parts of migration safely and flags the hard parts for your review, not a single-command converter.
 
 ## Does S1Interop redistribute Schedule One game files?
 
-Never. S1Interop generates facades from local reference metadata you already have on disk — game assemblies you own through your own Schedule One install. It does not:
+Never. S1Interop generates facades from local reference metadata on disk. It does not:
 
 - commit game assemblies to version control,
 - include game files in generated NuGet packages,
@@ -55,7 +52,7 @@ Use S1API when you want item, NPC, shop, saveable, or UI workflows. Use MAPI whe
 
 Use S1Interop when your mod or helper library still needs direct access to `ScheduleOne.*` or `Il2CppScheduleOne.*` types and you do not want every consumer to hand-maintain Mono and IL2CPP conditionals.
 
-The longer version is in [S1API and S1Interop](s1api-and-s1interop.md).
+See [S1API and S1Interop](s1api-and-s1interop.md).
 
 ## Why are my declaration diagnostics (S1I001-S1I003) silent?
 
@@ -78,11 +75,11 @@ Once both paths resolve to real game installs, `S1I001`-`S1I003` will fire on an
 
 Yes. If your project already references `S1Interop.Generators`, you can author declarations by hand in `S1Interop.Generated/S1Interop.BackendNeutral.cs` without ever running `sdkgen`. The generator will pick them up on the next build.
 
-That said, `sdkgen` is the recommended starting point because it inspects your real source usage, existing aliases, namespace imports, and string-held game type names, then emits only the declarations your project appears to need. Hand-authoring is most useful for adding `S1InteropMember` bindings for private members or overloaded methods that the automatic facade cannot safely infer.
+`sdkgen` is still the best starting point because it inspects real source usage, aliases, namespace imports, string-held game type names, and local metadata. Hand-authoring is mainly for `S1InteropMember` bindings that automatic discovery cannot infer.
 
 ## What does --dry-run do vs --apply?
 
-- **`--dry-run`** shows every operation S1Interop would perform — source rewrites, project edits, solution updates, generated declarations — without writing any files. Use it to understand the full scope of a migration before committing.
+- **`--dry-run`** shows operations without writing files: source rewrites, project edits, solution updates, and generated declarations.
 - **`--apply`** writes the changes: modifies source files, updates `.csproj` and `.sln` files, writes declaration files, creates backups, and records a rollback manifest under `s1interop-runs/<run-id>/`.
 
 > [!WARNING]
@@ -113,7 +110,7 @@ Replace `<run-id>` with the directory name created by the `--apply` run you want
 </Project>
 ```
 
-It is gitignored because every developer installs Schedule One in a different location. Committing those paths would break the build for anyone with a different install path and would reveal local file-system layout in a public repository.
+It is gitignored because install paths differ by machine. Committing it would break other developers and expose local file-system layout.
 
 **To set it up:** copy `local.build.props.example` (which is committed) to `local.build.props` and fill in your own paths. The example file is the template; your filled-in copy stays local.
 
@@ -126,7 +123,7 @@ Generated symbols appear after a design-time build (triggered automatically by y
 3. Your IDE runs a design-time build in the background, or you run `dotnet build` manually.
 4. The new facade classes, `Handle` types, and member accessors appear in IntelliSense and are compiled into your assembly.
 
-If symbols are missing immediately after editing a declaration file, build the project once — that is almost always the cause. Generated symbols are not emitted at restore time; they require at least one compilation pass.
+If symbols are missing immediately after editing declarations, build once. Generated symbols require a compilation pass; restore is not enough.
 
 ## Related pages
 

@@ -61,7 +61,7 @@ When the build target is known at compile time — through the MSBuild property 
 
 ## The two packages
 
-S1Interop is two NuGet packages. Mixing them up is the most common source of confusion.
+S1Interop is two NuGet packages. Keep the split clear.
 
 | Term | Package id | What it is | When it runs |
 | --- | --- | --- | --- |
