@@ -55,6 +55,10 @@ public sealed class SourceInteropAnalyzer
         @"AccessTools\.(?:Field|Property(?:Getter|Setter)?)\s*\(\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*,\s*""[A-Za-z_][A-Za-z0-9_]*""",
         RegexOptions.Compiled);
 
+    private static readonly Regex DirectMemberLookupNameRegex = new(
+        @"(?:Get(?:Field|Property)|AccessTools\.(?:Field|Property(?:Getter|Setter)?))\s*\([^;\r\n]*?""(?<member>[A-Za-z_][A-Za-z0-9_]*)""",
+        RegexOptions.Compiled);
+
     private static readonly Regex GetTypeReceiverRegex = new(
         @"(?<name>[A-Za-z_][A-Za-z0-9_.]*)\s*\.\s*GetType\s*\(\s*\)",
         RegexOptions.Compiled);
@@ -641,6 +645,11 @@ public sealed class SourceInteropAnalyzer
     private static bool IsDirectMemberReflectionLookupLine(IReadOnlyList<string> lines, int index)
     {
         string line = lines[index];
+        if (ContainsBackingFieldMemberLookup(line))
+        {
+            return false;
+        }
+
         Match accessToolsLookup = AccessToolsFieldOrPropertyLookupRegex.Match(line);
         if (accessToolsLookup.Success)
         {
@@ -671,6 +680,10 @@ public sealed class SourceInteropAnalyzer
         return !HasFieldPropertyFallbackPair(sourceWindow) &&
                !HasFieldPropertyFallbackPair(backwardWindow);
     }
+
+    private static bool ContainsBackingFieldMemberLookup(string line) =>
+        DirectMemberLookupNameRegex.Matches(line)
+            .Any(match => GeneratedMemberNameFilters.IsBackingFieldName(match.Groups["member"].Value));
 
     private static bool HasKnownBackendGetTypeReceiver(IReadOnlyList<string> lines, int index, string receiver)
     {

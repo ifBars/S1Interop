@@ -631,6 +631,11 @@ internal sealed partial class S1InteropFixtureTests
                     {
                         ReflectionUtils.TrySetFieldOrProperty(manager, "QueuedCallData", null);
                     }
+
+                    public object? ReadGeneratedBackingField()
+                    {
+                        return ReflectionUtils.TryGetFieldOrProperty(_landVehicle, "HealthBackingField");
+                    }
                 }
                 """);
 
@@ -662,6 +667,9 @@ internal sealed partial class S1InteropFixtureTests
                     target.Kind == MemberAccessKind.FieldOrProperty &&
                     !target.IsStatic),
                 "Member-access discovery should infer S1API-style alias-qualified ScheduleOne parameter types.");
+            Assert(
+                targets.All(target => !target.MemberName.Contains("BackingField", StringComparison.Ordinal)),
+                "Member-access discovery should skip compiler/FishNet-style backing-field names.");
 
             string source = File.ReadAllText(tempSource);
             string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, tempSource, targets);
@@ -874,6 +882,11 @@ internal sealed partial class S1InteropFixtureTests
                         return containerGetter;
                     }
 
+                    public static FieldInfo? GetCompilerBackingField()
+                    {
+                        return typeof(PhoneApp).GetField("HealthBackingField", BindingFlags.NonPublic | BindingFlags.Instance);
+                    }
+
                     public static PropertyInfo? GetEnumeratorCurrent(object enumerator)
                     {
                         var current = enumerator.GetType().GetProperty("Current");
@@ -894,6 +907,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 risks.All(risk => !risk.Evidence.Contains("MelonEnvironment", StringComparison.Ordinal)),
                 "Direct member reflection lookup risk should skip MelonLoader-owned reflection internals.");
+            Assert(
+                risks.All(risk => !risk.Evidence.Contains("HealthBackingField", StringComparison.Ordinal)),
+                "Direct member reflection lookup risk should skip compiler/FishNet-style backing-field names.");
             Assert(
                 risks.Where(risk => risk.Kind == "DirectMemberReflectionLookup").All(risk => risk.Remediation.Contains("S1InteropMember", StringComparison.Ordinal)),
                 "Direct member reflection lookup risk should point developers toward generated S1InteropMember declarations.");
@@ -926,6 +942,7 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"PhoneApp\", \"_homeScreenInstance\", Alias = \"_homeScreenInstance\")]", StringComparison.Ordinal) &&
                 !generatedTargets.Contains("MelonEnvironment", StringComparison.Ordinal) &&
+                !generatedTargets.Contains("HealthBackingField", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"SystemInfo\", \"deviceUniqueIdentifier\", Alias = \"deviceUniqueIdentifier\", Kind = S1Interop.S1InteropMemberKind.Property)]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.PlayerScripts.Player\", Alias = \"Player\")]", StringComparison.Ordinal) &&
                 generatedTargets.Contains("[assembly: S1Interop.S1InteropMember(\"Player\", \"teleport\", Alias = \"teleport\")]", StringComparison.Ordinal) &&
@@ -943,6 +960,7 @@ internal sealed partial class S1InteropFixtureTests
                 rewrittenSource.Contains("var teleportField = S1Interop.Generated.S1InteropMemberRegistry.teleportFieldInfo;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("FieldInfo titleField = S1Interop.Generated.S1InteropMemberRegistry.titleFieldInfo;", StringComparison.Ordinal) &&
                 rewrittenSource.Contains("MethodInfo? containerGetter = S1Interop.Generated.S1InteropMemberRegistry.ContainerPropertyInfo!.GetMethod;", StringComparison.Ordinal) &&
+                rewrittenSource.Contains("return typeof(PhoneApp).GetField(\"HealthBackingField\", BindingFlags.NonPublic | BindingFlags.Instance);", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("typeof(SystemInfo).GetProperty(\"deviceUniqueIdentifier\").GetMethod", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("targetPlayer.GetType().GetField(\"teleport\"", StringComparison.Ordinal) &&
                 !rewrittenSource.Contains("AccessTools.Field(typeof(S1Quests.Quest), \"title\")", StringComparison.Ordinal) &&

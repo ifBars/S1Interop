@@ -118,6 +118,11 @@ public sealed class MemberAccessTargetCatalog
 
                 string ownerAlias = GetSimpleTypeName(match.Groups["type"].Value);
                 string memberName = match.Groups["member"].Value;
+                if (GeneratedMemberNameFilters.IsBackingFieldName(memberName))
+                {
+                    continue;
+                }
+
                 targets.Add(new MemberAccessTarget(
                     Path.GetFullPath(sourceFile),
                     index + 1,
@@ -139,6 +144,11 @@ public sealed class MemberAccessTargetCatalog
 
                 string ownerAlias = GetSimpleTypeName(ownerTypeName);
                 string memberName = accessToolsMatch.Groups["member"].Value;
+                if (GeneratedMemberNameFilters.IsBackingFieldName(memberName))
+                {
+                    continue;
+                }
+
                 targets.Add(new MemberAccessTarget(
                     Path.GetFullPath(sourceFile),
                     index + 1,
@@ -160,6 +170,11 @@ public sealed class MemberAccessTargetCatalog
 
                 string ownerAlias = GetSimpleTypeName(ownerTypeName);
                 string memberName = instanceMatch.Groups["member"].Value;
+                if (GeneratedMemberNameFilters.IsBackingFieldName(memberName))
+                {
+                    continue;
+                }
+
                 targets.Add(new MemberAccessTarget(
                     Path.GetFullPath(sourceFile),
                     index + 1,
@@ -336,6 +351,11 @@ public sealed class MemberAccessTargetCatalog
 
             string ownerAlias = GetSimpleTypeName(ownerTypeName);
             string memberName = match.Groups["member"].Value;
+            if (GeneratedMemberNameFilters.IsBackingFieldName(memberName))
+            {
+                continue;
+            }
+
             yield return new MemberAccessTarget(
                 Path.GetFullPath(sourceFile),
                 lineNumber,
@@ -371,6 +391,11 @@ public sealed class MemberAccessTargetCatalog
 
             string ownerAlias = Unescape(match.Groups["owner"].Value);
             string memberName = Unescape(match.Groups["member"].Value);
+            if (GeneratedMemberNameFilters.IsBackingFieldName(memberName))
+            {
+                continue;
+            }
+
             string memberAlias = Unescape(match.Groups["alias"].Value);
             string options = match.Groups["options"].Value;
             yield return new MemberAccessTarget(

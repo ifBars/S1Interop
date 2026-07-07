@@ -124,7 +124,7 @@ Use `S1InteropMember` for:
 - better aliases for readability;
 - overloaded methods that need explicit parameter type names or by-ref markers;
 - Mono/IL2CPP disagreements that need a pinned binding;
-- migration-inferred reflection patterns that cannot yet be represented by the automatic type facade, including simple cached `FieldInfo`/`PropertyInfo` lookups from `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `AccessTools.Field(typeof(...), "...")`, `AccessTools.Property(typeof(...), "...")`, `AccessTools.PropertyGetter(typeof(...), "...")`, or `AccessTools.PropertySetter(typeof(...), "...")`.
+- migration-inferred reflection patterns that cannot yet be represented by the automatic type facade, including simple cached `FieldInfo`/`PropertyInfo` lookups from `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `AccessTools.Field(typeof(...), "...")`, `AccessTools.Property(typeof(...), "...")`, `AccessTools.PropertyGetter(typeof(...), "...")`, or `AccessTools.PropertySetter(typeof(...), "...")`. Migration-inferred declarations skip backing-field names such as `HealthBackingField` or `<Health>k__BackingField`; use the real field or property instead.
 
 ## Bridge declarations
 
