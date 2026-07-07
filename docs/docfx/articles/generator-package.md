@@ -52,7 +52,7 @@ Internal infrastructure shared by every facade and by migration-rewritten call s
 - `S1InteropRuntime` and `S1InteropRuntimeBackend`: detect or constant-bind the active backend (`Mono`, `Il2Cpp`, or `Unknown`). When the build target is known at compile time, `Backend` is emitted as a `const`; otherwise it is resolved at runtime through type and assembly probes.
 - `S1InteropTypeRegistry`: the type-name and resolution cache. Exposes per-alias `*Name`, `*MonoName`, `*Il2CppName`, `Resolve`, `Create`, `IsInstance`, `As*`, `TryAs*`, `Is*`, `Get*`, `TrySet*`, `Invoke*`, and `Invoke*<T>` members.
 - `S1InteropMemberRegistry`: reflection-based get/set/invoke helpers used by the registry and facades.
-- `S1InteropHarmonyPatcher`: emitted only when `[S1InteropPatch]` is used. It is internal generated infrastructure, not an author-facing `PatchAll` API.
+- `S1InteropHarmonyPatcher`: emitted only when `[S1InteropPatch]` is used. It is internal generated infrastructure, not an author-facing `PatchAll` API. It records per-patch status so missing IL2CPP targets and Harmony failures are visible.
 - `S1InteropObject<TTag>`: the generic backend-neutral handle backing every facade `Handle`.
 - `S1InteropObjectCast`: object/proxy unwrapping helper referenced by `S1I007` diagnostics.
 - `S1InteropUnityEventBridge` and `S1InteropDelegateEventBridge`: bridge helpers emitted only when the matching bridge attribute is present.
@@ -88,7 +88,7 @@ Generated facades are `internal` by default. The generator does not shorten name
 | `[assembly: S1InteropNamespace(...)]` | Registry entries and a basic facade with `Handle` for every matching public type. The `Handle` only has generic members (`HasValue`, `Instance`, `Value`). No named member accessors unless `IncludeMembers = true` opts matching types into member facade discovery. |
 | `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. The `Handle` gains named accessors from referenced Mono and IL2CPP metadata, with concrete signatures where the metadata is backend-neutral. Enum declarations instead emit S1Interop-owned enum mirrors when backend values agree. Also emits the matching registry `Tag` and resolution entries. |
 | `[assembly: S1InteropMember(...)]` | A named accessor on the owner facade and, for instance fields/properties, on `Handle` with the chosen alias. Used for private members, ambiguous overloads, pinned bindings, and migration-inferred reflection access. It uses concrete signatures when local metadata proves the member shape; otherwise it keeps object/generic fallback helpers. |
-| `[S1InteropPatch(...)]` | A generated target type/member binding plus internal Harmony registrar. The target resolves through the same member registry as explicit method declarations and is applied once by generated startup code. |
+| `[S1InteropPatch(...)]` | A generated target type/member binding plus internal Harmony registrar. The target validates like an explicit method declaration when references are available, resolves through the same member registry at runtime, and is applied once by generated startup code. |
 | `[assembly: S1InteropGenerateUnityEventBridge]` | `S1InteropUnityEventBridge` in `S1Interop.Generated` with `Add`/`Remove` overloads. |
 | `[assembly: S1InteropGenerateDelegateEventBridge]` | `S1InteropDelegateEventBridge` in `S1Interop.Generated` with `Combine`/`Remove` helpers. |
 

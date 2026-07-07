@@ -71,6 +71,23 @@ internal sealed partial class S1InteropFixtureTests
                 method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(parameterTypes));
     }
 
+    private static IReadOnlyList<object> GetGeneratedPatchReports(Type patcherType)
+    {
+        object reportsValue = patcherType
+            .GetProperty("Reports", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetValue(null)
+            ?? throw new InvalidOperationException("Generated patcher did not expose Reports.");
+        if (reportsValue is not System.Collections.IEnumerable reports)
+        {
+            throw new InvalidOperationException("Generated patch reports are not enumerable.");
+        }
+
+        return reports.Cast<object>().ToArray();
+    }
+
+    private static object? GetReportValue(object report, string propertyName) =>
+        report.GetType().GetProperty(propertyName)?.GetValue(report);
+
     private static string RunTypeRegistryGenerator(string source, params string[] symbols)
     {
         IReadOnlyDictionary<string, string> generatedSources = RunS1InteropGenerator(source, symbols);

@@ -211,6 +211,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 public bool IsStatic { get; set; }
 
                 /// <summary>
+                /// Gets or sets whether failure to resolve or apply this patch should fail assembly startup.
+                /// </summary>
+                public bool Required { get; set; }
+
+                /// <summary>
                 /// Gets or sets method parameter type names used to disambiguate overloads.
                 /// </summary>
                 public string[] ParameterTypeNames { get; set; } = System.Array.Empty<string>();

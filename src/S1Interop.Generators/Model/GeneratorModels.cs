@@ -187,12 +187,16 @@ internal readonly struct S1InteropPatchEntry
         string patchTypeName,
         S1InteropTypeEntry ownerEntry,
         S1InteropMemberEntry targetMemberEntry,
-        ImmutableArray<S1InteropPatchHandlerEntry> handlers)
+        ImmutableArray<S1InteropPatchHandlerEntry> handlers,
+        bool required,
+        Location? location)
     {
         PatchTypeName = patchTypeName;
         OwnerEntry = ownerEntry;
         TargetMemberEntry = targetMemberEntry;
         Handlers = handlers;
+        Required = required;
+        Location = location;
     }
 
     public string PatchTypeName { get; }
@@ -202,6 +206,10 @@ internal readonly struct S1InteropPatchEntry
     public S1InteropMemberEntry TargetMemberEntry { get; }
 
     public ImmutableArray<S1InteropPatchHandlerEntry> Handlers { get; }
+
+    public bool Required { get; }
+
+    public Location? Location { get; }
 }
 
 internal readonly struct S1InteropConstructorEntry

@@ -21,7 +21,8 @@ using S1Interop;
         "ScheduleOne.Management.TransitRoute",
         "ScheduleOne.ItemFramework.ItemInstance",
         "string&"
-    })]
+    },
+    Required = true)]
 internal static class MoveItemDestinationPatch
 {
     [S1InteropPrefix]
@@ -39,6 +40,8 @@ internal static class MoveItemDestinationPatch
 
 The `string&` entry is the by-ref marker for `ref string` or `out string`. For overloaded methods, use fully qualified Mono parameter type names. S1Interop converts those names to the IL2CPP wrapper names when the mod runs on IL2CPP.
 
+Use `Required = true` for patches your mod cannot run without. Required patches throw during generated startup if the target cannot be resolved, no handler can be found, or Harmony rejects the patch.
+
 ## Do not call PatchAll
 
 Do not call `PatchAll` for S1Interop patch attributes.
@@ -48,6 +51,21 @@ When a project contains `[S1InteropPatch]`, the generator emits an internal patc
 Calling `PatchAll` yourself can double-apply handlers. With S1Interop, the API is the attributes. The registrar is implementation detail.
 
 If your mod also has ordinary `[HarmonyPatch]` or MelonLoader patch attributes, keep treating those as ordinary Harmony/MelonLoader patches. S1Interop patch attributes are only for backend-neutral Schedule One target resolution.
+
+## Runtime status
+
+The generated registrar records one status report per S1Interop patch in `S1Interop.Generated.S1InteropHarmonyPatcher.Reports`:
+
+| Status | Meaning |
+| --- | --- |
+| `Applied` | The target resolved and Harmony accepted the patch. |
+| `SkippedMissingTarget` | The target method could not be resolved for the active backend. Check the method name, overload parameters, IL2CPP wrapper name, and local references. |
+| `SkippedMissingHandler` | The patch class did not resolve a marked prefix, postfix, or finalizer handler. |
+| `PatchFailed` | The target resolved, but Harmony or the active backend rejected the patch. |
+
+Missing and failed optional patches are logged. Required patches throw after recording the report.
+
+`Applied` only means the method body was patched. It does not prove the game still calls that method on IL2CPP. If the method is tiny, accessor-like, or only used from hot paths, IL2CPP may inline callers so your handler never runs. Patch a higher-level method when possible and validate on the actual IL2CPP branch you support.
 
 ## Attribute reference
 
@@ -62,6 +80,7 @@ If your mod also has ordinary `[HarmonyPatch]` or MelonLoader patch attributes, 
 | `OwnerAlias` | Optional generated owner alias. Use only when you need predictable registry names. |
 | `MethodAlias` | Optional generated method alias. Use only when you need predictable registry names. |
 | `IsStatic` | Optional hint for generated invocation helpers. Target method lookup does not require it. |
+| `Required` | Throw during generated startup when the patch cannot be applied. Use for patches the mod cannot safely run without. |
 
 Patch handler attributes go on methods inside the patch class:
 
@@ -75,7 +94,9 @@ S1Interop does not expose a backend-neutral transpiler attribute. Transpilers ar
 
 ## What gets generated
 
-A patch declaration also registers the target owner and method as generated interop metadata. The generated patcher resolves:
+A patch declaration also registers the target owner and method as generated interop metadata. When Mono or IL2CPP references are available during compilation, missing target types or methods report `S1I001` or `S1I003`.
+
+At runtime, the generated patcher resolves:
 
 ```csharp
 S1Interop.Generated.S1InteropMemberRegistry.MoveItemBehaviourIsDestinationValidMethod

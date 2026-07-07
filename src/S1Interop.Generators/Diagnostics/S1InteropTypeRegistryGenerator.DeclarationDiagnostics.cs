@@ -13,8 +13,15 @@ public sealed partial class S1InteropTypeRegistryGenerator
     {
         ReportIl2CppSourceDiagnostics(context, compilation);
 
-        ImmutableArray<S1InteropTypeDiagnosticTarget> typeTargets = GetDeclaredTypeDiagnosticTargets(compilation);
-        ImmutableArray<S1InteropMemberDiagnosticTarget> memberTargets = GetDeclaredMemberDiagnosticTargets(compilation);
+        ImmutableArray<S1InteropPatchEntry> patchTargets = InteropDeclarationReader.GetPatchEntries(compilation);
+        ImmutableArray<S1InteropTypeDiagnosticTarget> typeTargets = GetDeclaredTypeDiagnosticTargets(compilation)
+            .AddRange(patchTargets.Select(patch => new S1InteropTypeDiagnosticTarget(patch.OwnerEntry, patch.Location)))
+            .Distinct(S1InteropTypeDiagnosticTargetComparer.Instance)
+            .ToImmutableArray();
+        ImmutableArray<S1InteropMemberDiagnosticTarget> memberTargets = GetDeclaredMemberDiagnosticTargets(compilation)
+            .AddRange(patchTargets.Select(patch => new S1InteropMemberDiagnosticTarget(patch.TargetMemberEntry, patch.Location)))
+            .Distinct(S1InteropMemberDiagnosticTargetComparer.Instance)
+            .ToImmutableArray();
         if (typeTargets.IsDefaultOrEmpty && memberTargets.IsDefaultOrEmpty)
         {
             return;

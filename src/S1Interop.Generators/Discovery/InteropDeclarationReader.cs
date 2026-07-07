@@ -457,6 +457,7 @@ internal static class InteropDeclarationReader
         string? ownerAlias = null;
         string? methodAlias = null;
         bool isStatic = false;
+        bool required = false;
         ImmutableArray<string> parameterTypeNames = ImmutableArray<string>.Empty;
         foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
         {
@@ -475,6 +476,10 @@ internal static class InteropDeclarationReader
             else if (argument.Key == "IsStatic" && argument.Value.Value is bool isStaticValue)
             {
                 isStatic = isStaticValue;
+            }
+            else if (argument.Key == "Required" && argument.Value.Value is bool requiredValue)
+            {
+                required = requiredValue;
             }
             else if (argument.Key == "ParameterTypeNames" && !argument.Value.Values.IsDefaultOrEmpty)
             {
@@ -504,7 +509,7 @@ internal static class InteropDeclarationReader
             valueTypeName: null,
             ImmutableArray<string>.Empty);
 
-        return new S1InteropPatchEntry(patchTypeName, ownerEntry, memberEntry, handlers);
+        return new S1InteropPatchEntry(patchTypeName, ownerEntry, memberEntry, handlers, required, GetAttributeLocation(attribute));
     }
 
     private static ImmutableArray<S1InteropPatchHandlerEntry> GetPatchHandlers(
@@ -540,4 +545,9 @@ internal static class InteropDeclarationReader
 
         return handlers.ToImmutable();
     }
+
+    private static Location? GetAttributeLocation(AttributeData attribute) =>
+        attribute.ApplicationSyntaxReference?.GetSyntax() is AttributeSyntax syntax
+            ? syntax.GetLocation()
+            : null;
 }

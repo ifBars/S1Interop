@@ -437,9 +437,12 @@ internal sealed partial class S1InteropFixtureTests
             patcherSource.Contains("internal static class S1InteropHarmonyPatcher", StringComparison.Ordinal) &&
             patcherSource.Contains("internal static void ApplyGeneratedPatches()", StringComparison.Ordinal) &&
             patcherSource.Contains("[global::System.Runtime.CompilerServices.ModuleInitializer]", StringComparison.Ordinal) &&
+            patcherSource.Contains("internal enum S1InteropPatchStatus", StringComparison.Ordinal) &&
+            patcherSource.Contains("internal static global::System.Collections.Generic.IReadOnlyList<S1InteropPatchReport> Reports => MutableReports;", StringComparison.Ordinal) &&
             patcherSource.Contains("S1InteropMemberRegistry.MoveItemBehaviourIsDestinationValidPatchTargetMethod", StringComparison.Ordinal) &&
+            patcherSource.Contains("Record(S1InteropPatchStatus.Applied", StringComparison.Ordinal) &&
             !patcherSource.Contains("PatchAll", StringComparison.Ordinal),
-            $"Generated Harmony registrar should be internal, automatic, and registry-backed without a PatchAll API. Generated source:{Environment.NewLine}{patcherSource}");
+            $"Generated Harmony registrar should be internal, automatic, report-backed, and registry-backed without a PatchAll API. Generated source:{Environment.NewLine}{patcherSource}");
 
         System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.Patches", "MONO");
         Type patcherType = assembly.GetType("S1Interop.Generated.S1InteropHarmonyPatcher")
@@ -477,6 +480,178 @@ internal sealed partial class S1InteropFixtureTests
             prefixMethod.Name == "Prefix" &&
             prefixMethod.DeclaringType?.FullName == "SyntheticMod.MoveItemDestinationPatch",
             $"Generated S1Interop patcher should bind the declared prefix handler. Prefix: {prefixMethod.DeclaringType?.FullName}.{prefixMethod.Name}");
+
+        IReadOnlyList<object> reports = GetGeneratedPatchReports(patcherType);
+        Assert(reports.Count == 1, $"Generated S1Interop patcher should record one patch report, got {reports.Count}.");
+        object report = reports[0];
+        Assert(
+            string.Equals(GetReportValue(report, "Status")?.ToString(), "Applied", StringComparison.Ordinal) &&
+            string.Equals(GetReportValue(report, "TargetTypeName")?.ToString(), "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", StringComparison.Ordinal) &&
+            string.Equals(GetReportValue(report, "TargetMethodName")?.ToString(), "IsDestinationValid", StringComparison.Ordinal) &&
+            string.Equals(GetReportValue(report, "PatchTypeName")?.ToString(), "SyntheticMod.MoveItemDestinationPatch", StringComparison.Ordinal),
+            $"Generated S1Interop patch report should describe the applied target. Report: {report}");
+    }
+
+    private void S1InteropPatchAttributesReportMissingAndFailedRuntimePatchTargets()
+    {
+        const string source =
+            """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null)
+                    {
+                        throw new System.InvalidOperationException("Synthetic patch failure.");
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                        Method = method;
+                    }
+
+                    public System.Reflection.MethodInfo Method { get; }
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    private void ExistingPatchTarget()
+                    {
+                    }
+                }
+            }
+
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "MissingPatchTarget",
+                    MethodAlias = "MissingPatchTarget")]
+                internal static class MissingPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "ExistingPatchTarget",
+                    MethodAlias = "ExistingPatchTarget")]
+                internal static class FailingPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+            }
+            """;
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.PatchReports", "MONO");
+        Type patcherType = assembly.GetType("S1Interop.Generated.S1InteropHarmonyPatcher")
+            ?? throw new InvalidOperationException("Generated Harmony patcher type was not emitted.");
+        IReadOnlyList<object> reports = GetGeneratedPatchReports(patcherType);
+
+        Assert(
+            reports.Count == 2 &&
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "SkippedMissingTarget", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "TargetMethodName")?.ToString(), "MissingPatchTarget", StringComparison.Ordinal)) &&
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "PatchFailed", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "TargetMethodName")?.ToString(), "ExistingPatchTarget", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "ExceptionTypeName")?.ToString(), "System.InvalidOperationException", StringComparison.Ordinal)),
+            $"Generated S1Interop patch reports should distinguish missing targets from Harmony patch failures. Reports:{Environment.NewLine}{string.Join(Environment.NewLine, reports)}");
+    }
+
+    private void S1InteropPatchAttributesCanFailStartupForRequiredMissingTargets()
+    {
+        const string source =
+            """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null)
+                    {
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                        Method = method;
+                    }
+
+                    public System.Reflection.MethodInfo Method { get; }
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                }
+            }
+
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "MissingPatchTarget",
+                    MethodAlias = "RequiredMissingPatchTarget",
+                    Required = true)]
+                internal static class RequiredMissingPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+            }
+            """;
+
+        bool threw = false;
+        try
+        {
+            System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.RequiredPatch", "MONO");
+            _ = assembly.GetType("S1Interop.Generated.S1InteropHarmonyPatcher", throwOnError: true);
+        }
+        catch (Exception exception)
+        {
+            string exceptionText = exception.ToString();
+            threw = exceptionText.Contains("Required S1Interop patch failed", StringComparison.Ordinal) &&
+                    exceptionText.Contains("SkippedMissingTarget", StringComparison.Ordinal);
+        }
+
+        Assert(threw, "Required S1Interop patches should fail startup when the target method cannot be resolved.");
     }
 
     private void S1InteropTypeRegistryGeneratorKeepsDeclaredClrScalarsOutOfHandleParameters()
@@ -1266,6 +1441,74 @@ internal sealed partial class S1InteropFixtureTests
                 diagnostic.GetMessage().Contains("container", StringComparison.Ordinal) &&
                 diagnostic.GetMessage().Contains("PlayerCamera", StringComparison.Ordinal)),
             $"S1InteropMember declarations should report S1I003 when the member name is absent from the referenced owner type. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void S1InteropPatchTargetsValidateAgainstReferencedGameAssemblies()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    public void StartMoving()
+                    {
+                    }
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                }
+            }
+            """);
+        const string source =
+            """
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "StartMoving",
+                    MethodAlias = "MoveItemBehaviourStartMoving")]
+                internal static class MoveItemPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix()
+                    {
+                    }
+                }
+            }
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference, il2CppGameReference]);
+
+        Assert(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == "S1I003" &&
+                diagnostic.GetMessage().Contains("StartMoving", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("MoveItemBehaviour", StringComparison.Ordinal) &&
+                diagnostic.GetMessage().Contains("IL2CPP", StringComparison.Ordinal)),
+            $"S1InteropPatch declarations should report S1I003 when a method exists on Mono but is absent from the IL2CPP reference surface. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
     private void S1InteropTypeRegistryGeneratorValidatesMethodParameterAliasesAgainstReferencedGameAssemblies()
