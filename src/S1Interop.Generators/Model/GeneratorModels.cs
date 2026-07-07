@@ -105,6 +105,13 @@ internal enum S1InteropMemberKind
     Property
 }
 
+internal enum S1InteropPatchHandlerKind
+{
+    Prefix,
+    Postfix,
+    Finalizer
+}
+
 internal readonly struct S1InteropBridgeRequests
 {
     public S1InteropBridgeRequests(bool generateUnityEventBridge, bool generateDelegateEventBridge)
@@ -159,6 +166,42 @@ internal readonly struct S1InteropMemberEntry
     public string? ValueTypeName { get; }
 
     public ImmutableArray<string> ParameterNames { get; }
+}
+
+internal readonly struct S1InteropPatchHandlerEntry
+{
+    public S1InteropPatchHandlerEntry(S1InteropPatchHandlerKind kind, string methodName)
+    {
+        Kind = kind;
+        MethodName = methodName;
+    }
+
+    public S1InteropPatchHandlerKind Kind { get; }
+
+    public string MethodName { get; }
+}
+
+internal readonly struct S1InteropPatchEntry
+{
+    public S1InteropPatchEntry(
+        string patchTypeName,
+        S1InteropTypeEntry ownerEntry,
+        S1InteropMemberEntry targetMemberEntry,
+        ImmutableArray<S1InteropPatchHandlerEntry> handlers)
+    {
+        PatchTypeName = patchTypeName;
+        OwnerEntry = ownerEntry;
+        TargetMemberEntry = targetMemberEntry;
+        Handlers = handlers;
+    }
+
+    public string PatchTypeName { get; }
+
+    public S1InteropTypeEntry OwnerEntry { get; }
+
+    public S1InteropMemberEntry TargetMemberEntry { get; }
+
+    public ImmutableArray<S1InteropPatchHandlerEntry> Handlers { get; }
 }
 
 internal readonly struct S1InteropConstructorEntry

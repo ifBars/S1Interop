@@ -161,6 +161,86 @@ public sealed partial class S1InteropTypeRegistryGenerator
             }
 
             /// <summary>
+            /// Declares a backend-neutral Harmony patch target.
+            /// </summary>
+            /// <remarks>
+            /// The generator resolves this Mono type and method to the matching native runtime member and applies the patch through the generated S1Interop registrar.
+            /// </remarks>
+            [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+            internal sealed class S1InteropPatchAttribute : System.Attribute
+            {
+                /// <summary>
+                /// Initializes a backend-neutral patch declaration.
+                /// </summary>
+                /// <param name="monoTypeName">The full Mono runtime type name, such as <c>ScheduleOne.NPCs.Behaviour.MoveItemBehaviour</c>.</param>
+                /// <param name="methodName">The runtime method name to patch.</param>
+                public S1InteropPatchAttribute(string monoTypeName, string methodName)
+                {
+                    MonoTypeName = monoTypeName;
+                    MethodName = methodName;
+                }
+
+                /// <summary>
+                /// Gets the full Mono runtime type name.
+                /// </summary>
+                public string MonoTypeName { get; }
+
+                /// <summary>
+                /// Gets the runtime method name to patch.
+                /// </summary>
+                public string MethodName { get; }
+
+                /// <summary>
+                /// Gets or sets the full IL2CPP wrapper type name when the default name mapping is not sufficient.
+                /// </summary>
+                public string? Il2CppTypeName { get; set; }
+
+                /// <summary>
+                /// Gets or sets the generated owner alias used by the registry.
+                /// </summary>
+                public string? OwnerAlias { get; set; }
+
+                /// <summary>
+                /// Gets or sets the generated method alias used by the member registry.
+                /// </summary>
+                public string? MethodAlias { get; set; }
+
+                /// <summary>
+                /// Gets or sets whether the target method is static. Method resolution does not require this, but generated invocation helpers use it.
+                /// </summary>
+                public bool IsStatic { get; set; }
+
+                /// <summary>
+                /// Gets or sets method parameter type names used to disambiguate overloads.
+                /// </summary>
+                public string[] ParameterTypeNames { get; set; } = System.Array.Empty<string>();
+            }
+
+            /// <summary>
+            /// Marks a method as the prefix handler for a backend-neutral S1Interop patch class.
+            /// </summary>
+            [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false)]
+            internal sealed class S1InteropPrefixAttribute : System.Attribute
+            {
+            }
+
+            /// <summary>
+            /// Marks a method as the postfix handler for a backend-neutral S1Interop patch class.
+            /// </summary>
+            [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false)]
+            internal sealed class S1InteropPostfixAttribute : System.Attribute
+            {
+            }
+
+            /// <summary>
+            /// Marks a method as the finalizer handler for a backend-neutral S1Interop patch class.
+            /// </summary>
+            [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false)]
+            internal sealed class S1InteropFinalizerAttribute : System.Attribute
+            {
+            }
+
+            /// <summary>
             /// Requests generated helpers for converting simple UnityEvent listener registrations across runtimes.
             /// </summary>
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = false)]

@@ -13,6 +13,7 @@ For what the generator emits from these declarations and when, see [Generated ou
 | `S1InteropNamespace` | You need broad runtime type registration for a namespace, usually without generating member facades for every type. |
 | `S1InteropType` | You need a backend-neutral facade and compatible public member helpers for one game type. |
 | `S1InteropMember` | You need an explicit binding for a private member, ambiguous overload, pinned Harmony target, or migration-discovered reflection access. |
+| `S1InteropPatch` | You need a backend-neutral Harmony patch target that resolves to the native Mono or IL2CPP method at runtime. |
 | `S1InteropGenerateUnityEventBridge` | You need generated listener conversion helpers for simple `UnityEvent` add/remove calls. |
 | `S1InteropGenerateDelegateEventBridge` | You need generated delegate combine/remove helpers for migrated event assignments. |
 
@@ -126,6 +127,32 @@ Use `S1InteropMember` for:
 - Mono/IL2CPP disagreements that need a pinned binding;
 - migration-inferred reflection patterns that cannot yet be represented by the automatic type facade, including simple cached `FieldInfo`/`PropertyInfo`/`MethodInfo` lookups from `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `typeof(...).GetMethod(...)`, `AccessTools.Field(typeof(...), "...")`, `AccessTools.Property(typeof(...), "...")`, `AccessTools.PropertyGetter(typeof(...), "...")`, `AccessTools.PropertySetter(typeof(...), "...")`, or `AccessTools.Method(typeof(...), "...")`. Migration-inferred declarations skip backing-field names such as `HealthBackingField` or `<Health>k__BackingField`; use the real field or property instead.
 
+## `S1InteropPatch`
+
+Backend-neutral Harmony patch target declaration. Put it on the patch class and mark handler methods with `S1InteropPrefix`, `S1InteropPostfix`, or `S1InteropFinalizer`.
+
+```csharp
+[S1Interop.S1InteropPatch(
+    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+    "IsDestinationValid",
+    ParameterTypeNames = new[]
+    {
+        "ScheduleOne.Management.TransitRoute",
+        "ScheduleOne.ItemFramework.ItemInstance",
+        "string&"
+    })]
+internal static class MoveItemDestinationPatch
+{
+    [S1Interop.S1InteropPrefix]
+    private static bool Prefix(object? __instance, ref string invalidReason)
+    {
+        return true;
+    }
+}
+```
+
+Patch declarations generate normal type/member registry entries for the target and an internal Harmony registrar. You do not call `PatchAll`; S1Interop applies generated patch declarations once when the mod assembly loads. See [Backend-neutral Harmony patching](harmony-patching.md) for the full workflow.
+
 ## Bridge declarations
 
 Migration can add bridge declarations when source contains simple delegate patterns that need different runtime delegate shapes:
@@ -169,6 +196,7 @@ Generated symbols are emitted into the same compilation as the rest of the proje
 
 - [Generated output](generator-package.md)
 - [Backend-neutral SDK](backend-neutral-sdk.md)
+- [Backend-neutral Harmony patching](harmony-patching.md)
 - [SDK generation](sdk-generation.md)
 - [Migrate to backend-neutral](migrate-to-backend-neutral.md)
 - [Diagnostics](diagnostics.md)

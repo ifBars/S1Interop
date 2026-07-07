@@ -26,6 +26,8 @@ Most Schedule One projects already fall into a few familiar shapes. S1Interop sh
 
 Use the helper API that owns your domain. If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already gives you the right workflow, keep it. S1Interop is the generated interop layer for the lower-level game-wrapper calls that still leak through. See [S1API and S1Interop](s1api-and-s1interop.md) for the deeper comparison.
 
+For direct Harmony patches whose target type changes between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md). The mod author writes S1Interop patch attributes; generated code resolves and applies the native target method once.
+
 ## Which path should I use?
 
 | Situation | Start with | Why |

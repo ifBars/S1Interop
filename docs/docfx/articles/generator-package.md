@@ -35,8 +35,9 @@ The generator emits source under stable file names so IDEs can display them in t
 
 | File | Emitted when | Contains |
 | --- | --- | --- |
-| `S1InteropTypeAttribute.g.cs` | Always, on first generation. | The `S1Interop` attribute classes (`S1InteropTypeAttribute`, `S1InteropNamespaceAttribute`, `S1InteropMemberAttribute`, `S1InteropMemberKind`, `S1InteropGenerateUnityEventBridgeAttribute`, `S1InteropGenerateDelegateEventBridgeAttribute`). You never define these yourself. |
+| `S1InteropTypeAttribute.g.cs` | Always, on first generation. | The `S1Interop` attribute classes (`S1InteropTypeAttribute`, `S1InteropNamespaceAttribute`, `S1InteropMemberAttribute`, `S1InteropMemberKind`, `S1InteropPatchAttribute`, patch handler attributes, `S1InteropGenerateUnityEventBridgeAttribute`, `S1InteropGenerateDelegateEventBridgeAttribute`). You never define these yourself. |
 | `S1Interop.TypeRegistry.g.cs` | Always, when the generator is referenced. | The `S1Interop.Generated` runtime backend detector, type registry, member registry, object handle, object-cast helper, delegate bridge, per-type `Tag`/registry entries, and every `S1Interop.ScheduleOne.*` type facade. |
+| `S1Interop.HarmonyPatcher.g.cs` | Only when at least one `[S1InteropPatch]` class is present. | Internal Harmony patch registrar with a module initializer. It resolves patch targets through `S1InteropMemberRegistry` and applies generated patch declarations once. |
 | `S1Interop.UnityEventBridge.g.cs` | Only when `[assembly: S1InteropGenerateUnityEventBridge]` is present. | `S1Interop.Generated.S1InteropUnityEventBridge` with `Add`/`Remove` overloads for parameterless and one-argument UnityEvents. |
 | `S1Interop.DelegateEventBridge.g.cs` | Only when `[assembly: S1InteropGenerateDelegateEventBridge]` is present. | `S1Interop.Generated.S1InteropDelegateEventBridge` with `Combine`/`Remove` helpers for delegate event fields. |
 
@@ -53,6 +54,7 @@ Internal infrastructure shared by every facade and by migration-rewritten call s
 - `S1InteropRuntime` and `S1InteropRuntimeBackend`: detect or constant-bind the active backend (`Mono`, `Il2Cpp`, or `Unknown`). When the build target is known at compile time, `Backend` is emitted as a `const`; otherwise it is resolved at runtime through type and assembly probes.
 - `S1InteropTypeRegistry`: the type-name and resolution cache. Exposes per-alias `*Name`, `*MonoName`, `*Il2CppName`, `Resolve`, `Create`, `IsInstance`, `As*`, `TryAs*`, `Is*`, `Get*`, `TrySet*`, `Invoke*`, and `Invoke*<T>` members.
 - `S1InteropMemberRegistry`: reflection-based get/set/invoke helpers used by the registry and facades.
+- `S1InteropHarmonyPatcher`: emitted only when `[S1InteropPatch]` is used. It is internal generated infrastructure, not an author-facing `PatchAll` API.
 - `S1InteropObject<TTag>`: the generic backend-neutral handle backing every facade `Handle`.
 - `S1InteropObjectCast`: object/proxy unwrapping helper referenced by `S1I007` diagnostics.
 - `S1InteropUnityEventBridge` and `S1InteropDelegateEventBridge`: bridge helpers emitted only when the matching bridge attribute is present.
@@ -88,6 +90,7 @@ Generated facades are `internal` by default. The generator does not shorten name
 | `[assembly: S1InteropNamespace(...)]` | Registry entries and a basic facade with `Handle` for every matching public type. The `Handle` only has generic members (`HasValue`, `Instance`, `Value`). No named member accessors unless `IncludeMembers = true` opts matching types into member facade discovery. |
 | `[assembly: S1InteropType(...)]` | A per-type facade under `S1Interop.ScheduleOne.*` with `Handle`, `As`/`TryAs`/`Is`, constructor helpers, and discovered public member accessors. The `Handle` gains named accessors from referenced Mono and IL2CPP metadata, with concrete signatures where the metadata is backend-neutral. Enum declarations instead emit S1Interop-owned enum mirrors when backend values agree. Also emits the matching registry `Tag` and resolution entries. |
 | `[assembly: S1InteropMember(...)]` | A named accessor on the owner facade and, for instance fields/properties, on `Handle` with the chosen alias. Used for private members, ambiguous overloads, pinned bindings, and migration-inferred reflection access. It uses concrete signatures when local metadata proves the member shape; otherwise it keeps object/generic fallback helpers. |
+| `[S1InteropPatch(...)]` | A generated target type/member binding plus internal Harmony registrar. The target resolves through the same member registry as explicit method declarations and is applied once by generated startup code. |
 | `[assembly: S1InteropGenerateUnityEventBridge]` | `S1InteropUnityEventBridge` in `S1Interop.Generated` with `Add`/`Remove` overloads. |
 | `[assembly: S1InteropGenerateDelegateEventBridge]` | `S1InteropDelegateEventBridge` in `S1Interop.Generated` with `Combine`/`Remove` helpers. |
 
@@ -110,5 +113,6 @@ A few practical notes that prevent the most common confusion:
 - It cannot rewrite existing user source. Roslyn source generators are additive only. Any call-site transformation happens through CLI migration before compilation, not inside the generator.
 - It cannot ship game assemblies or a static catalog of Schedule One APIs. Generated member coverage comes from the Mono and IL2CPP reference assemblies already referenced by the project.
 - It does not generate shortened duplicate namespaces. One canonical namespace per game type.
+- It does not expose a public patching startup API. S1Interop patch declarations are applied by generated internal code so authors do not accidentally double-apply patches.
 
-For the full attribute reference, continue to [Declarations](backend-neutral-declarations.md).
+For the full attribute reference, continue to [Declarations](backend-neutral-declarations.md). For patch authoring, see [Backend-neutral Harmony patching](harmony-patching.md).

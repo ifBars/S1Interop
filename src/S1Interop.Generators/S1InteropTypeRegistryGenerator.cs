@@ -28,6 +28,8 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Select(static (compilation, _) => InteropDeclarationReader.GetNamespaceEntries(compilation));
         IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> memberEntries = context.CompilationProvider
             .Select(static (compilation, _) => InteropDeclarationReader.GetAssemblyMemberEntries(compilation));
+        IncrementalValueProvider<ImmutableArray<S1InteropPatchEntry>> patchEntries = context.CompilationProvider
+            .Select(static (compilation, _) => InteropDeclarationReader.GetPatchEntries(compilation));
         IncrementalValueProvider<S1InteropBridgeRequests> bridgeRequests = context.CompilationProvider
             .Select(static (compilation, _) => InteropDeclarationReader.GetBridgeRequests(compilation));
 
@@ -47,13 +49,27 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             .Combine(namespaceEntries)
             .Select(static (input, _) => input.Left.AddRange(input.Right));
 
+        IncrementalValueProvider<ImmutableArray<S1InteropTypeEntry>> patchTypeEntries = patchEntries
+            .Select(static (entries, _) => entries
+                .Select(entry => entry.OwnerEntry)
+                .Distinct(S1InteropTypeEntryComparer.Instance)
+                .ToImmutableArray());
+
         IncrementalValueProvider<ImmutableArray<S1InteropTypeEntry>> allEntries = declaredEntries
             .Combine(attributedTypeEntries.Collect())
-            .Select(static (input, _) => InteropDeclarationReader.MergeTypeEntries(input.Left.AddRange(input.Right)));
+            .Combine(patchTypeEntries)
+            .Select(static (input, _) => InteropDeclarationReader.MergeTypeEntries(input.Left.Left.AddRange(input.Left.Right).AddRange(input.Right)));
+
+        IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> explicitMemberEntries = memberEntries
+            .Combine(patchEntries)
+            .Select(static (input, _) => input.Left
+                .AddRange(input.Right.Select(entry => entry.TargetMemberEntry))
+                .Distinct(S1InteropMemberEntryComparer.Instance)
+                .ToImmutableArray());
 
         IncrementalValueProvider<ImmutableArray<S1InteropMemberEntry>> allMemberEntries = context.CompilationProvider
             .Combine(allEntries)
-            .Combine(memberEntries)
+            .Combine(explicitMemberEntries)
             .Select(static (input, _) => PublicMemberCatalog.MergeMemberEntries(
                 PublicMemberCatalog.EnrichMemberEntries(input.Left.Left, input.Left.Right, input.Right),
                 PublicMemberCatalog.DiscoverMemberEntries(input.Left.Left, input.Left.Right)));
@@ -71,6 +87,15 @@ public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerat
             sourceContext.AddSource(
                 "S1Interop.TypeRegistry.g.cs",
                 SourceText.From(GenerateRegistrySource(input.Left.Left.Left.Left, input.Left.Left.Left.Right, input.Left.Left.Right, input.Left.Right, input.Right), Encoding.UTF8));
+        });
+        context.RegisterSourceOutput(patchEntries, static (sourceContext, entries) =>
+        {
+            if (!entries.IsDefaultOrEmpty)
+            {
+                sourceContext.AddSource(
+                    "S1Interop.HarmonyPatcher.g.cs",
+                    SourceText.From(GenerateHarmonyPatchSource(entries), Encoding.UTF8));
+            }
         });
         context.RegisterSourceOutput(bridgeRequests, static (sourceContext, requests) =>
         {

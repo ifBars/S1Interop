@@ -358,6 +358,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         string qualified = Regex.Replace(source, @"(?<!global::)\bSystem\.", "global::System.");
         return qualified
             .Replace("Il2Cppglobal::System.", "Il2CppSystem.")
+            .Replace("namespace global::System.", "namespace System.")
             .Replace("\"global::System.", "\"System.");
     }
 

@@ -87,6 +87,48 @@ internal static class InteropDeclarationReader
             .ToImmutableArray();
     }
 
+    public static ImmutableArray<S1InteropPatchEntry> GetPatchEntries(Compilation compilation)
+    {
+        INamedTypeSymbol? patchAttributeType = compilation.GetTypeByMetadataName(PatchAttributeMetadataName);
+        if (patchAttributeType is null)
+        {
+            return ImmutableArray<S1InteropPatchEntry>.Empty;
+        }
+
+        INamedTypeSymbol? prefixAttributeType = compilation.GetTypeByMetadataName(PatchPrefixAttributeMetadataName);
+        INamedTypeSymbol? postfixAttributeType = compilation.GetTypeByMetadataName(PatchPostfixAttributeMetadataName);
+        INamedTypeSymbol? finalizerAttributeType = compilation.GetTypeByMetadataName(PatchFinalizerAttributeMetadataName);
+
+        var entries = ImmutableArray.CreateBuilder<S1InteropPatchEntry>();
+        foreach (INamedTypeSymbol typeSymbol in EnumerateDeclaredTypes(compilation.Assembly.GlobalNamespace))
+        {
+            AttributeData[] patchAttributes = typeSymbol.GetAttributes()
+                .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, patchAttributeType))
+                .ToArray();
+            if (patchAttributes.Length == 0)
+            {
+                continue;
+            }
+
+            ImmutableArray<S1InteropPatchHandlerEntry> handlers = GetPatchHandlers(
+                typeSymbol,
+                prefixAttributeType,
+                postfixAttributeType,
+                finalizerAttributeType);
+            string patchTypeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            foreach (AttributeData patchAttribute in patchAttributes)
+            {
+                S1InteropPatchEntry? entry = TryCreatePatchEntry(patchAttribute, patchTypeName, handlers);
+                if (entry is not null)
+                {
+                    entries.Add(entry.Value);
+                }
+            }
+        }
+
+        return entries.ToImmutable();
+    }
+
     public static S1InteropBridgeRequests GetBridgeRequests(Compilation compilation) =>
         new(
             HasAssemblyAttribute(compilation, UnityEventBridgeAttributeMetadataName),
@@ -216,6 +258,38 @@ internal static class InteropDeclarationReader
             foreach (INamedTypeSymbol type in EnumerateReferencedTypes(child))
             {
                 yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> EnumerateDeclaredTypes(INamespaceSymbol namespaceSymbol)
+    {
+        foreach (INamedTypeSymbol type in namespaceSymbol.GetTypeMembers())
+        {
+            yield return type;
+            foreach (INamedTypeSymbol nestedType in EnumerateNestedTypes(type))
+            {
+                yield return nestedType;
+            }
+        }
+
+        foreach (INamespaceSymbol child in namespaceSymbol.GetNamespaceMembers())
+        {
+            foreach (INamedTypeSymbol type in EnumerateDeclaredTypes(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(INamedTypeSymbol typeSymbol)
+    {
+        foreach (INamedTypeSymbol nestedType in typeSymbol.GetTypeMembers())
+        {
+            yield return nestedType;
+            foreach (INamedTypeSymbol child in EnumerateNestedTypes(nestedType))
+            {
+                yield return child;
             }
         }
     }
@@ -363,5 +437,107 @@ internal static class InteropDeclarationReader
             parameterTypeNames,
             null,
             ImmutableArray<string>.Empty);
+    }
+
+    private static S1InteropPatchEntry? TryCreatePatchEntry(
+        AttributeData attribute,
+        string patchTypeName,
+        ImmutableArray<S1InteropPatchHandlerEntry> handlers)
+    {
+        if (attribute.ConstructorArguments.Length < 2 ||
+            attribute.ConstructorArguments[0].Value is not string monoTypeName ||
+            attribute.ConstructorArguments[1].Value is not string methodName ||
+            string.IsNullOrWhiteSpace(monoTypeName) ||
+            string.IsNullOrWhiteSpace(methodName))
+        {
+            return null;
+        }
+
+        string? il2CppTypeName = null;
+        string? ownerAlias = null;
+        string? methodAlias = null;
+        bool isStatic = false;
+        ImmutableArray<string> parameterTypeNames = ImmutableArray<string>.Empty;
+        foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
+        {
+            if (argument.Key == "Il2CppTypeName" && argument.Value.Value is string il2CppTypeNameValue && !string.IsNullOrWhiteSpace(il2CppTypeNameValue))
+            {
+                il2CppTypeName = il2CppTypeNameValue;
+            }
+            else if (argument.Key == "OwnerAlias" && argument.Value.Value is string ownerAliasValue && !string.IsNullOrWhiteSpace(ownerAliasValue))
+            {
+                ownerAlias = ownerAliasValue;
+            }
+            else if (argument.Key == "MethodAlias" && argument.Value.Value is string methodAliasValue && !string.IsNullOrWhiteSpace(methodAliasValue))
+            {
+                methodAlias = methodAliasValue;
+            }
+            else if (argument.Key == "IsStatic" && argument.Value.Value is bool isStaticValue)
+            {
+                isStatic = isStaticValue;
+            }
+            else if (argument.Key == "ParameterTypeNames" && !argument.Value.Values.IsDefaultOrEmpty)
+            {
+                parameterTypeNames = argument.Value.Values
+                    .Select(value => value.Value as string)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!)
+                    .ToImmutableArray();
+            }
+        }
+
+        string resolvedOwnerAlias = SanitizeIdentifier(ownerAlias ?? GetSimpleName(monoTypeName));
+        string resolvedMethodAlias = SanitizeIdentifier(methodAlias ?? resolvedOwnerAlias + ToPascalIdentifier(methodName));
+        var ownerEntry = new S1InteropTypeEntry(
+            resolvedOwnerAlias,
+            monoTypeName,
+            il2CppTypeName ?? ToIl2CppTypeName(monoTypeName),
+            discoverMembers: false);
+        var memberEntry = new S1InteropMemberEntry(
+            resolvedMethodAlias,
+            resolvedOwnerAlias,
+            methodName,
+            S1InteropMemberKind.Method,
+            isStatic,
+            canWrite: false,
+            parameterTypeNames,
+            valueTypeName: null,
+            ImmutableArray<string>.Empty);
+
+        return new S1InteropPatchEntry(patchTypeName, ownerEntry, memberEntry, handlers);
+    }
+
+    private static ImmutableArray<S1InteropPatchHandlerEntry> GetPatchHandlers(
+        INamedTypeSymbol typeSymbol,
+        INamedTypeSymbol? prefixAttributeType,
+        INamedTypeSymbol? postfixAttributeType,
+        INamedTypeSymbol? finalizerAttributeType)
+    {
+        var handlers = ImmutableArray.CreateBuilder<S1InteropPatchHandlerEntry>();
+        foreach (IMethodSymbol method in typeSymbol.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (method.MethodKind != MethodKind.Ordinary)
+            {
+                continue;
+            }
+
+            foreach (AttributeData attribute in method.GetAttributes())
+            {
+                if (prefixAttributeType is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, prefixAttributeType))
+                {
+                    handlers.Add(new S1InteropPatchHandlerEntry(S1InteropPatchHandlerKind.Prefix, method.Name));
+                }
+                else if (postfixAttributeType is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, postfixAttributeType))
+                {
+                    handlers.Add(new S1InteropPatchHandlerEntry(S1InteropPatchHandlerKind.Postfix, method.Name));
+                }
+                else if (finalizerAttributeType is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, finalizerAttributeType))
+                {
+                    handlers.Add(new S1InteropPatchHandlerEntry(S1InteropPatchHandlerKind.Finalizer, method.Name));
+                }
+            }
+        }
+
+        return handlers.ToImmutable();
     }
 }

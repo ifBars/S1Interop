@@ -29,6 +29,7 @@ Use S1Interop for:
 
 - generated facades for direct `ScheduleOne.*` and `Il2CppScheduleOne.*` types;
 - reducing duplicated `#if MONO` / `#if IL2CPP` code in direct patch mods, S1API-specific mods, and mixed projects;
+- backend-neutral Harmony patch targets for mods that patch vanilla Schedule One methods directly;
 - moving an existing Mono mod toward IL2CPP, dual-runtime, or backend-neutral builds;
 - generating typed fields, properties, enum mirrors, constructors, and simple methods from local metadata when safe;
 - compile-time diagnostics for missing declarations, bad member bindings, and known IL2CPP boundary issues;

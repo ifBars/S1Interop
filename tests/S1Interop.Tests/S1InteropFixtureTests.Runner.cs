@@ -139,6 +139,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
+        S1InteropPatchAttributesGenerateInternalBackendNeutralHarmonyRegistrar();
+        count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
         count++;
         S1InteropTypeRegistryGeneratorEnrichesExplicitMembersFromMetadata();
@@ -328,6 +330,8 @@ internal sealed partial class S1InteropFixtureTests
         HarmonyMethodTargetGeneratorQualifiesParameterTypesAndSkipsClrArrayDeclarations();
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
+        count++;
+        S1InteropPatchAttributesGenerateInternalBackendNeutralHarmonyRegistrar();
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
         count++;

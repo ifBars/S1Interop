@@ -334,6 +334,151 @@ internal sealed partial class S1InteropFixtureTests
             $"Backend-neutral member registry should route managed hash set parameter names to IL2CPP hash set wrappers at runtime. Generated source:{Environment.NewLine}{runtimeGenerated}");
     }
 
+    private void S1InteropPatchAttributesGenerateInternalBackendNeutralHarmonyRegistrar()
+    {
+        const string source =
+            """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public static int PatchCount { get; private set; }
+                    public static string? LastHarmonyId { get; private set; }
+                    public static System.Reflection.MethodBase? LastOriginal { get; private set; }
+                    public static HarmonyMethod? LastPrefix { get; private set; }
+                    public static HarmonyMethod? LastPostfix { get; private set; }
+                    public static HarmonyMethod? LastFinalizer { get; private set; }
+
+                    public Harmony(string id)
+                    {
+                        LastHarmonyId = id;
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null)
+                    {
+                        PatchCount++;
+                        LastOriginal = original;
+                        LastPrefix = prefix;
+                        LastPostfix = postfix;
+                        LastFinalizer = finalizer;
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                        Method = method;
+                    }
+
+                    public System.Reflection.MethodInfo Method { get; }
+                }
+            }
+
+            namespace ScheduleOne.Management
+            {
+                public sealed class TransitRoute
+                {
+                }
+            }
+
+            namespace ScheduleOne.ItemFramework
+            {
+                public sealed class ItemInstance
+                {
+                }
+            }
+
+            namespace ScheduleOne.NPCs.Behaviour
+            {
+                public sealed class MoveItemBehaviour
+                {
+                    private bool IsDestinationValid(
+                        ScheduleOne.Management.TransitRoute route,
+                        ScheduleOne.ItemFramework.ItemInstance item,
+                        ref string invalidReason)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+                    "IsDestinationValid",
+                    MethodAlias = "MoveItemBehaviourIsDestinationValidPatchTarget",
+                    ParameterTypeNames = new[] { "ScheduleOne.Management.TransitRoute", "ScheduleOne.ItemFramework.ItemInstance", "string&" })]
+                internal static class MoveItemDestinationPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static bool Prefix(object? __instance, ref string invalidReason)
+                    {
+                        return true;
+                    }
+
+                    [S1Interop.S1InteropPostfix]
+                    private static void Postfix(object? __instance)
+                    {
+                    }
+                }
+            }
+            """;
+
+        IReadOnlyDictionary<string, string> generated = RunS1InteropGenerator(source, "MONO");
+        string patcherSource = generated.Single(pair => pair.Key.Contains("S1Interop.HarmonyPatcher.g.cs", StringComparison.Ordinal)).Value;
+        Assert(
+            patcherSource.Contains("internal static class S1InteropHarmonyPatcher", StringComparison.Ordinal) &&
+            patcherSource.Contains("internal static void ApplyGeneratedPatches()", StringComparison.Ordinal) &&
+            patcherSource.Contains("[global::System.Runtime.CompilerServices.ModuleInitializer]", StringComparison.Ordinal) &&
+            patcherSource.Contains("S1InteropMemberRegistry.MoveItemBehaviourIsDestinationValidPatchTargetMethod", StringComparison.Ordinal) &&
+            !patcherSource.Contains("PatchAll", StringComparison.Ordinal),
+            $"Generated Harmony registrar should be internal, automatic, and registry-backed without a PatchAll API. Generated source:{Environment.NewLine}{patcherSource}");
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.Patches", "MONO");
+        Type patcherType = assembly.GetType("S1Interop.Generated.S1InteropHarmonyPatcher")
+            ?? throw new InvalidOperationException("Generated Harmony patcher type was not emitted.");
+        Assert(!patcherType.IsPublic, "Generated Harmony patcher should not be a public author API.");
+        Assert(
+            !patcherType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Any(method => method.Name == "PatchAll"),
+            "Generated Harmony patcher should not expose a PatchAll method.");
+
+        Type harmonyType = assembly.GetType("HarmonyLib.Harmony")
+            ?? throw new InvalidOperationException("Synthetic Harmony type was not compiled.");
+        Assert(
+            (int)(harmonyType.GetProperty("PatchCount")?.GetValue(null) ?? -1) == 1,
+            "Generated module initializer should apply S1Interop patch attributes once when the mod assembly loads.");
+
+        MethodInfo applyMethod = patcherType.GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(method => method.Name == "ApplyGeneratedPatches" && method.GetParameters().Length == 0);
+        applyMethod.Invoke(null, null);
+        Assert(
+            (int)(harmonyType.GetProperty("PatchCount")?.GetValue(null) ?? -1) == 1,
+            "Generated S1Interop patch application should be guarded against accidental second application.");
+
+        System.Reflection.MethodBase original = (System.Reflection.MethodBase?)harmonyType.GetProperty("LastOriginal")?.GetValue(null)
+            ?? throw new InvalidOperationException("Synthetic Harmony did not record the original method.");
+        Assert(
+            original.Name == "IsDestinationValid" &&
+            original.DeclaringType?.FullName == "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+            $"Generated S1Interop patcher should resolve the native target method. Original: {original.DeclaringType?.FullName}.{original.Name}");
+
+        object prefix = harmonyType.GetProperty("LastPrefix")?.GetValue(null)
+            ?? throw new InvalidOperationException("Synthetic Harmony did not record the prefix.");
+        MethodInfo prefixMethod = (MethodInfo?)prefix.GetType().GetProperty("Method")?.GetValue(prefix)
+            ?? throw new InvalidOperationException("Synthetic Harmony prefix did not expose the patch method.");
+        Assert(
+            prefixMethod.Name == "Prefix" &&
+            prefixMethod.DeclaringType?.FullName == "SyntheticMod.MoveItemDestinationPatch",
+            $"Generated S1Interop patcher should bind the declared prefix handler. Prefix: {prefixMethod.DeclaringType?.FullName}.{prefixMethod.Name}");
+    }
+
     private void S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers()
     {
         MetadataReference monoGameReference = CreateMetadataReferenceFromSource(

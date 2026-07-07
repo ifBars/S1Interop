@@ -28,6 +28,8 @@
       href: backend-neutral-sdk.md
     - name: Declarations
       href: backend-neutral-declarations.md
+    - name: Harmony patching
+      href: harmony-patching.md
     - name: Diagnostics
       href: diagnostics.md
 - name: Workflows
