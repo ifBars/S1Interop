@@ -87,9 +87,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
         builder.AppendLine("            public bool HasValue => value.HasValue;");
 
         var emittedHandleMembers = CreateReservedHandleMemberNames();
-        foreach (S1InteropMemberEntry member in members.OrderBy(member => member.MemberName, StringComparer.Ordinal))
+        foreach (S1InteropMemberEntry member in members
+                     .OrderBy(member => member.Kind == S1InteropMemberKind.Method ? 1 : 0)
+                     .ThenBy(member => member.MemberName, StringComparer.Ordinal))
         {
-            if (ShouldGenerateHandleMember(member) &&
+            if (ShouldGenerateHandleMember(member, facadeHandleTypes, facadeEnumTypes) &&
                 TryReserveHandleMemberNames(member, emittedHandleMembers))
             {
                 GenerateTypeHandleMember(builder, member, facadeHandleTypes, facadeEnumTypes);
@@ -185,19 +187,33 @@ public sealed partial class S1InteropTypeRegistryGenerator
         CreateReservedFacadeMemberNames().Contains(typeName) ||
         string.Equals(typeName, "Handle", StringComparison.Ordinal);
 
-    private static bool ShouldGenerateHandleMember(S1InteropMemberEntry member) =>
-        !member.IsStatic && member.Kind != S1InteropMemberKind.Method;
+    private static bool ShouldGenerateHandleMember(
+        S1InteropMemberEntry member,
+        IReadOnlyDictionary<string, FacadeHandleType> facadeHandleTypes,
+        IReadOnlyDictionary<string, string> facadeEnumTypes)
+    {
+        if (member.IsStatic)
+        {
+            return false;
+        }
+
+        return member.Kind == S1InteropMemberKind.Method
+            ? CanGenerateTypedMethodFacadeMember(member, facadeHandleTypes, facadeEnumTypes)
+            : true;
+    }
 
     private static bool TryReserveHandleMemberNames(S1InteropMemberEntry member, HashSet<string> reservedNames)
     {
         string memberName = ToPascalIdentifier(member.MemberName);
-        var generatedNames = new List<string>
-        {
-            memberName,
-            $"Get{memberName}",
-            $"Get{memberName}Value"
-        };
-        if (member.CanWrite)
+        List<string> generatedNames = member.Kind == S1InteropMemberKind.Method
+            ? [memberName]
+            :
+            [
+                memberName,
+                $"Get{memberName}",
+                $"Get{memberName}Value"
+            ];
+        if (member.Kind != S1InteropMemberKind.Method && member.CanWrite)
         {
             generatedNames.Add($"TrySet{memberName}");
         }
@@ -250,6 +266,12 @@ public sealed partial class S1InteropTypeRegistryGenerator
         IReadOnlyDictionary<string, string> facadeEnumTypes)
     {
         string memberName = ToPascalIdentifier(member.MemberName);
+        if (member.Kind == S1InteropMemberKind.Method)
+        {
+            GenerateTypedHandleMethodFacadeMember(builder, member, memberName, facadeHandleTypes, facadeEnumTypes);
+            return;
+        }
+
         FacadeMemberType memberType = GetFacadeMemberType(member.ValueTypeName, facadeHandleTypes, facadeEnumTypes);
         builder.AppendLine();
         builder.AppendLine($"            public {GetFacadeReturnTypeName(memberType)} {memberName} => {GenerateFacadeGetExpression(member, "value.Instance", memberType)};");
@@ -394,6 +416,30 @@ public sealed partial class S1InteropTypeRegistryGenerator
         builder.AppendLine($"        public static {GetFacadeReturnTypeName(returnType)} {memberName}(Handle instance{parameterPrefix}){GenerateTypedMethodInvocation(member, "instance.Value.Instance", returnType, facadeHandleTypes, facadeEnumTypes)}");
         builder.AppendLine($"        public static {GetFacadeReturnTypeName(returnType)} {memberName}(object? instance{parameterPrefix}){GenerateTypedMethodInvocation(member, "instance", returnType, facadeHandleTypes, facadeEnumTypes)}");
     }
+
+    private static void GenerateTypedHandleMethodFacadeMember(
+        StringBuilder builder,
+        S1InteropMemberEntry member,
+        string memberName,
+        IReadOnlyDictionary<string, FacadeHandleType> facadeHandleTypes,
+        IReadOnlyDictionary<string, string> facadeEnumTypes)
+    {
+        if (!TryGetTypedMethodReturnType(member, facadeHandleTypes, facadeEnumTypes, out FacadeMemberType returnType) ||
+            !TryGetTypedMethodParameters(member, facadeHandleTypes, facadeEnumTypes, out string? parameters))
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.AppendLine($"            public {GetFacadeReturnTypeName(returnType)} {memberName}({parameters}){GenerateTypedMethodInvocation(member, "value.Instance", returnType, facadeHandleTypes, facadeEnumTypes)}");
+    }
+
+    private static bool CanGenerateTypedMethodFacadeMember(
+        S1InteropMemberEntry member,
+        IReadOnlyDictionary<string, FacadeHandleType> facadeHandleTypes,
+        IReadOnlyDictionary<string, string> facadeEnumTypes) =>
+        TryGetTypedMethodReturnType(member, facadeHandleTypes, facadeEnumTypes, out _) &&
+        TryGetTypedMethodParameters(member, facadeHandleTypes, facadeEnumTypes, out _);
 
     private static void GenerateTypedConstructorMembers(
         StringBuilder builder,

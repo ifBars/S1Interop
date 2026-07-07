@@ -15,6 +15,7 @@ if (vehicle.HasValue)
 {
     string? name = vehicle.VehicleName;
     float? throttle = vehicle.CurrentThrottle;
+    string? started = vehicle.StartEngine();
 }
 ```
 
@@ -57,7 +58,7 @@ When reference metadata is available, that type declaration can generate:
 - `As`, `TryAs`, and `Is` helpers;
 - a typed backend-neutral handle;
 - compatible public field and property accessors;
-- invokers for unambiguous public methods.
+- typed handle methods and facade invokers for unambiguous public methods.
 
 `S1InteropMember` remains available for cases the type facade cannot safely infer yet: private members, better aliases, ambiguous overloads, pinned Harmony targets, and migration-specific reflection bindings.
 
@@ -65,7 +66,7 @@ When reference metadata is available, that type declaration can generate:
 
 The current facade layer intentionally favors correctness over pretending every game API is already a normal C# wrapper. You will still see `Handle`, `As`, `TryAs`, `Get<T>`, `Get...Value<T>`, `TrySet...`, and `Invoke` patterns in generated output.
 
-Use named facade members first when they are generated. Discovered public fields, properties, and methods use concrete signatures when the metadata is safe for both backends today: scalar values, `string`, `object`, `void` method returns, declared enum mirrors, and game-object values whose types are also declared as S1Interop facades. Examples include `vehicle.VehicleName`, `vehicle.CurrentThrottle`, `vehicle.AssignedDriver`, or `LandVehicle.GetCurrentThrottle(vehicle)`. Declared enum types emit S1Interop-owned enum mirrors when both backend surfaces agree on enum values, so enum-valued members can use one stable enum type in mod source. Read-only discovered fields/properties still get named getters, but named `TrySet...` helpers are generated only when the referenced metadata says the member is writable on the available backend surfaces.
+Use named facade members first when they are generated. Discovered public fields, properties, and methods use concrete signatures when the metadata is safe for both backends today: scalar values, `string`, `object`, `void` method returns, declared enum mirrors, and game-object values whose types are also declared as S1Interop facades. Examples include `vehicle.VehicleName`, `vehicle.CurrentThrottle`, `vehicle.AssignedDriver`, `vehicle.StartEngine()`, or `LandVehicle.GetCurrentThrottle(vehicle)`. Declared enum types emit S1Interop-owned enum mirrors when both backend surfaces agree on enum values, so enum-valued members can use one stable enum type in mod source. Read-only discovered fields/properties still get named getters, but named `TrySet...` helpers are generated only when the referenced metadata says the member is writable on the available backend surfaces.
 
 Explicit `S1InteropMember` declarations follow the same direction when metadata allows it. Use them for private members, aliases, pinned bindings, or migration-generated reflection targets; if the local references identify one compatible field, property, or method, the generated facade can still expose concrete typed overloads. If the binding is unresolved or ambiguous, it stays on the object/generic fallback helpers.
 
