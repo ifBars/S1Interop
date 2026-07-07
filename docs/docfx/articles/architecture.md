@@ -11,13 +11,13 @@ S1Interop has two halves:
 
 ```mermaid
 flowchart TD
-    ModSource["Mod source\nScheduleOne refs, using statements,\nHarmony targets, reflection seams"]
-    LocalRefs["Local game references\nMono Assembly-CSharp\nIL2CPP wrapper assemblies"]
-    SdkGen["s1interop sdkgen\nusage-driven or full-sdk"]
-    Declarations["S1Interop.Generated/\nS1Interop.BackendNeutral.cs\nS1InteropType, Namespace,\nMember, Patch attributes"]
-    Generator["S1Interop.Generators\nRoslyn source generator\nand analyzer"]
-    GeneratedSource["Generated source\nS1InteropRuntime\nType registry\nMember registry\nFacades and Handles\nPatch target registration\nRuntime helpers"]
-    Build["dotnet build /\nIDE design-time build"]
+    ModSource["Mod source<br/>ScheduleOne refs, using statements,<br/>Harmony targets, reflection seams"]
+    LocalRefs["Local game references<br/>Mono Assembly-CSharp<br/>IL2CPP wrapper assemblies"]
+    SdkGen["s1interop sdkgen<br/>usage-driven or full-sdk"]
+    Declarations["S1Interop.Generated/<br/>S1Interop.BackendNeutral.cs<br/>S1InteropType, Namespace,<br/>Member, Patch attributes"]
+    Generator["S1Interop.Generators<br/>Roslyn source generator<br/>and analyzer"]
+    GeneratedSource["Generated source<br/>S1InteropRuntime<br/>Type registry<br/>Member registry<br/>Facades and Handles<br/>Patch target registration<br/>Runtime helpers"]
+    Build["dotnet build /<br/>IDE design-time build"]
     ModDll["Mod assembly"]
 
     ModSource --> SdkGen
@@ -39,14 +39,14 @@ That split is why S1Interop can be adopted in pieces. A mod can use only diagnos
 
 ```mermaid
 flowchart TD
-    ModDll["One mod DLL\nbuilt against the backend-neutral surface"]
+    ModDll["One mod DLL<br/>built against the backend-neutral surface"]
     MelonLoader["MelonLoader loads the mod"]
-    RuntimeProbe["S1InteropRuntime detects backend\ncompile-time constant when pinned\nruntime probe when unknown"]
-    FacadeCall["Mod calls\nS1Interop.ScheduleOne.* facade\nor generated helper"]
-    Registry["Generated registry\nresolves type/member names\nand caches reflection"]
-    MonoGame["Mono game runtime\nScheduleOne.*"]
-    Il2CppGame["IL2CPP game runtime\nIl2CppScheduleOne.*\nIl2CppInterop proxies"]
-    Result["Typed Handle / value /\npatch target / helper result"]
+    RuntimeProbe["S1InteropRuntime detects backend<br/>compile-time constant when pinned<br/>runtime probe when unknown"]
+    FacadeCall["Mod calls<br/>S1Interop.ScheduleOne.* facade<br/>or generated helper"]
+    Registry["Generated registry<br/>resolves type/member names<br/>and caches reflection"]
+    MonoGame["Mono game runtime<br/>ScheduleOne.*"]
+    Il2CppGame["IL2CPP game runtime<br/>Il2CppScheduleOne.*<br/>Il2CppInterop proxies"]
+    Result["Typed Handle / value /<br/>patch target / helper result"]
 
     ModDll --> MelonLoader
     MelonLoader --> RuntimeProbe

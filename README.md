@@ -26,7 +26,7 @@ flowchart LR
     Refs["Local Mono and IL2CPP references"] --> SdkGen
     SdkGen --> Declarations["S1Interop declarations"]
     Declarations --> Generator["S1Interop.Generators"]
-    Generator --> Generated["Runtime registry, facades,\nhandles, diagnostics, helpers"]
+    Generator --> Generated["Runtime registry, facades,<br/>handles, diagnostics, helpers"]
     Generated --> Build["Build"]
     Source --> Build
     Build --> Dll["One mod DLL"]
