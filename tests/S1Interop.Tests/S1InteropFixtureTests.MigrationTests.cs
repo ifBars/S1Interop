@@ -1507,9 +1507,9 @@ internal sealed partial class S1InteropFixtureTests
                 "Fresh backend-neutral scaffold should use real copied S1FuelMod aliases as assembly-level runtime-resolved declarations.");
             Assert(
                 starterSource.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"vehicleName\", Alias = \"S1FuelVehicleName\")]", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(vehicle)", StringComparison.Ordinal) &&
-                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.Get(vehicle, \"vehicleName\")", StringComparison.Ordinal),
-                "Fresh backend-neutral scaffold should compile declared and dynamic generated type-scoped facade helpers from real copied S1FuelMod reflection usage.");
+                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.As(vehicle).VehicleName", StringComparison.Ordinal) &&
+                starterSource.Contains("S1Interop.ScheduleOne.Vehicles.LandVehicle.Get(S1Interop.ScheduleOne.Vehicles.LandVehicle.As(vehicle), \"vehicleName\")", StringComparison.Ordinal),
+                "Fresh backend-neutral scaffold should compile declared Handle members and dynamic generated type-scoped facade helpers from real copied S1FuelMod reflection usage.");
         }
         finally
         {
@@ -1569,7 +1569,7 @@ internal sealed partial class S1InteropFixtureTests
                     {
                         S1Interop.ScheduleOne.Vehicles.LandVehicle.Handle landVehicle = S1Interop.ScheduleOne.Vehicles.LandVehicle.As(vehicle);
 
-                        return $"{S1Interop.ScheduleOne.Vehicles.LandVehicle.TypeName}|{landVehicle.HasValue}|{S1Interop.ScheduleOne.Vehicles.LandVehicle.GetVehicleName(landVehicle)}";
+                        return $"{S1Interop.ScheduleOne.Vehicles.LandVehicle.TypeName}|{landVehicle.HasValue}|{landVehicle.VehicleName}";
                     }
                 }
                 """,

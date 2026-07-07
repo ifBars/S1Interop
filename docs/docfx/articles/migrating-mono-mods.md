@@ -1,11 +1,11 @@
 # Migration overview
 
-Use migration when an existing mod still carries direct game-wrapper code. S1Interop can move that project toward one of two shapes:
+Use migration when an existing mod still carries direct game-wrapper code. S1Interop can move that access toward one of two shapes:
 
 - backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
 - dual-runtime: the project builds separate Mono and IL2CPP assemblies from runtime-specific configurations.
 
-Pick the shape first. The commands and output are different enough that the docs split them into separate pages.
+Pick the shape first. The commands and output are different enough to keep separate.
 
 | Goal | Start here |
 | --- | --- |
@@ -20,9 +20,9 @@ Start with analysis:
 s1interop analyze .
 ```
 
-Analysis tells you which runtime the project currently targets, which game paths or references it can see, and which source patterns are likely to fail on IL2CPP.
+Analysis reports the current runtime target, visible game paths or references, and source patterns likely to fail on IL2CPP.
 
-For real mods, this is usually more useful than starting with a migration command. Most projects already have MelonLoader lifecycle code, Harmony patches, deployment scripts, helper libraries, and maybe S1API or MAPI references. `analyze` separates normal mod structure from the direct game calls that need interop work.
+Most mods already have MelonLoader lifecycle code, Harmony patches, deployment scripts, helper libraries, and maybe S1API or MAPI references. `analyze` separates normal mod structure from direct game calls that need interop work.
 
 ## Safety model
 
@@ -46,13 +46,13 @@ s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 
 ## Verification
 
-Use sandbox verification before touching a real mod tree when possible. This is most useful for dual-runtime migrations because `verify-migration` can apply the migration plan in a temporary copy:
+Use sandbox verification before touching a real mod tree when possible. `verify-migration` applies the migration plan in a temporary copy:
 
 ```powershell
 s1interop verify-migration . --dual-runtime --include-source-migrations
 ```
 
-Build-gated verification can also compile both runtime configurations when local game paths are available:
+When local game paths are available, build-gated verification can compile both runtime configurations:
 
 ```powershell
 s1interop verify-migration . --dual-runtime --build `
@@ -60,11 +60,11 @@ s1interop verify-migration . --dual-runtime --build `
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 
-For backend-neutral projects, the usual verification path is a normal build plus the generator diagnostics described in [Diagnostics](diagnostics.md). The generator surface itself is documented in [Generated output](generator-package.md).
+For backend-neutral projects, verify with a normal build and the generator diagnostics described in [Diagnostics](diagnostics.md). The generated surface is documented in [Generated output](generator-package.md).
 
 ## What to migrate first
 
-Do not try to move an entire mature mod in one pass. Start with the direct game-wrapper code that creates build friction:
+Do not move an entire mature mod in one pass. Start with direct game-wrapper code that creates build friction:
 
 - `using ScheduleOne.*` paired with `using Il2CppScheduleOne.*` under conditionals;
 - casts between `object`, Unity objects, and generated IL2CPP wrappers;

@@ -1,12 +1,12 @@
 # Backend-neutral Harmony patching
 
-S1Interop patch attributes are for mod code that wants to patch a Schedule One method without choosing `ScheduleOne.*` on Mono and `Il2CppScheduleOne.*` on IL2CPP in source.
+Use S1Interop patch attributes when a mod needs to patch a Schedule One method without choosing `ScheduleOne.*` on Mono and `Il2CppScheduleOne.*` on IL2CPP in source.
 
 The patch still lands on the real native method. S1Interop only owns target lookup: it reads the Mono type and method name from your attribute, maps that target to the active backend, resolves the `MethodInfo`, and applies the Harmony patch through generated code.
 
 ## Basic patch
 
-Your project still needs a Harmony reference. Normal MelonLoader mod projects already have one through `0Harmony.dll`; S1Interop only removes the backend-specific target lookup from your source.
+Your project still needs Harmony. Normal MelonLoader mod projects already have it through `0Harmony.dll`; S1Interop only removes backend-specific target lookup from your source.
 
 Write the target as the Mono game type name. Mark the handler methods with S1Interop's patch-role attributes.
 
@@ -43,9 +43,9 @@ The `string&` entry is the by-ref marker for `ref string` or `out string`. For o
 
 Do not call `PatchAll` for S1Interop patch attributes.
 
-When a project contains `[S1InteropPatch]`, the generator emits an internal `S1Interop.Generated.S1InteropHarmonyPatcher` and a module initializer. That generated initializer applies S1Interop patches once when the mod assembly loads. It also has an internal guard so an accidental second internal apply call does not patch the same handlers twice.
+When a project contains `[S1InteropPatch]`, the generator emits an internal patch registrar and a module initializer. That initializer applies S1Interop patches once when the mod assembly loads.
 
-This avoids a common MelonLoader/Harmony mistake: writing patch attributes, then also calling `PatchAll` during startup and running every patch twice. With S1Interop, your API is the attributes. The generated registrar is implementation detail.
+Calling `PatchAll` yourself can double-apply handlers. With S1Interop, the API is the attributes. The registrar is implementation detail.
 
 If your mod also has ordinary `[HarmonyPatch]` or MelonLoader patch attributes, keep treating those as ordinary Harmony/MelonLoader patches. S1Interop patch attributes are only for backend-neutral Schedule One target resolution.
 
@@ -71,7 +71,7 @@ Patch handler attributes go on methods inside the patch class:
 | `S1InteropPostfix` | Postfix handler. |
 | `S1InteropFinalizer` | Finalizer handler. |
 
-S1Interop does not expose a backend-neutral transpiler attribute. Transpilers are too easy to tie to Mono-only IL assumptions. Keep them runtime-specific until S1Interop has a safer abstraction.
+S1Interop does not expose a backend-neutral transpiler attribute. Transpilers are tied to Mono-only IL assumptions too easily. Keep them runtime-specific until S1Interop has a safer abstraction.
 
 ## What gets generated
 
@@ -83,21 +83,21 @@ S1Interop.Generated.S1InteropMemberRegistry.MoveItemBehaviourIsDestinationValidM
 
 or the equivalent alias for your patch target, then calls Harmony with generated `HarmonyMethod` objects for the marked handlers.
 
-That means the same overload-resolution path is used by:
+The same overload-resolution path is used by:
 
 - migrated cached `MethodInfo` bindings;
 - explicit `S1InteropMember` method declarations;
 - backend-neutral S1Interop patch attributes.
 
-There is no second patch-only resolver to keep in sync.
+There is no second patch-only resolver.
 
 ## When to use this
 
-Use S1Interop patch attributes when the patch target itself is the portability problem:
+Use S1Interop patch attributes when the patch target is the portability problem:
 
 - a direct patch mod has separate Mono and IL2CPP `typeof(...)` targets;
 - an S1API mod uses S1API for content but still patches a vanilla Schedule One method directly;
 - a hybrid mod has cached `AccessTools.Method(...)` calls next to normal gameplay code;
 - a method overload is stable, but its declaring type lives under different Mono and IL2CPP wrapper namespaces.
 
-Keep using S1API for the gameplay workflow it owns. This feature is for the lower-level patch target seam that S1API does not need to abstract.
+Keep using S1API for the gameplay workflow it owns. This feature is for patch targets S1API does not need to abstract.

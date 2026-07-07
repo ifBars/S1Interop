@@ -277,8 +277,8 @@ internal sealed partial class S1InteropFixtureTests
             {
                 string parameterName = member.OwnerAlias.Equals("LandVehicle", StringComparison.Ordinal) ? "vehicle" : "instance";
                 string facadeName = GetTypeFacadeName(member);
-                builder.AppendLine($"        public static object? Read{member.Alias}(object {parameterName}) => {facadeName}.Get{ToPascalIdentifier(member.MemberName)}({parameterName});");
-                builder.AppendLine($"        public static object? Read{member.Alias}Dynamically(object {parameterName}) => {facadeName}.Get({parameterName}, \"{EscapeCSharpString(member.MemberName)}\");");
+                builder.AppendLine($"        public static object? Read{member.Alias}(object {parameterName}) => {facadeName}.As({parameterName}).{ToPascalIdentifier(member.MemberName)};");
+                builder.AppendLine($"        public static object? Read{member.Alias}Dynamically(object {parameterName}) => {facadeName}.Get({facadeName}.As({parameterName}), \"{EscapeCSharpString(member.MemberName)}\");");
             }
         }
 
@@ -308,11 +308,7 @@ internal sealed partial class S1InteropFixtureTests
 
         string typeName = parts[^1];
         IEnumerable<string> namespaceParts = parts.Take(parts.Length - 1);
-        if (parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
-        {
-            namespaceParts = namespaceParts.Skip(1);
-        }
-        else
+        if (!parts[0].Equals("ScheduleOne", StringComparison.Ordinal))
         {
             namespaceParts = new[] { "Types" }.Concat(namespaceParts);
         }

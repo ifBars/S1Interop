@@ -1,10 +1,12 @@
 # S1API and S1Interop
 
-Keep S1API when it owns the modding workflow. Use S1Interop for direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access that you do not want to hand-maintain across Mono and IL2CPP. That access can live in a patch mod, an S1API content mod, or a hybrid project with both.
+Use S1API for gameplay workflows it already owns. Use S1Interop for direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access that you do not want to hand-maintain across Mono and IL2CPP.
+
+That direct access can live in a patch mod, an S1API content mod, or a hybrid project with both.
 
 ## What S1API owns in your mod
 
-S1API is a curated gameplay API. Use it when it already models the thing you are building.
+S1API is a curated gameplay API. Keep using it when it already models what your mod is doing.
 
 Use S1API for:
 
@@ -15,7 +17,7 @@ Use S1API for:
 - lifecycle events such as `GameLifecycle.OnPreLoad`, `OnLoadComplete`, `OnSaveStart`, and `OnSaveComplete`;
 - packaged player installs where `S1APILoader` chooses the matching Mono or IL2CPP framework build at startup.
 
-S1API owns gameplay decisions: registration timing, save/load semantics, content builders, loader packaging, and IL2CPP delegate quirks.
+S1API owns registration timing, save/load semantics, content builders, loader packaging, and IL2CPP delegate quirks.
 
 ## What S1Interop owns in a mod
 
@@ -26,7 +28,7 @@ Use S1Interop for:
 - generated facades for direct `ScheduleOne.*` and `Il2CppScheduleOne.*` types;
 - reducing duplicated `#if MONO` / `#if IL2CPP` code in direct patch mods, S1API-specific mods, and mixed projects;
 - backend-neutral Harmony patch targets for mods that patch vanilla Schedule One methods directly;
-- moving an existing Mono mod toward IL2CPP, dual-runtime, or backend-neutral builds;
+- moving an existing Mono mod toward IL2CPP support, dual-runtime builds, or backend-neutral builds;
 - generating typed fields, properties, enum mirrors, constructors, and simple methods from local metadata when safe;
 - diagnostics for missing declarations, bad member bindings, and IL2CPP boundary issues;
 - migration, rollback manifests, local path setup, and sandbox verification;
@@ -40,20 +42,20 @@ S1API makes domain decisions: NPC builder behavior, saveable load order, item ID
 
 S1Interop covers repetitive backend glue: runtime type names, member bindings, direct casts, cached reflection, and Harmony targets that differ between Mono and IL2CPP.
 
-| Question | Prefer S1API | Prefer S1Interop |
+| Situation | Use S1API for | Use S1Interop for |
 | --- | --- | --- |
-| "I want to add an item, NPC, quest, phone app, save data, or content workflow." | Yes. Use the module that owns the workflow. | Only for direct game access the module does not expose. |
-| "My mod already has Mono and IL2CPP configurations." | Only for the gameplay workflows S1API owns. | Yes, when shared direct game access can move behind generated facades while both configurations remain validation targets. |
-| "My mod requires S1API, but I also patch a vanilla method and read a few game properties." | Keep S1API for the content workflow. | Yes, especially when that patch currently branches between `ScheduleOne.*` and `Il2CppScheduleOne.*`. |
-| "My mod copied a helper that caches `FieldInfo`, `PropertyInfo`, or Harmony `AccessTools` bindings." | S1API owns the higher-level workflow when one exists. | Yes, when the binding points at a Schedule One game type and can be generated from local metadata. |
-| "I want one player-facing dependency with content helpers and loader behavior." | Yes. S1API has runtime packages and `S1APILoader`. | No. The generator package is a build-time tool, not a gameplay framework. |
-| "I want a backend-neutral direct game SDK for types S1API does not wrap." | No, unless S1API adds that domain. | Yes. Declare the type and let the generator emit facades where metadata is safe. |
+| Adding an item, NPC, quest, phone app, save data, or content workflow | The module that owns the workflow. | Direct game access the module does not expose. |
+| Existing Mono and IL2CPP configurations | Gameplay workflows S1API owns. | Shared direct game access that can move behind generated facades while both configurations stay as validation targets. |
+| S1API mod with a vanilla Harmony patch | Content registration and lifecycle. | Backend-neutral patch targets and nearby game member reads. |
+| Copied reflection helper or cached `AccessTools` binding | Higher-level workflow, when one exists. | Generated bindings for Schedule One types and members. |
+| One player-facing dependency with content helpers and loader behavior | Runtime packages and `S1APILoader`. | Not this use case. The generator package is a build-time tool, not a gameplay framework. |
+| Backend-neutral direct game SDK for types S1API does not wrap | Not this use case unless S1API adds that domain. | Type declarations and generated facades from local metadata. |
 
 ## How to choose
 
-If S1API supports the content workflow, start there. If your mod later needs a direct Schedule One type that S1API does not expose, use S1Interop for that gap instead of adding hand-written Mono/IL2CPP branches.
+If S1API supports the content workflow, keep that code in S1API. If the same mod needs a direct Schedule One type that S1API does not expose, use S1Interop for that gap instead of adding hand-written Mono/IL2CPP branches.
 
-If you already have a mod, start with `s1interop analyze .`. Keep your MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game access point, not the whole project.
+For an existing mod, start with `s1interop analyze .`. Keep your MelonLoader entry point, Harmony patches, logging, config, deployment scripts, and any S1API/MAPI/SteamNetworkLib dependencies. The first useful migration is usually one direct game access point, not the whole project.
 
 For native Mono/IL2CPP mods, start with code that reads or invokes the same game member on both backends. For S1API-specific mods, start outside the S1API workflow: a Harmony target lookup, cached `FieldInfo`, local `ReflectionUtils.TryGetFieldOrProperty(...)`, or direct game-wrapper cast. For hybrid mods, move in small pieces and keep both runtime builds as proof.
 
