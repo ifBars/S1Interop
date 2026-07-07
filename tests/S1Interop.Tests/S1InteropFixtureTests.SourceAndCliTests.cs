@@ -355,9 +355,9 @@ internal sealed partial class S1InteropFixtureTests
                 Path.Combine(tempRoot, "MoveItemPatch.cs"),
                 """
                 using HarmonyLib;
-                using ScheduleOne.ItemFramework;
-                using ScheduleOne.Management;
                 using ScheduleOne.NPCs.Behaviour;
+                using S1Items = ScheduleOne.ItemFramework;
+                using S1Management = ScheduleOne.Management;
                 using S1Vehicles = ScheduleOne.Vehicles;
 
                 namespace HarmonyBindingMod;
@@ -370,8 +370,8 @@ internal sealed partial class S1InteropFixtureTests
                             typeof(MoveItemBehaviour),
                             nameof(MoveItemBehaviour.IsDestinationValid),
                             [
-                                typeof(TransitRoute),
-                                typeof(ItemInstance),
+                                typeof(S1Management.TransitRoute),
+                                typeof(S1Items.ItemInstance),
                                 typeof(string).MakeByRefType()
                             ]
                         );
@@ -1202,9 +1202,9 @@ internal sealed partial class S1InteropFixtureTests
                 tempSource,
                 """
                 using HarmonyLib;
-                using ScheduleOne.ItemFramework;
-                using ScheduleOne.Management;
                 using ScheduleOne.NPCs.Behaviour;
+                using S1Items = ScheduleOne.ItemFramework;
+                using S1Management = ScheduleOne.Management;
                 using S1Vehicles = ScheduleOne.Vehicles;
 
                 namespace HarmonyBindingMod;
@@ -1217,8 +1217,8 @@ internal sealed partial class S1InteropFixtureTests
                             typeof(MoveItemBehaviour),
                             nameof(MoveItemBehaviour.IsDestinationValid),
                             [
-                                typeof(TransitRoute),
-                                typeof(ItemInstance),
+                                typeof(S1Management.TransitRoute),
+                                typeof(S1Items.ItemInstance),
                                 typeof(string).MakeByRefType()
                             ]
                         );
@@ -1255,6 +1255,8 @@ internal sealed partial class S1InteropFixtureTests
             string generated = File.ReadAllText(targetSource);
             Assert(
                 generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.NPCs.Behaviour.MoveItemBehaviour\", Alias = \"MoveItemBehaviour\")]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.ItemFramework.ItemInstance\", Alias = \"ItemInstance\")]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Management.TransitRoute\", Alias = \"TransitRoute\")]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Vehicles.LandVehicle\", Alias = \"LandVehicle\")]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\" })]", StringComparison.Ordinal) &&
                 generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"MarkLoadedFromSave\", Alias = \"MarkLoadedFromSave\", Kind = S1Interop.S1InteropMemberKind.Method)]", StringComparison.Ordinal) &&

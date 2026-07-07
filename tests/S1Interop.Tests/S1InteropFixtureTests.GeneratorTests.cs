@@ -75,6 +75,40 @@ internal sealed partial class S1InteropFixtureTests
             "Alias and static ScheduleOne usings should remain source-level guarded because global namespace imports cannot replace them safely.");
     }
 
+    private void HarmonyMethodTargetGeneratorQualifiesParameterTypesAndSkipsClrArrayDeclarations()
+    {
+        var target = new HarmonyMethodTarget(
+            "MoveItemPatch.cs",
+            10,
+            18,
+            "method",
+            "MoveItemBehaviour",
+            "ScheduleOne.NPCs.Behaviour.MoveItemBehaviour",
+            "IsDestinationValid",
+            "IsDestinationValid",
+            [
+                "ScheduleOne.Management.TransitRoute",
+                "ScheduleOne.ItemFramework.ItemInstance",
+                "string&",
+                "byte[]",
+                "System.Guid&",
+                "string[]"
+            ]);
+
+        string generated = new HarmonyMethodTargetGenerator().GenerateSource([target]);
+
+        Assert(
+            generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.ItemFramework.ItemInstance\", Alias = \"ItemInstance\")]", StringComparison.Ordinal) &&
+            generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Management.TransitRoute\", Alias = \"TransitRoute\")]", StringComparison.Ordinal) &&
+            generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\", \"byte[]\", \"System.Guid&\", \"string[]\" })]", StringComparison.Ordinal),
+            $"Harmony method target generation should declare resolved Schedule One parameter types while keeping declared overload parameters concise. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            !generated.Contains("S1InteropType(\"byte[]\"", StringComparison.Ordinal) &&
+            !generated.Contains("S1InteropType(\"string[]\"", StringComparison.Ordinal) &&
+            !generated.Contains("S1InteropType(\"System.Guid\"", StringComparison.Ordinal),
+            $"CLR parameter types should stay as ParameterTypeNames literals, not generated S1InteropType declarations. Generated source:{Environment.NewLine}{generated}");
+    }
+
     private void S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache()
     {
         const string source =

@@ -56,7 +56,7 @@ Choose the workflow first:
 | You are... | First command after install |
 | --- | --- |
 | New to Schedule One modding | `s1interop new .\MyFirstMod --apply` |
-| Bringing an existing Mono mod | `s1interop analyze .` |
+| Bringing an existing Mono, dual-config, S1API, or hybrid mod | `s1interop analyze .` |
 | Exploring local game API coverage | `s1interop sdkgen . --full-sdk --apply` |
 | Unsure whether migration is safe | `s1interop verify-migration . --dual-runtime --include-source-migrations` |
 

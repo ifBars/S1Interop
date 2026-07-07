@@ -135,6 +135,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
         count++;
+        HarmonyMethodTargetGeneratorQualifiesParameterTypesAndSkipsClrArrayDeclarations();
+        count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;
         S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers();
@@ -322,6 +324,8 @@ internal sealed partial class S1InteropFixtureTests
         ScheduleOneUsingRewriterGroupsAdjacentUsings();
         count++;
         ScheduleOneUsingRewriterCanPreferGlobalFacade();
+        count++;
+        HarmonyMethodTargetGeneratorQualifiesParameterTypesAndSkipsClrArrayDeclarations();
         count++;
         S1InteropTypeRegistryGeneratorProducesBackendSpecificReflectionCache();
         count++;

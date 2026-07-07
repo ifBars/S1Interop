@@ -259,7 +259,7 @@ public sealed class HarmonyMethodTargetCatalog
             return sourceType;
         }
 
-        return GetSimpleTypeName(ResolveRuntimeTypeName(sourceType, scheduleOneUsings));
+        return ResolveRuntimeTypeName(sourceType, scheduleOneUsings);
     }
 
     private static string ResolveRuntimeTypeName(

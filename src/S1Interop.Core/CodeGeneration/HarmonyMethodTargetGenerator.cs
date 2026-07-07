@@ -28,12 +28,12 @@ public sealed class HarmonyMethodTargetGenerator
 
         foreach (string parameterTypeName in targets
                      .SelectMany(target => target.ParameterTypeNames)
-                     .Select(parameter => parameter.EndsWith("&", StringComparison.Ordinal) ? parameter[..^1] : parameter)
-                     .Where(parameter => !IsPrimitiveTypeName(parameter))
+                     .Select(GetParameterRuntimeTypeName)
+                     .Where(parameter => !IsFrameworkParameterTypeName(parameter))
                      .Distinct(StringComparer.Ordinal)
                      .OrderBy(parameter => parameter, StringComparer.Ordinal))
         {
-            builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{Escape(parameterTypeName)}\", Alias = \"{Escape(parameterTypeName)}\")]");
+            builder.AppendLine($"[assembly: S1Interop.S1InteropType(\"{Escape(parameterTypeName)}\", Alias = \"{Escape(GetParameterAlias(parameterTypeName))}\")]");
         }
 
         foreach (HarmonyMethodTarget target in targets.OrderBy(target => target.MethodAlias, StringComparer.Ordinal))
@@ -46,7 +46,7 @@ public sealed class HarmonyMethodTargetGenerator
             if (target.ParameterTypeNames.Count > 0)
             {
                 builder.Append(", ParameterTypeNames = new[] { ");
-                builder.Append(string.Join(", ", target.ParameterTypeNames.Select(parameter => $"\"{Escape(parameter)}\"")));
+                builder.Append(string.Join(", ", target.ParameterTypeNames.Select(parameter => $"\"{Escape(GetDeclaredParameterTypeName(parameter))}\"")));
                 builder.Append(" }");
             }
 
@@ -65,6 +65,36 @@ public sealed class HarmonyMethodTargetGenerator
 
     private static bool IsPrimitiveTypeName(string parameter) =>
         parameter is "bool" or "byte" or "char" or "double" or "float" or "int" or "long" or "object" or "short" or "string" or "uint" or "ulong" or "void";
+
+    private static bool IsWellKnownClrTypeName(string parameter) =>
+        parameter.StartsWith("System.", StringComparison.Ordinal);
+
+    private static string GetParameterRuntimeTypeName(string parameter) =>
+        parameter.EndsWith("&", StringComparison.Ordinal) ? parameter[..^1] : parameter;
+
+    private static string GetDeclaredParameterTypeName(string parameter)
+    {
+        bool byRef = parameter.EndsWith("&", StringComparison.Ordinal);
+        string runtimeTypeName = byRef ? parameter[..^1] : parameter;
+        string declaredTypeName = IsFrameworkParameterTypeName(runtimeTypeName)
+            ? runtimeTypeName
+            : GetParameterAlias(runtimeTypeName);
+        return byRef ? declaredTypeName + "&" : declaredTypeName;
+    }
+
+    private static bool IsFrameworkParameterTypeName(string parameter)
+    {
+        string runtimeTypeName = GetParameterRuntimeTypeName(parameter);
+        while (runtimeTypeName.EndsWith("[]", StringComparison.Ordinal))
+        {
+            runtimeTypeName = runtimeTypeName[..^2];
+        }
+
+        return IsPrimitiveTypeName(runtimeTypeName) || IsWellKnownClrTypeName(runtimeTypeName);
+    }
+
+    private static string GetParameterAlias(string parameter) =>
+        parameter[(parameter.LastIndexOf('.') + 1)..];
 
     private static string Escape(string value) =>
         value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
