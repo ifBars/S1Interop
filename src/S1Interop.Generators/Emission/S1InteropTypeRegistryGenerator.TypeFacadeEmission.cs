@@ -274,13 +274,13 @@ public sealed partial class S1InteropTypeRegistryGenerator
 
         FacadeMemberType memberType = GetFacadeMemberType(member.ValueTypeName, facadeHandleTypes, facadeEnumTypes);
         builder.AppendLine();
-        builder.AppendLine($"            public {GetFacadeReturnTypeName(memberType)} {memberName} => {GenerateFacadeGetExpression(member, "value.Instance", memberType)};");
-        builder.AppendLine($"            public T? Get{memberName}<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(value.Instance);");
-        builder.AppendLine($"            public T? Get{memberName}Value<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(value.Instance);");
+        builder.AppendLine($"            public {GetFacadeReturnTypeName(memberType)} {memberName} => {GenerateFacadeGetExpression(member, "this.value.Instance", memberType)};");
+        builder.AppendLine($"            public T? Get{memberName}<T>() where T : class => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}<T>(this.value.Instance);");
+        builder.AppendLine($"            public T? Get{memberName}Value<T>() where T : struct => S1Interop.Generated.S1InteropMemberRegistry.Get{member.Alias}Value<T>(this.value.Instance);");
         if (member.CanWrite)
         {
             GenerateTypedTrySetHandleMember(builder, member, memberName, memberType);
-            builder.AppendLine($"            public bool TrySet{memberName}(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(value.Instance, memberValue);");
+            builder.AppendLine($"            public bool TrySet{memberName}(object? memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(this.value.Instance, memberValue);");
         }
     }
 
@@ -351,7 +351,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             return;
         }
 
-        builder.AppendLine($"            public bool TrySet{memberName}({GetFacadeParameterTypeName(memberType)} memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(value.Instance, {GetFacadeArgumentExpression("memberValue", memberType)});");
+        builder.AppendLine($"            public bool TrySet{memberName}({GetFacadeParameterTypeName(memberType)} memberValue) => S1Interop.Generated.S1InteropMemberRegistry.TrySet{member.Alias}(this.value.Instance, {GetFacadeArgumentExpression("memberValue", memberType)});");
     }
 
     private static void GenerateTypedTrySetStaticFacadeMember(
@@ -431,7 +431,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         }
 
         builder.AppendLine();
-        builder.AppendLine($"            public {GetFacadeReturnTypeName(returnType)} {memberName}({parameters}){GenerateTypedMethodInvocation(member, "value.Instance", returnType, facadeHandleTypes, facadeEnumTypes)}");
+        builder.AppendLine($"            public {GetFacadeReturnTypeName(returnType)} {memberName}({parameters}){GenerateTypedMethodInvocation(member, "this.value.Instance", returnType, facadeHandleTypes, facadeEnumTypes)}");
     }
 
     private static bool CanGenerateTypedMethodFacadeMember(
@@ -610,6 +610,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
             return default;
         }
 
+        if (TryGetScalarFacadeTypeName(normalized, out string? scalarTypeName))
+        {
+            return FacadeMemberType.Scalar(scalarTypeName!);
+        }
+
         if (facadeHandleTypes.TryGetValue(NormalizeBackendNeutralTypeName(normalized), out FacadeHandleType handleType))
         {
             return FacadeMemberType.Handle(handleType);
@@ -620,9 +625,13 @@ public sealed partial class S1InteropTypeRegistryGenerator
             return FacadeMemberType.Enum(enumTypeName);
         }
 
-        return normalized is "bool" or "byte" or "char" or "decimal" or "double" or "float" or "int" or "long" or "object" or "sbyte" or "short" or "string" or "uint" or "ulong" or "ushort"
-            ? FacadeMemberType.Scalar(normalized)
-            : default;
+        return default;
+    }
+
+    private static bool TryGetScalarFacadeTypeName(string typeName, out string? scalarTypeName)
+    {
+        scalarTypeName = NormalizeComparableTypeName(typeName);
+        return scalarTypeName is "bool" or "byte" or "char" or "decimal" or "double" or "float" or "int" or "long" or "object" or "sbyte" or "short" or "string" or "uint" or "ulong" or "ushort";
     }
 
     private static string? StripNullableAnnotation(string? typeName)
