@@ -2,7 +2,7 @@
 
 S1Interop patch attributes are for mod code that wants to patch a Schedule One method without choosing `ScheduleOne.*` on Mono and `Il2CppScheduleOne.*` on IL2CPP in source.
 
-The patch still lands on the real native method. S1Interop only owns the target lookup: it reads the Mono type and method name from your attribute, maps that target to the active backend, resolves the `MethodInfo`, and applies the Harmony patch through generated code.
+The patch still lands on the real native method. S1Interop only owns target lookup: it reads the Mono type and method name from your attribute, maps that target to the active backend, resolves the `MethodInfo`, and applies the Harmony patch through generated code.
 
 ## Basic patch
 
@@ -45,7 +45,7 @@ Do not call `PatchAll` for S1Interop patch attributes.
 
 When a project contains `[S1InteropPatch]`, the generator emits an internal `S1Interop.Generated.S1InteropHarmonyPatcher` and a module initializer. That generated initializer applies S1Interop patches once when the mod assembly loads. It also has an internal guard so an accidental second internal apply call does not patch the same handlers twice.
 
-This avoids a common MelonLoader/Harmony mistake: writing patch attributes, then also calling `PatchAll` during startup and ending up with every patch running twice. With S1Interop, your API is the attributes. The generated registrar is implementation detail.
+This avoids a common MelonLoader/Harmony mistake: writing patch attributes, then also calling `PatchAll` during startup and running every patch twice. With S1Interop, your API is the attributes. The generated registrar is implementation detail.
 
 If your mod also has ordinary `[HarmonyPatch]` or MelonLoader patch attributes, keep treating those as ordinary Harmony/MelonLoader patches. S1Interop patch attributes are only for backend-neutral Schedule One target resolution.
 
@@ -71,7 +71,7 @@ Patch handler attributes go on methods inside the patch class:
 | `S1InteropPostfix` | Postfix handler. |
 | `S1InteropFinalizer` | Finalizer handler. |
 
-S1Interop does not expose a backend-neutral transpiler attribute. Harmony transpilers are powerful, but they are also one of the easiest places to accidentally write Mono-only IL assumptions into an IL2CPP mod. Keep transpilers as explicit runtime-specific work until the project has a safer abstraction for them.
+S1Interop does not expose a backend-neutral transpiler attribute. Transpilers are too easy to tie to Mono-only IL assumptions. Keep them runtime-specific until S1Interop has a safer abstraction.
 
 ## What gets generated
 

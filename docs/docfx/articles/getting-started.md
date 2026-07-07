@@ -1,6 +1,6 @@
 # Getting started
 
-S1Interop is currently distributed as local alpha packages that you build and pack from source. By the end of this guide you will have the `s1interop` CLI tool installed and ready to analyze an existing mod project or scaffold a new backend-neutral one. The whole process takes about five minutes if you already have the .NET SDK installed.
+S1Interop is currently distributed as local alpha packages that you build and pack from source. This guide installs the `s1interop` CLI so you can analyze an existing mod or scaffold a backend-neutral one.
 
 You need the .NET SDK (8.0 or later) installed before running these commands.
 
@@ -37,7 +37,7 @@ Confirm that the tool installed correctly and check its version.
 .\.tools\s1interop --help
 ```
 
-You should see the version string `0.1.0-alpha.1` and the full command list. If the tool is not found, double-check that the `--tool-path` matches the directory you used in the previous step.
+The command should print `0.1.0-alpha.1` and the command list. If the tool is not found, check that `--tool-path` matches the directory from the install command.
 
 ## 4. Run your first command
 

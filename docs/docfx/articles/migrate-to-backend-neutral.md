@@ -1,6 +1,6 @@
 # Migrate to backend-neutral
 
-Use this path when an existing Mono mod should move toward one assembly that can run on Mono or IL2CPP.
+Use this path when an existing Mono mod should move toward one assembly that runs on Mono or IL2CPP.
 
 Backend-neutral source moves away from direct `ScheduleOne.*` or `Il2CppScheduleOne.*` calls and uses generated facades under `S1Interop.ScheduleOne.*`. Mono and IL2CPP configurations remain useful as validation targets.
 
@@ -80,7 +80,7 @@ if (vehicle.HasValue)
 }
 ```
 
-Keep mod code close to normal game API usage while generated code handles backend differences.
+Keep mod code close to normal game API usage. Generated code handles the backend differences.
 
 For a mod that already uses S1API, keep the S1API calls where they are. For a mod that already has real Mono/IL2CPP configurations, keep those builds as validation targets. Move the direct Schedule One access that can be shared safely: Harmony targets, direct game-wrapper casts, cached member metadata, and small field/property reads around patches.
 
@@ -96,6 +96,6 @@ If both Mono and IL2CPP references are configured, generator diagnostics can cat
 
 ## Current limits
 
-Backend-neutral migration is still alpha. Advanced mods may still need explicit declarations or small source edits. Unsupported cases should show up as diagnostics or source-risk reports rather than silent guesses.
+Backend-neutral migration is still alpha. Advanced mods may need explicit declarations or small source edits. Unsupported cases should show up as diagnostics or source-risk reports, not silent guesses.
 
-Ordinary public members are generated when Mono and IL2CPP metadata make them safe. Overloads, constructors, collection conversions, `Il2CppSystem.Guid`, Unity object/proxy casts, and arbitrary reflection flows may still need explicit `S1InteropMember` declarations, generated reports, or runtime-specific code.
+Ordinary public members are generated when Mono and IL2CPP metadata make them safe. Overloads, constructors, collection conversions, `Il2CppSystem.Guid`, Unity object/proxy casts, and arbitrary reflection flows may still need explicit `S1InteropMember` declarations, source-risk reports, or runtime-specific code.

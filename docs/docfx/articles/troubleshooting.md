@@ -21,7 +21,7 @@ After adding the reference, run a full build so the generator emits the declarat
 
 **Cause:** No design-time build has run since you added or changed a declaration. The Roslyn generator emits symbols during compilation, not at restore time. If you edit `S1Interop.BackendNeutral.cs` and immediately try to use the new facade in another file, the IDE may not yet know about it.
 
-**Fix:** Build the project once — either via your IDE's build command or `dotnet build`. After the build (or after the IDE runs its own design-time build), the new symbols appear in IntelliSense and are compiled into the assembly.
+**Fix:** Build the project once, either via your IDE or `dotnet build`. After the build (or after the IDE runs its own design-time build), the new symbols appear in IntelliSense and are compiled into the assembly.
 
 > [!NOTE]
 > Generated symbols are emitted into the same compilation as the rest of your project. They are not a separate assembly and are not referenced from a runtime package. The `S1Interop.Generators` package ships only the generator DLL under `analyzers/dotnet/cs`.
@@ -77,7 +77,7 @@ Generated and migrated projects already bridge that property into `RestoreAdditi
 
 ## Migration applied but something went wrong
 
-**Cause:** A migration wrote unexpected changes — source rewrites, project edits, or solution updates that need to be undone.
+**Cause:** A migration wrote unexpected changes: source rewrites, project edits, or solution updates that need to be undone.
 
 **Fix:** Every applied migration writes a rollback manifest and file backups under `s1interop-runs/<run-id>/`. Run the rollback command to restore all backed-up files:
 
@@ -118,10 +118,10 @@ The `--mono-game-path` and `--il2cpp-game-path` flags override `local.build.prop
 **Fix:** Replace the plain cast with `S1InteropObjectCast.As<T>(value)`:
 
 ```csharp
-// Before — triggers S1I007 on IL2CPP builds
+// Before - triggers S1I007 on IL2CPP builds
 var obj = (MyUnityType)rawObject;
 
-// After — routes through TryCast<T> on IL2CPP, safe on both runtimes
+// After - routes through TryCast<T> on IL2CPP, safe on both runtimes
 var obj = S1InteropObjectCast.As<MyUnityType>(rawObject);
 ```
 

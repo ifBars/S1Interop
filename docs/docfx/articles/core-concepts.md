@@ -1,12 +1,12 @@
 # Core concepts
 
-Start here for the terms used throughout the S1Interop docs. Read it once before the workflow pages so the vocabulary is settled.
+Start here for the terms used throughout the S1Interop docs.
 
 For the high-level "what is S1Interop" pitch, see [Introduction](introduction.md). For the full generated-symbol reference, see [Generated output](generator-package.md).
 
 ## Runtimes and backends
 
-Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you would need to maintain two separate mod assemblies — one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`. S1Interop lets you target both from a single codebase by abstracting the difference behind generated facades.
+Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you usually maintain separate mod assemblies: one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`. S1Interop moves that split behind generated facades.
 
 ### Mono vs IL2CPP at a glance
 
@@ -20,15 +20,15 @@ Schedule One ships both a Mono build and an IL2CPP build, and players may run ei
 | **Object casts** | Standard `as` / `is` | Must route through `TryCast<T>` on proxy |
 
 > [!NOTE]
-> S1Interop diagnostic codes `S1I004`-`S1I007` catch known IL2CPP boundary failures — Harmony transpiler misuse, managed collection callbacks, managed byte buffers at native boundaries, and plain object casts — at compile time. They only fire when the compilation targets IL2CPP.
+> S1Interop diagnostic codes `S1I004`-`S1I007` catch known IL2CPP boundary failures at compile time: Harmony transpiler misuse, managed collection callbacks, managed byte buffers at native boundaries, and plain object casts. They only fire when the compilation targets IL2CPP.
 
 ### How S1Interop resolves the backend
 
 S1Interop needs to know the active backend so it can route type resolution and member access to the right runtime surface. It resolves the backend in priority order:
 
-1. **`S1InteropTargetRuntime` MSBuild property** — set this in your project file or `local.build.props` to pin the backend at compile time (values: `Mono`, `Il2Cpp`).
-2. **Preprocessor symbols** — define `MONO` or `IL2CPP` in your `<DefineConstants>` to tell the generator explicitly.
-3. **Runtime probes** — when no compile-time signal is present, the generated `S1InteropRuntime` type probes well-known type and assembly names at startup to detect which backend is loaded.
+1. **`S1InteropTargetRuntime` MSBuild property**: set this in your project file or `local.build.props` to pin the backend at compile time (values: `Mono`, `Il2Cpp`).
+2. **Preprocessor symbols**: define `MONO` or `IL2CPP` in your `<DefineConstants>` to tell the generator explicitly.
+3. **Runtime probes**: when no compile-time signal is present, the generated `S1InteropRuntime` type probes well-known type and assembly names at startup to detect which backend is loaded.
 
 > [!TIP]
 > Pinning the backend at compile time via `S1InteropTargetRuntime` lets the generator emit `Backend` as a `const`, which in turn lets the compiler eliminate the dead branch entirely in release builds.
@@ -48,7 +48,7 @@ bool onMono   = S1InteropRuntime.IsMono;
 bool onIl2Cpp = S1InteropRuntime.IsIl2Cpp;
 ```
 
-When the build target is known at compile time — through the MSBuild property or preprocessor symbols — `Backend` is emitted as a `const` field rather than a runtime-resolved property. This means the compiler can eliminate the unused code path entirely in an optimised build.
+When the build target is known at compile time through the MSBuild property or preprocessor symbols, `Backend` is emitted as a `const` field rather than a runtime-resolved property. The compiler can eliminate the unused code path in an optimized build.
 
 ### Term reference
 
@@ -68,9 +68,9 @@ S1Interop is two NuGet packages. Keep the split clear.
 | **CLI tool** | `S1Interop` | A .NET global tool exposing the `s1interop` command. Owns project analysis, migration planning/application/rollback, SDK declaration generation, and sandbox verification. | On demand from a terminal. Never runs during compilation. |
 | **Generator package** | `S1Interop.Generators` | A Roslyn incremental source generator and analyzer. Reads declarations and emits source plus diagnostics. | During every build (and IDE design-time build) of a project that references it. |
 
-A mod project that only wants the generated SDK surface can reference just the generator package and author declarations by hand. The CLI is the recommended way to produce those declarations, but it is not a runtime dependency of the generator.
+A mod project that only wants the generated SDK surface can reference just the generator package and author declarations by hand. Use the CLI to produce those declarations; it is not a runtime dependency.
 
-S1Interop's package split is also its product boundary. The generator and CLI own interop mechanics: type registration, facade emission, source-risk diagnostics, migration, rollback, and sandbox verification. Higher-level gameplay APIs can sit above that layer and keep their own domain abstractions.
+The package split is also the boundary. S1Interop owns interop mechanics: type registration, facade emission, source-risk diagnostics, migration, rollback, and sandbox verification. Higher-level gameplay APIs can sit above that layer.
 
 ## Declarations
 
@@ -117,10 +117,10 @@ A `readonly struct` nested on each type facade. Wraps `S1InteropObject<AliasTag>
 
 The members available on a `Handle` depend on how the type was declared:
 
-- **Namespace-only** (via `S1InteropNamespace` with default `IncludeMembers = false`): the `Handle` exposes only generic members - `HasValue`, `Instance` (the raw `object?`), `Value` (the underlying `S1InteropObject<...>`), and `ToString`. You can still use `As`/`TryAs`/`Is` on the facade and call reflection-style `Get`/`TrySet`/`Invoke` on the registry, but there are no named accessors on the `Handle` itself.
+- **Namespace-only** (via `S1InteropNamespace` with default `IncludeMembers = false`): the `Handle` exposes only generic members - `HasValue`, `Instance` (the raw `object?`), `Value` (the underlying `S1InteropObject<...>`), and `ToString`. Facade `As`/`TryAs`/`Is` and registry `Get`/`TrySet`/`Invoke` remain available, but `Handle` has no named accessors.
 - **Type-declared** (via `S1InteropType`, or `S1InteropNamespace` with `IncludeMembers = true`): the `Handle` gains named accessors for compatible public fields, properties, and unambiguous public methods discovered from referenced Mono and IL2CPP metadata. Backend-neutral scalar, `string`, `object`, `void` method shapes, declared enum mirrors, and game-object values with declared facades get concrete signatures, such as `vehicle.VehicleName`, `vehicle.CurrentThrottle`, or `vehicle.AssignedDriver`; read-only discovered values get named getters without named setters; unsafe shapes stay on object/generic fallback helpers.
 
-The transition from generic-only to named accessors happens after the next build completes. There is a short delay between saving a declaration file and the IDE regenerating the source - the Roslyn generator runs as part of compilation, which is not instantaneous. See [Build timing](backend-neutral-declarations.md#build-timing) for details.
+The transition from generic-only to named accessors happens after the next build completes. See [Build timing](backend-neutral-declarations.md#build-timing).
 
 ### `S1InteropTypeRegistry`
 
@@ -159,7 +159,7 @@ ScheduleOne.Vehicles.LandVehicle -> S1Interop.ScheduleOne.Vehicles.LandVehicle
 FishNet.Runtime.*                -> S1Interop.FishNet.Runtime.*
 ```
 
-The generator does not emit shortened duplicates like `S1Interop.Vehicles.LandVehicle`. One canonical namespace is easier to learn, search, and document.
+The generator does not emit shortened duplicates like `S1Interop.Vehicles.LandVehicle`. One canonical namespace keeps code search and docs predictable.
 
 ## Migration and verification
 

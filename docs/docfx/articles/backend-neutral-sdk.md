@@ -34,8 +34,6 @@ Keep Mono and IL2CPP build configurations as validation targets when you have bo
 
 ## Type-first coverage
 
-Short version:
-
 Use `S1InteropNamespace` for broad runtime type registration:
 
 ```csharp
@@ -44,7 +42,7 @@ Use `S1InteropNamespace` for broad runtime type registration:
 
 Namespace declarations are type-only by default. They keep full-SDK builds practical without generating member facades for every type.
 
-`S1InteropType` means "generate backend-neutral coverage for this game type."
+Use `S1InteropType` when mod code needs a facade for one game type:
 
 ```csharp
 [assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle")]

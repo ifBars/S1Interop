@@ -1,6 +1,6 @@
 # FAQ
 
-Short answers for migration paths, package usage, safety, and scope.
+Common questions about migration paths, packages, safety, and scope.
 
 ## Which migration path should I choose: backend-neutral or dual-runtime?
 

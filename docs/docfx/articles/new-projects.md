@@ -1,6 +1,6 @@
 # New backend-neutral projects
 
-Use `new` when you want to start with the backend-neutral shape instead of writing a Mono-only mod first.
+Use `new` when you want to start backend-neutral instead of writing a Mono-only mod first.
 
 ```powershell
 s1interop new .\MyBackendNeutralMod --apply
@@ -12,7 +12,7 @@ The scaffold includes:
 - Mono and IL2CPP build configurations for validating the same backend-neutral source against both reference surfaces;
 - `local.build.props.example` for machine-specific game paths;
 - a starter `S1Interop.Generated/S1Interop.BackendNeutral.cs` declaration file;
-- package references needed by the generated helpers.
+- package references needed by the generated helpers;
 - a normal MelonLoader entry point with `[MelonInfo]`, `[MelonGame]`, and a `MelonMod` class.
 
 After creating the project:
@@ -24,7 +24,7 @@ After creating the project:
 5. Open the `.sln` in Visual Studio or Rider.
 6. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
 
-Those two configurations are not meant to make you maintain two source implementations. They are validation targets. Your mod code should still prefer generated `S1Interop.ScheduleOne.*` facades and shared source wherever S1Interop can express the backend difference safely.
+Those two configurations are validation targets, not two source implementations. Prefer generated `S1Interop.ScheduleOne.*` facades and shared source wherever S1Interop can express the backend difference safely.
 
 For a blank project, seed the SDK from your local game references:
 
@@ -47,6 +47,6 @@ Use S1Interop for direct game access:
 - simple public fields, properties, constructors, enum mirrors, and methods when metadata is safe;
 - explicit `S1InteropMember` declarations for private, ambiguous, or migration-specific seams.
 
-Use domain libraries for the work they already handle well. Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for Steam lobby and P2P helpers. Use S1Interop when your mod still needs direct game-wrapper access underneath those libraries.
+Use domain libraries for the work they already handle well. Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for Steam lobby and P2P helpers. Use S1Interop for direct game-wrapper access underneath those libraries.
 
 It does not commit game assemblies, wrapper dumps, decompiled source, prefabs, scenes, textures, or exported Unity projects.

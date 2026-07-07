@@ -1,6 +1,6 @@
 # Migration overview
 
-Use migration when a project already builds against Mono, already has Mono/IL2CPP configurations, or uses helper APIs while still carrying direct game-wrapper code. S1Interop can move that project toward one of two shapes:
+Use migration when an existing mod still carries direct game-wrapper code. S1Interop can move that project toward one of two shapes:
 
 - backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
 - dual-runtime: the project builds separate Mono and IL2CPP assemblies from runtime-specific configurations.
@@ -22,7 +22,7 @@ s1interop analyze .
 
 Analysis tells you which runtime the project currently targets, which game paths or references it can see, and which source patterns are likely to fail on IL2CPP.
 
-For real mods, this is usually more useful than starting with a migration command. A typical project may already have native Mono/IL2CPP configurations, a MelonLoader entry point, Harmony patches, local deployment events, helper libraries, and maybe S1API or MAPI references. `analyze` lets you separate normal mod structure from the direct game calls that actually need interop work.
+For real mods, this is usually more useful than starting with a migration command. Most projects already have MelonLoader lifecycle code, Harmony patches, deployment scripts, helper libraries, and maybe S1API or MAPI references. `analyze` separates normal mod structure from the direct game calls that need interop work.
 
 ## Safety model
 

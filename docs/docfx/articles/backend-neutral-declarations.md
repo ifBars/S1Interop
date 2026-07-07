@@ -79,7 +79,23 @@ A `S1Interop.ScheduleOne.Vehicles.LandVehicle` facade with:
 - accessors for compatible public fields/properties and typed `Handle` methods for unambiguous public methods, discovered from the referenced Mono and IL2CPP metadata;
 - the underlying registry `Tag` and resolution entries in `S1Interop.Generated.S1InteropTypeRegistry`.
 
-This is the key difference from `S1InteropNamespace` alone: `S1InteropType` opts the type into member discovery, so the `Handle` gains named accessors in addition to the generic `HasValue`/`Instance`/`Value` members. When the discovered member type is backend-neutral today, the accessor uses a concrete signature, for example `vehicle.VehicleName` as `string?`, `vehicle.CurrentThrottle` as `float?`, `vehicle.AssignedDriver` as `S1Interop.ScheduleOne.PlayerScripts.Player.Handle` when `Player` is also declared as a facade, `vehicle.StartEngine()` as `string?`, or an S1Interop-owned enum mirror when the enum type is declared and both backend value sets agree. Read-only discovered fields/properties remain readable but do not get named `TrySet...` helpers unless both available backend surfaces expose a writable member. If a method name would collide with a field/property accessor such as `GetState` for a `State` property, the property shape wins on `Handle`; the static facade method remains available. Members whose types are undeclared game wrappers, collections, by-ref values, generic methods, overloaded methods, or otherwise unsafe stay on the object/generic fallback helpers. Generated backing fields are skipped; use the real public field or property instead. If you only have an `S1InteropNamespace` declaration for `ScheduleOne`, the `Player` type's `Handle` will only have generic members - you will not see `player.Money` or similar named accessors until you add an `S1InteropType` declaration for that specific type.
+`S1InteropType` is the difference between a generic wrapper and useful mod code. It opts the type into member discovery, so `Handle` can expose named members instead of only `HasValue`, `Instance`, and `Value`.
+
+Concrete signatures are emitted when Mono and IL2CPP metadata agree. Examples:
+
+- `vehicle.VehicleName` as `string?`;
+- `vehicle.CurrentThrottle` as `float?`;
+- `vehicle.AssignedDriver` as `S1Interop.ScheduleOne.PlayerScripts.Player.Handle` when `Player` is also declared;
+- `vehicle.StartEngine()` as `string?`;
+- an S1Interop-owned enum mirror when enum values match on both backends.
+
+Rules that matter in real mods:
+
+- Read-only fields and properties get getters, but no named `TrySet...` helper.
+- If a method collides with a property shape, such as `GetState` for a `State` property, the property wins on `Handle`; the static facade method remains available.
+- Undeclared game wrappers, collections, by-ref values, generic methods, overloaded methods, and unsafe conversions stay on object/generic fallback helpers.
+- Generated backing fields are skipped. Use the real public field or property.
+- Namespace-only declarations do not create named accessors. If you only declare `S1InteropNamespace("ScheduleOne")`, `Player.Handle` will not expose `player.Money` until you add `S1InteropType("ScheduleOne.PlayerScripts.Player")`.
 
 If the referenced assemblies do not contain the requested type, the generator reports `S1I001`. Declaration diagnostics are quiet when no game reference surface is available, so package-restore and docs-only builds do not fail.
 
@@ -113,7 +129,9 @@ Explicit member binding for cases the type facade cannot safely infer.
 
 ### What this generates
 
-Named accessors with the chosen `Alias` on the owner type's facade and, when the instance member has a safe signature, on `Handle`. Explicit declarations resolve private members, better aliases, ambiguous overloads, pinned bindings, and migration-inferred reflection patterns. When the referenced Mono and IL2CPP metadata identify one compatible member, the generator enriches the declaration with return, value, parameter type, and parameter-name metadata. That means explicit field/property and method bindings can still get concrete scalar, `string`, enum, and declared-facade `Handle` signatures.
+Named accessors with the chosen `Alias` on the owner facade and, when the instance member has a safe signature, on `Handle`. Use explicit declarations for private members, better aliases, ambiguous overloads, pinned bindings, and migration-inferred reflection patterns.
+
+When Mono and IL2CPP metadata identify one compatible member, the generator enriches the declaration with return, value, parameter type, and parameter-name metadata. Explicit field/property and method bindings can still get concrete scalar, `string`, enum, and declared-facade `Handle` signatures.
 
 If metadata is missing, ambiguous, incompatible, generic, or uses a conversion S1Interop does not understand yet, the explicit binding stays on the object/generic `Get<T>`, `Get...Value<T>`, `TrySet`, and `Invoke<T>` fallback helpers.
 
@@ -167,7 +185,7 @@ Migration can add bridge declarations when source contains simple delegate patte
 - `S1InteropGenerateUnityEventBridge` emits `S1Interop.Generated.S1InteropUnityEventBridge` with `Add`/`Remove` overloads for parameterless and one-argument UnityEvents, including a per-event delegate wrapper cache so the same managed listener can be removed later.
 - `S1InteropGenerateDelegateEventBridge` emits `S1Interop.Generated.S1InteropDelegateEventBridge` with `Combine<T>`/`Remove<T>` helpers for delegate event fields.
 
-These are implementation support for migrated code, not a replacement for higher-level S1API helpers when those helpers already cover the event or UI surface.
+These support migrated code. Keep S1API event or UI helpers when they already cover the workflow.
 
 ## Where to keep declarations
 
@@ -183,12 +201,12 @@ Declarations are read by the generator during compilation. After you edit the de
 2. The IDE triggers a design-time build in the background, or you run `dotnet build` manually.
 3. The new or changed generated symbols appear in IntelliSense and are compiled into the assembly.
 
-There is a short delay between saving and the generated symbols updating. The Roslyn generator runs as part of the compilation, which is not instantaneous - the IDE needs to re-parse, re-bind, and re-emit before IntelliSense reflects the new state. The delay depends on project size, available game reference assemblies, and IDE load. If a generated symbol is missing immediately after editing a declaration, wait a moment or trigger a full build (`dotnet build`).
+There is a short delay between saving and the generated symbols updating. If a generated symbol is missing immediately after editing a declaration, trigger a full build (`dotnet build`).
 
 The most common cause of "generated type not found" is that no design-time build has completed since the declaration was added. If the symbol still does not appear after a full build, check that the project references `S1Interop.Generators` and that the declaration file is included in the compilation.
 
 > [!IMPORTANT]
-> When you start with an `S1InteropNamespace` declaration and later add an `S1InteropType` for a specific type, the `Handle` for that type gains named member accessors after the next build completes. Concrete signatures appear where the discovered member metadata is backend-neutral. Before the build runs, the `Handle` still only exposes generic members (`HasValue`, `Instance`, `Value`). This is expected - the generator has not yet re-discovered members for the newly declared type.
+> When you start with `S1InteropNamespace` and later add `S1InteropType`, the `Handle` gains named member accessors after the next build. Before that build, it still only exposes generic members (`HasValue`, `Instance`, `Value`).
 
 Generated symbols are emitted into the same compilation as the rest of the project. They are not separate assemblies and are not referenced from a package at runtime. The `S1Interop.Generators` package only ships the generator DLL under `analyzers/dotnet/cs`; it does not add a runtime DLL reference.
 
