@@ -264,7 +264,7 @@ public sealed class MemberAccessFallbackRewriter
         string facadeName = GetTypeFacadeName(target);
         return string.IsNullOrWhiteSpace(instance)
             ? $"{facadeName}.{accessor}()"
-            : $"{facadeName}.{accessor}({instance})";
+            : $"{facadeName}.As({instance}).{accessor}()";
     }
 
     private static string GetTypeFacadeName(MemberAccessTarget target)

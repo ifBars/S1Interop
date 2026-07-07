@@ -577,9 +577,9 @@ internal sealed partial class S1InteropFixtureTests
 
         string migratedSource = File.ReadAllText(tempSource);
         Assert(
-                migratedSource.Contains("return S1Interop.ScheduleOne.UI.OffenceNoticeUI.GetContainer<GameObject>(notice);", StringComparison.Ordinal) &&
+                migratedSource.Contains("return S1Interop.ScheduleOne.UI.OffenceNoticeUI.As(notice).GetContainer<GameObject>();", StringComparison.Ordinal) &&
                 !migratedSource.Contains("typeof(GameOffenceNotice).GetField(\"container\"", StringComparison.Ordinal),
-                "Simple typed fallback getter should be rewritten through the generated type-scoped facade.");
+                "Simple typed fallback getter should be rewritten through the generated Handle getter.");
             Assert(
                 migratedSource.Contains("return S1Interop.Generated.S1InteropMemberRegistry.GetInstanceValue(notice, \"container\");", StringComparison.Ordinal) &&
                 !migratedSource.Contains("notice.GetType().GetField(\"container\"", StringComparison.Ordinal),
@@ -1020,8 +1020,8 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.GameOffenceNotice.GetContainer<GameObject>(notice);", StringComparison.Ordinal),
-            $"Simple typed fallback getter should rewrite through the generated type-scoped facade. Rewritten source:{Environment.NewLine}{rewritten}");
+            rewritten.Contains("return S1Interop.GameOffenceNotice.As(notice).GetContainer<GameObject>();", StringComparison.Ordinal),
+            $"Simple typed fallback getter should rewrite through the generated Handle getter. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MemberAccessFallbackRewriterRewritesNullableValueGetter()
@@ -1059,8 +1059,8 @@ internal sealed partial class S1InteropFixtureTests
 
         string rewritten = new MemberAccessFallbackRewriter().RewriteSource(source, sourcePath, [target]);
         Assert(
-            rewritten.Contains("return S1Interop.UnityEngine.Rendering.RenderPipelineAsset.GetRenderScaleValue<float>(asset);", StringComparison.Ordinal),
-            $"Nullable value fallback getter should rewrite through the generated type-scoped facade value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
+            rewritten.Contains("return S1Interop.UnityEngine.Rendering.RenderPipelineAsset.As(asset).GetRenderScaleValue<float>();", StringComparison.Ordinal),
+            $"Nullable value fallback getter should rewrite through the generated Handle value accessor. Rewritten source:{Environment.NewLine}{rewritten}");
     }
 
     private void MemberAccessFallbackRewriterRewritesDynamicNamedHelpers()
