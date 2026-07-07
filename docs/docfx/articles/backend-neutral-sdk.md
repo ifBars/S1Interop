@@ -2,6 +2,8 @@
 
 For what the generator emits at build time and when those symbols appear, see [Generated output](generator-package.md). For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md).
 
+This page covers the full backend-neutral facade path. If you only want diagnostics, dual-runtime project setup, patch targets, Steam P2P helpers, or a few explicit member bindings, see [Use cases](use-cases.md).
+
 Instead of writing code against `ScheduleOne.*` in Mono and `Il2CppScheduleOne.*` in IL2CPP, use generated facades under `S1Interop.ScheduleOne.*`.
 
 ```csharp
@@ -28,7 +30,7 @@ S1Interop does not emit shortened duplicates such as `S1Interop.Vehicles.*`.
 
 ## Authoring model and validation targets
 
-The goal is one source surface with generated facades, not a pile of `#if MONO` / `#if IL2CPP` branches.
+For this path, the goal is one source surface with generated facades, not a pile of `#if MONO` / `#if IL2CPP` branches.
 
 Keep Mono and IL2CPP build configurations as validation targets when you have both local reference surfaces.
 

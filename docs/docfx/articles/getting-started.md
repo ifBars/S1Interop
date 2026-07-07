@@ -59,10 +59,11 @@ Review dry-run output before adding `--apply`:
 .\.tools\s1interop new .\MyMod --dry-run
 ```
 
-If you are not sure which command fits your situation, use the [Adoption guide](adoption-guide.md) before applying changes.
+If you are not sure which command fits your situation, use [Use cases](use-cases.md) or the [Adoption guide](adoption-guide.md) before applying changes.
 
 ## Next steps
 
+- [Use cases](use-cases.md): decide whether you need diagnostics, dual-runtime builds, generated helpers, or the full backend-neutral path.
 - [New projects](new-projects.md): scaffold a backend-neutral mod project from scratch and generate your first SDK declarations.
 - [Migrate to backend-neutral](migrate-to-backend-neutral.md): migrate an existing Mono mod to a single assembly that runs on both Mono and IL2CPP.
 - [Migrate to dual-runtime](migrate-to-dual-runtime.md): move an existing Mono mod toward separate Mono and IL2CPP assemblies from shared source.

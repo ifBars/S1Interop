@@ -79,7 +79,7 @@ internal static class MigrationPlanningCommand
                         null,
                         "low",
                         true,
-                        "Install the S1Interop Roslyn generator package for backend-neutral attributes and generated helpers.")
+                        "Install the S1Interop Roslyn generator package for attributes, diagnostics, and generated helpers.")
                 };
 
                 string starterPath = BackendNeutralStarterGenerator.GetSourcePath(project.ProjectPath);
@@ -91,7 +91,7 @@ internal static class MigrationPlanningCommand
                         null,
                         "low",
                         true,
-                        "Create an editable S1Interop backend-neutral declarations file with starter generator attributes."));
+                        "Create an editable S1Interop declarations file for optional generated helpers and facade bindings."));
                 }
 
                 return new ProjectMigrationPlan(project.ProjectPath, operations);
@@ -121,7 +121,7 @@ internal static class MigrationPlanningCommand
                         null,
                         "low",
                         true,
-                        "Install the S1Interop Roslyn generator package required by generated SDK facade type registry attributes."));
+                        "Install the S1Interop Roslyn generator package required by generated facade type registry attributes."));
                 }
 
                 if (facadePlan.HasContent)

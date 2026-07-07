@@ -25,6 +25,7 @@ S1Interop is generated interop. It is not an item builder, NPC scheduler, phone 
 
 Use S1Interop for:
 
+- diagnostics and build hooks when you keep your existing S1API code and manual runtime branches;
 - generated facades for direct `ScheduleOne.*` and `Il2CppScheduleOne.*` types;
 - reducing duplicated `#if MONO` / `#if IL2CPP` code in direct patch mods, S1API-specific mods, and mixed projects;
 - backend-neutral Harmony patch targets for mods that patch vanilla Schedule One methods directly;
@@ -47,6 +48,7 @@ S1Interop covers repetitive backend glue: runtime type names, member bindings, d
 | Adding an item, NPC, quest, phone app, save data, or content workflow | The module that owns the workflow. | Direct game access the module does not expose. |
 | Existing Mono and IL2CPP configurations | Gameplay workflows S1API owns. | Shared direct game access that can move behind generated facades while both configurations stay as validation targets. |
 | S1API mod with a vanilla Harmony patch | Content registration and lifecycle. | Backend-neutral patch targets and nearby game member reads. |
+| S1API mod that already handles both runtimes manually | The gameplay API dependency and loader behavior. | Diagnostics, build hooks, and narrow helper declarations without forcing a full generated SDK. |
 | Copied reflection helper or cached `AccessTools` binding | Higher-level workflow, when one exists. | Generated bindings for Schedule One types and members. |
 | One player-facing dependency with content helpers and loader behavior | Runtime packages and `S1APILoader`. | Not this use case. The generator package is a build-time tool, not a gameplay framework. |
 | Backend-neutral direct game SDK for types S1API does not wrap | Not this use case unless S1API adds that domain. | Type declarations and generated facades from local metadata. |

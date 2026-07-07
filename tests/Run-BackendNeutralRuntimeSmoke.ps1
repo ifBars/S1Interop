@@ -205,10 +205,15 @@ $buildArgs = @(
     $Configuration
 )
 
+$buildArgs += @("-p:S1InteropReferenceRuntime=Mono", "-p:S1InteropTargetRuntime=Unknown")
 if ($Runtime -eq "Mono") {
     $buildArgs += "-p:MonoGamePath=$gameRoot"
 } else {
-    $buildArgs += @("-p:S1InteropReferenceRuntime=Il2Cpp", "-p:Il2CppGamePath=$gameRoot")
+    if (-not [string]::IsNullOrWhiteSpace($env:S1_MONO_GAME_PATH)) {
+        $buildArgs += "-p:MonoGamePath=$env:S1_MONO_GAME_PATH"
+    }
+
+    $buildArgs += "-p:Il2CppGamePath=$gameRoot"
 }
 
 if (-not [string]::IsNullOrWhiteSpace($packageSource)) {
@@ -217,7 +222,7 @@ if (-not [string]::IsNullOrWhiteSpace($packageSource)) {
 
 Invoke-DotNetBuild $buildArgs
 
-$builtDll = Join-Path (Split-Path -Parent $projectFile) "bin\$Configuration\$targetFramework\$assemblyName.dll"
+$builtDll = Join-Path (Split-Path -Parent $projectFile) "bin\Single\$Configuration\$targetFramework\$assemblyName.dll"
 Assert-File $builtDll "built mod DLL"
 
 $existingMods = @(Get-ChildItem -LiteralPath $modsPath -Filter "*.dll" -File | Select-Object -ExpandProperty Name)

@@ -1495,6 +1495,7 @@ internal sealed partial class S1InteropFixtureTests
                 "--nologo",
                 "-v:minimal",
                 "-p:S1InteropReferenceRuntime=Il2Cpp",
+                "-p:S1InteropTargetRuntime=Il2Cpp",
                 $"-p:Il2CppGamePath={il2CppGamePath}",
                 $"-p:RestorePackagesPath={packageCache}",
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
@@ -1677,6 +1678,7 @@ internal sealed partial class S1InteropFixtureTests
                 "--nologo",
                 "-v:minimal",
                 "-p:S1InteropReferenceRuntime=Il2Cpp",
+                "-p:S1InteropTargetRuntime=Il2Cpp",
                 $"-p:Il2CppGamePath={il2CppGamePath}",
                 $"-p:RestorePackagesPath={packageCache}",
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
@@ -2136,6 +2138,7 @@ internal sealed partial class S1InteropFixtureTests
                 "--nologo",
                 "-v:minimal",
                 "-p:S1InteropReferenceRuntime=Il2Cpp",
+                "-p:S1InteropTargetRuntime=Il2Cpp",
                 $"-p:Il2CppGamePath={il2CppGamePath}",
                 $"-p:RestorePackagesPath={packageCache}",
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
@@ -2277,6 +2280,7 @@ internal sealed partial class S1InteropFixtureTests
             "--nologo",
             "-v:minimal",
             "-p:S1InteropReferenceRuntime=Il2Cpp",
+            "-p:S1InteropTargetRuntime=Il2Cpp",
             $"-p:Il2CppGamePath={il2CppGamePath}",
             $"-p:RestorePackagesPath={packageCache}",
             $"-p:RestoreAdditionalProjectSources={packageSource}");

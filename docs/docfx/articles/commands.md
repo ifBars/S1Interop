@@ -5,6 +5,8 @@ This is the CLI reference for the `s1interop` command. The `S1Interop` package i
 Most commands default to the current directory when a path is optional.
 Unknown options, missing option values, and invalid option values fail before command dispatch so migration typos do not silently fall back to defaults.
 
+Use only the commands that fit your project. `analyze`, `lint`, and `build-hook` are useful even when you keep manual Mono/IL2CPP code. `migrate --dual-runtime` can add separate runtime builds without requiring a generated SDK. `sdkgen` is for projects that want generated facade declarations.
+
 ```text
 s1interop analyze [path=.] [--configuration name] [--format text|json]
 s1interop new <path> [--dry-run|--apply] [--format text|json]
@@ -22,13 +24,13 @@ s1interop --version
 
 | Command | Use it for |
 | --- | --- |
-| `analyze` | Inspect projects, runtime references, configurations, packages, and source risks. |
+| `analyze` | Inspect projects, runtime references, configurations, packages, and source risks without changing files. |
 | `new` | Create a backend-neutral project scaffold. |
-| `init` | Add backend-neutral declarations and generator support to an existing project. |
-| `lint` | Report issues using inferred project/runtime context. |
-| `sdkgen` | Generate backend-neutral SDK declarations and facades. |
-| `build-hook` | Add build-time validation hooks where supported. |
-| `migrate` | Plan or apply dual-runtime migration changes. |
+| `init` | Add a declaration file and generator support to an existing project. |
+| `lint` | Report issues using inferred project/runtime context. Useful for diagnostics-only adoption. |
+| `sdkgen` | Generate SDK declarations and facades when you want generated game access. |
+| `build-hook` | Add build-time validation hooks where supported. Useful when you keep manual runtime branches. |
+| `migrate` | Plan or apply migration changes. Use `--dual-runtime` for separate Mono and IL2CPP builds. |
 | `verify-migration` | Run migration plans in a disposable sandbox, optionally with builds. |
 
 ## Dry-run and apply

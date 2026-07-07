@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -509,6 +510,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         }
 
         var generatedParameters = new List<string>(parameterTypeNames.Length);
+        string[] generatedParameterNames = GetGeneratedParameterNames(parameterNames);
         for (int index = 0; index < parameterTypeNames.Length; index++)
         {
             FacadeMemberType type = GetFacadeParameterType(parameterTypeNames[index], facadeHandleTypes, facadeEnumTypes);
@@ -517,7 +519,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 return false;
             }
 
-            generatedParameters.Add($"{GetFacadeParameterTypeName(type)} {parameterNames[index]}");
+            generatedParameters.Add($"{GetFacadeParameterTypeName(type)} {generatedParameterNames[index]}");
         }
 
         parameters = string.Join(", ", generatedParameters);
@@ -553,9 +555,10 @@ public sealed partial class S1InteropTypeRegistryGenerator
         }
 
         var arguments = new List<string>(parameterNames.Length);
+        string[] generatedParameterNames = GetGeneratedParameterNames(parameterNames);
         for (int index = 0; index < parameterTypeNames.Length; index++)
         {
-            arguments.Add(GenerateFacadeArgumentExpression(parameterNames[index], parameterTypeNames[index], facadeHandleTypes, facadeEnumTypes));
+            arguments.Add(GenerateFacadeArgumentExpression(generatedParameterNames[index], parameterTypeNames[index], facadeHandleTypes, facadeEnumTypes));
         }
 
         return string.Join(", ", arguments);
@@ -569,6 +572,43 @@ public sealed partial class S1InteropTypeRegistryGenerator
         GetFacadeParameterType(parameterTypeName, facadeHandleTypes, facadeEnumTypes).IsHandle
             ? parameterName + ".Value.Instance"
             : parameterName;
+
+    private static string[] GetGeneratedParameterNames(ImmutableArray<string> parameterNames)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        string[] generatedNames = new string[parameterNames.Length];
+        for (int index = 0; index < parameterNames.Length; index++)
+        {
+            string baseName = SanitizeParameterName(parameterNames[index], index);
+            string name = baseName;
+            int suffix = 2;
+            while (!used.Add(name))
+            {
+                name = baseName + suffix.ToString(CultureInfo.InvariantCulture);
+                suffix++;
+            }
+
+            generatedNames[index] = name;
+        }
+
+        return generatedNames;
+    }
+
+    private static string SanitizeParameterName(string parameterName, int index)
+    {
+        if (string.IsNullOrWhiteSpace(parameterName))
+        {
+            return "arg" + index.ToString(CultureInfo.InvariantCulture);
+        }
+
+        string candidate = parameterName;
+        if (candidate is "instance" or "value" or "args" or "result" or "this" or "base")
+        {
+            candidate = "arg" + char.ToUpperInvariant(candidate[0]) + candidate.Substring(1);
+        }
+
+        return IsCSharpKeyword(candidate) ? "arg" + index.ToString(CultureInfo.InvariantCulture) : candidate;
+    }
 
     private static string GenerateFacadeGetExpression(S1InteropMemberEntry member, string? instanceExpression, FacadeMemberType memberType)
     {
@@ -778,6 +818,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
     private static string NormalizeBackendNeutralTypeName(string typeName) =>
         typeName
             .Replace("Il2CppScheduleOne.", "ScheduleOne.")
+            .Replace("Il2CppSteamworks.", "Steamworks.")
             .Replace("Il2CppSystem.", "System.");
 
     private readonly struct FacadeHandleType

@@ -6,7 +6,9 @@ For the high-level "what is S1Interop" pitch, see [Introduction](introduction.md
 
 ## Runtimes and backends
 
-Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you usually maintain separate mod assemblies: one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`. S1Interop moves that split behind generated facades.
+Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you usually maintain separate mod assemblies: one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`.
+
+S1Interop can move that split behind generated facades, but that is not the only use case. It can also analyze existing projects, add build-time diagnostics, scaffold dual-runtime builds, or generate a small helper surface while you keep manual backend code.
 
 ### Mono vs IL2CPP at a glance
 
@@ -68,7 +70,7 @@ S1Interop is two NuGet packages. Keep the split clear.
 | **CLI tool** | `S1Interop` | A .NET global tool exposing the `s1interop` command. Owns project analysis, migration planning/application/rollback, SDK declaration generation, and sandbox verification. | On demand from a terminal. Never runs during compilation. |
 | **Generator package** | `S1Interop.Generators` | A Roslyn incremental source generator and analyzer. Reads declarations and emits source plus diagnostics. | During every build (and IDE design-time build) of a project that references it. |
 
-A mod project that only wants the generated SDK surface can reference just the generator package and author declarations by hand. Use the CLI to produce those declarations; it is not a runtime dependency.
+A mod project that only wants build-time diagnostics or generated helper output can reference just the generator package. Use the CLI when you want project analysis, migration planning, declaration generation, sandbox verification, or rollback support.
 
 The package split is also the boundary. S1Interop owns interop mechanics: type registration, facade emission, source-risk diagnostics, migration, rollback, and sandbox verification. Higher-level gameplay APIs can sit above that layer.
 
@@ -128,7 +130,7 @@ The runtime type-name and resolution cache, emitted under `S1Interop.Generated`.
 
 ### `S1InteropMemberRegistry`
 
-Reflection-based get/set/invoke helpers used by the registry and by facades. Handles value conversion, overload selection by parameter type names, and instance vs static dispatch. Rarely called directly from mod code; the facades route through it.
+Reflection-based get/set/invoke helpers used by the registry and by facades. Handles value conversion, overload selection by parameter type names, and instance vs static dispatch. When a runtime lookup or conversion fails, `Reports` records the backend, member name, signature, and failure status. Rarely called directly from mod code; the facades route through it.
 
 ### `S1InteropRuntime` and `S1InteropRuntimeBackend`
 
@@ -210,8 +212,10 @@ See [Local game paths](local-paths.md) for the property reference.
 
 | You want to... | Use this |
 | --- | --- |
+| Understand which S1Interop pieces fit your mod | [Use cases](use-cases.md). |
 | Start a new backend-neutral mod | `s1interop new` then `s1interop sdkgen --full-sdk --apply`. See [New projects](new-projects.md). |
 | Inspect a mod's runtime assumptions and risks | `s1interop analyze`. See [Commands](commands.md). |
+| Add compile-time guardrails without generated facades | `s1interop lint`, `s1interop build-hook`, or `S1Interop.Generators` diagnostics. See [Diagnostics](diagnostics.md). |
 | Generate SDK declarations from existing source | `s1interop sdkgen --apply`. See [SDK generation](sdk-generation.md). |
 | Move a Mono mod toward one backend-neutral assembly | `s1interop init` then `s1interop sdkgen --apply`. See [Migrate to backend-neutral](migrate-to-backend-neutral.md). |
 | Build separate Mono and IL2CPP assemblies | `s1interop migrate --dual-runtime --apply`. See [Migrate to dual-runtime](migrate-to-dual-runtime.md). |

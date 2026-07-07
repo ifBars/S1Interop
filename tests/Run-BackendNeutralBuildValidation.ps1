@@ -77,7 +77,7 @@ if (-not [string]::IsNullOrWhiteSpace($packageSource)) {
     $commonArgs += "-p:RestoreAdditionalProjectSources=$packageSource"
 }
 
-Invoke-DotNetBuild ($commonArgs + @("-p:MonoGamePath=$monoRoot"))
-Invoke-DotNetBuild ($commonArgs + @("-p:S1InteropReferenceRuntime=Il2Cpp", "-p:Il2CppGamePath=$il2CppRoot"))
+Invoke-DotNetBuild ($commonArgs + @("-p:S1InteropReferenceRuntime=Mono", "-p:S1InteropTargetRuntime=Unknown", "-p:MonoGamePath=$monoRoot"))
+Invoke-DotNetBuild ($commonArgs + @("-p:S1InteropReferenceRuntime=Il2Cpp", "-p:S1InteropTargetRuntime=Il2Cpp", "-p:Il2CppGamePath=$il2CppRoot"))
 
 Write-Host "Backend-neutral build validation passed for Mono and IL2CPP reference surfaces."

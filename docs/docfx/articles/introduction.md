@@ -1,10 +1,12 @@
 # Introduction
 
-S1Interop gives Schedule One mods one generated surface for direct game access on Mono and IL2CPP.
+S1Interop gives Schedule One mods tools for the Mono/IL2CPP boundary.
 
-Use it for project analysis, SDK facade generation, rollbackable migrations, sandbox verification, and backend-neutral Harmony targets.
+You can use it for project analysis, build-time diagnostics, dual-runtime migration, generated SDK facades, rollbackable migrations, sandbox verification, backend-neutral Harmony targets, or small runtime helpers. These parts work together, but you do not have to adopt all of them.
 
 Keep S1API, MAPI, SteamNetworkLib, and dedicated server APIs where they own the gameplay workflow. Use S1Interop for direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access, type lookup, member binding, casts, delegates, and validation.
+
+Start with [Use cases](use-cases.md) if you are deciding how much of S1Interop to adopt.
 
 If you are already using S1API, start with [S1API and S1Interop](s1api-and-s1interop.md).
 
@@ -17,7 +19,14 @@ S1Interop ships as two packages.
 | CLI tool | `S1Interop` | A .NET global tool that provides the `s1interop` command. It analyzes projects, plans and applies migrations, generates SDK declaration files, and verifies results in sandboxes. | On demand from a terminal. |
 | Generator | `S1Interop.Generators` | A Roslyn source generator and analyzer package. It reads the declarations written by the CLI (or by hand) and emits generated source, diagnostics, and runtime helpers during compilation. | During every build and IDE design-time compilation of a mod project that references it. |
 
-Most projects use both. The CLI writes declarations and migration edits; the generator turns those declarations into compiled helpers and diagnostics. If you only need the generated SDK surface, reference `S1Interop.Generators` and write declarations by hand.
+Many projects use both. The CLI writes declarations and migration edits; the generator turns those declarations into compiled helpers and diagnostics.
+
+Some projects use only part of this:
+
+- diagnostics only, while keeping manual Mono/IL2CPP code;
+- `migrate --dual-runtime`, without moving to a generated SDK yet;
+- a few declarations or helpers for patches, events, casts, Steamworks, or member bindings;
+- full backend-neutral facades for one shipping DLL.
 
 ## What the CLI does
 

@@ -85,6 +85,20 @@ internal sealed partial class S1InteropFixtureTests
         return reports.Cast<object>().ToArray();
     }
 
+    private static IReadOnlyList<object> GetGeneratedMemberReports(Type memberRegistryType)
+    {
+        object reportsValue = memberRegistryType
+            .GetProperty("Reports", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetValue(null)
+            ?? throw new InvalidOperationException("Generated member registry did not expose Reports.");
+        if (reportsValue is not System.Collections.IEnumerable reports)
+        {
+            throw new InvalidOperationException("Generated member reports are not enumerable.");
+        }
+
+        return reports.Cast<object>().ToArray();
+    }
+
     private static object? GetReportValue(object report, string propertyName) =>
         report.GetType().GetProperty(propertyName)?.GetValue(report);
 

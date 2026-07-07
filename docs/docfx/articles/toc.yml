@@ -6,6 +6,8 @@
       href: introduction.md
     - name: Core concepts
       href: core-concepts.md
+    - name: Use cases
+      href: use-cases.md
     - name: Adoption guide
       href: adoption-guide.md
     - name: S1API and S1Interop

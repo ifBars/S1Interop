@@ -241,7 +241,7 @@ public sealed class MigrationPlanner
                     null,
                     "low",
                     true,
-                    "Install the S1Interop Roslyn generator package required by generated SDK facade type registry attributes."));
+                    "Install the S1Interop Roslyn generator package required by generated facade type registry attributes."));
             }
 
             operations.Add(new MigrationOperation(

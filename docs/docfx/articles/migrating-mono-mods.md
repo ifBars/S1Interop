@@ -7,6 +7,8 @@ Use migration when an existing mod still carries direct game-wrapper code. S1Int
 
 Pick the shape first. The commands and output are different enough to keep separate.
 
+You can also choose a smaller path: diagnostics only, build hooks only, generated patch targets only, or a few helper declarations. See [Use cases](use-cases.md) before assuming a migration has to rewrite the whole mod.
+
 | Goal | Start here |
 | --- | --- |
 | One assembly that can run on either backend | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |

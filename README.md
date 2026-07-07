@@ -1,17 +1,18 @@
 # S1Interop
 
-S1Interop is an alpha toolchain for Schedule One mod developers who want to move Mono mods toward IL2CPP, dual-runtime builds, or a backend-neutral single-assembly shape without hand-editing every project file and wrapper difference.
+S1Interop is an alpha toolchain for Schedule One mod developers who need help with Mono, IL2CPP, or both. You can use it for diagnostics, dual-runtime builds, small generated helpers, or a backend-neutral single-assembly shape.
 
 The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop is for the direct game access that remains in a mod, whether that mod is standalone, S1API-based, or a mix of both.
 
 That matters for real Schedule One projects because most mods are not blank SDK samples. A small Harmony patch mod, an S1API content mod, a MAPI building mod, a SteamNetworkLib multiplayer mod, and a dedicated server addon all have different owners for gameplay, networking, assets, and packaging. S1Interop should only take over the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` interop seams that make those projects hard to keep portable.
 
-The main product direction is a generated backend-neutral SDK:
+The pieces are meant to be composable:
 
 - `s1interop new` starts a backend-neutral mod project.
-- `s1interop sdkgen` generates facades from local game reference metadata.
+- `s1interop sdkgen` generates facades when you want backend-neutral game access.
 - `s1interop migrate --dual-runtime` helps existing Mono mods move toward two-assembly dual-runtime support.
 - `s1interop analyze`, `lint`, and `verify-migration` report unsafe IL2CPP boundary cases before they become runtime failures.
+- `S1Interop.Generators` can be used for diagnostics and selected generated helpers without running the full SDK path.
 
 It is not a finished "convert every mod with one command" tool yet. The current alpha already handles real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification, but unsupported or ambiguous cases are reported instead of guessed.
 
@@ -22,6 +23,7 @@ Backend-neutral authoring means one source model and generated `S1Interop.Schedu
 The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
+- [Use cases](docs/docfx/articles/use-cases.md)
 - [Core concepts](docs/docfx/articles/core-concepts.md)
 - [Adoption guide](docs/docfx/articles/adoption-guide.md)
 - [S1API and S1Interop](docs/docfx/articles/s1api-and-s1interop.md)
@@ -57,6 +59,7 @@ Choose the workflow first:
 | --- | --- |
 | New to Schedule One modding | `s1interop new .\MyFirstMod --apply` |
 | Bringing an existing Mono, dual-config, S1API, or hybrid mod | `s1interop analyze .` |
+| Keeping manual backend code but wanting guardrails | `s1interop lint .` |
 | Exploring local game API coverage | `s1interop sdkgen . --full-sdk --apply` |
 | Unsure whether migration is safe | `s1interop verify-migration . --dual-runtime --include-source-migrations` |
 

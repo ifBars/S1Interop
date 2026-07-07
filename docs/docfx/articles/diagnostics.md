@@ -4,7 +4,11 @@ S1Interop turns common IL2CPP runtime failures into compile-time feedback.
 
 All diagnostics on this page are reported by the `S1Interop.Generators` Roslyn package during compilation. They do not require the CLI to run. The generator reports them alongside your normal build errors and warnings, so you see them in your IDE error list and in `dotnet build` output the same way you would see any other compiler diagnostic.
 
+You can use these diagnostics even if you keep manual Mono and IL2CPP code. Generated facades are optional; the diagnostics are still useful as build-time guardrails.
+
 See [Generated output](generator-package.md) for build timing and the conditions under which each diagnostic group stays quiet.
+
+Generated helpers also keep runtime reports for cases the compiler cannot prove. If a facade method returns `null` or a `TrySet...` helper returns `false`, inspect `S1Interop.Generated.S1InteropMemberRegistry.Reports`. Those reports cover active-backend failures such as missing IL2CPP wrapper members, unresolved overload parameter types, ambiguous overloads, and argument conversion failures.
 
 ## Declaration diagnostics (S1I001-S1I003)
 
@@ -62,7 +66,7 @@ IL2CPP boundary diagnostics fire only when the compilation targets IL2CPP, detec
 These diagnostics catch source shapes that compile successfully but fail at runtime inside an IL2CPP game. They are intentionally narrow: normal managed collections and arrays inside ordinary mod logic are fine. The checks only trigger at the specific boundary crossing patterns described below.
 
 > [!TIP]
-> To trigger S1I004-S1I007 locally, build under the IL2CPP configuration (for example, `Debug Il2Cpp` or `Release Il2Cpp`). Mono-only builds will never report these diagnostics.
+> To trigger S1I004-S1I007 locally, run an explicit IL2CPP reference validation build, for example `dotnet build -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp`. Mono-reference single-assembly builds will not report these diagnostics.
 
 | Diagnostic | Severity | Meaning |
 | --- | --- | --- |
@@ -102,7 +106,7 @@ byte[] buffer = new byte[1024];
 SteamNetworking.ReadP2PPacket(buffer, ...);
 ```
 
-**Fix:** Use `Il2CppStructArray<byte>` at the IL2CPP boundary and copy the data into a managed `byte[]` after the call if you need managed access to the result.
+**Fix:** Use `S1Interop.Generated.S1InteropSteamNetworking` for Steam P2P reads and sends, or use `Il2CppStructArray<byte>` at the IL2CPP boundary and copy the data into a managed `byte[]` after the call if you need managed access to the result.
 
 ### S1I007 - Plain C# cast across IL2CPP object boundary
 

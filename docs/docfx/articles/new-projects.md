@@ -1,6 +1,8 @@
 # New backend-neutral projects
 
-Use `new` when you want a MelonLoader mod that validates against Mono and IL2CPP from day one.
+Use `new` when you want a MelonLoader mod that builds one backend-neutral DLL.
+
+If you want diagnostics for an existing mod, separate Mono/IL2CPP builds, or only a few generated helpers, start with [Use cases](use-cases.md) instead.
 
 ```powershell
 s1interop new .\MyBackendNeutralMod --apply
@@ -9,7 +11,7 @@ s1interop new .\MyBackendNeutralMod --apply
 The scaffold includes:
 
 - a C# project and solution;
-- Mono and IL2CPP build configurations for validating the same backend-neutral source against both reference surfaces;
+- `Debug` and `Release` builds that produce one `bin/Single/...` assembly;
 - `local.build.props.example` for machine-specific game paths;
 - a starter `S1Interop.Generated/S1Interop.BackendNeutral.cs` declaration file;
 - package references needed by the generated helpers;
@@ -22,9 +24,17 @@ After creating the project:
 3. Set `Il2CppGamePath` to a public `none` or `beta` branch install.
 4. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
 5. Open the `.sln` in Visual Studio or Rider.
-6. Build `Debug` for Mono and `Debug Il2Cpp` for IL2CPP.
+6. Build `Debug`.
 
-Those two configurations are validation targets, not two source implementations. Use generated `S1Interop.ScheduleOne.*` facades and shared source where S1Interop can express the backend difference safely.
+The normal build uses Mono reference assemblies, emits `S1InteropTargetRuntime=Unknown`, and detects Mono or IL2CPP at runtime. That DLL is the one you ship to both game installs.
+
+If you intentionally want an IL2CPP reference compile while developing declarations, run it explicitly and treat the output as a check:
+
+```powershell
+dotnet build .\MyBackendNeutralMod.sln -c Debug -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp
+```
+
+Do not publish separate Mono and IL2CPP DLLs for a backend-neutral project unless your mod still has runtime-specific code that S1Interop cannot cover yet.
 
 For a blank project, seed the SDK from your local game references:
 
@@ -44,9 +54,12 @@ Use S1Interop for direct game access:
 
 - generated facades for `ScheduleOne.*` / `Il2CppScheduleOne.*` types;
 - type/member lookup that should survive backend differences;
+- Unity component lookup helpers such as `S1Interop.Generated.S1InteropUnity`;
 - simple public fields, properties, constructors, enum mirrors, and methods when metadata is safe;
 - explicit `S1InteropMember` declarations for private, ambiguous, or migration-specific seams.
 
-Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for Steam lobby and P2P helpers. Use S1Interop for direct game-wrapper access underneath those libraries.
+Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for higher-level networking clients, sync vars, DTOs, chunking, and message protocols.
+
+Use S1Interop underneath those libraries when you still need direct backend-neutral game or Steamworks access. That includes Steam P2P byte buffers, relay/session calls, callback pumping, reliable send-mode lookup, Steam ID values, and Schedule One lobby member lookup.
 
 It does not commit game assemblies, wrapper dumps, decompiled source, prefabs, scenes, textures, or exported Unity projects.

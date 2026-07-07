@@ -118,6 +118,7 @@ internal sealed partial class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropType("ScheduleOne.NPCs.Behaviour.MoveItemBehaviour", Alias = "MoveItemBehaviour")]
             [assembly: S1Interop.S1InteropType("ScheduleOne.Management.TransitRoute", Alias = "TransitRoute")]
             [assembly: S1Interop.S1InteropType("ScheduleOne.ItemFramework.ItemInstance", Alias = "ItemInstance")]
+            [assembly: S1Interop.S1InteropType("Steamworks.SteamAPI", Alias = "SteamAPI")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "container", Alias = "NoticeContainer")]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "Instance", Alias = "PlayerCameraInstance", IsStatic = true)]
             [assembly: S1Interop.S1InteropMember("PlayerCamera", "_homeScreenInstance", Alias = "HomeScreenField", Kind = S1Interop.S1InteropMemberKind.Field)]
@@ -160,13 +161,17 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("public const string PhoneName = \"Il2CppScheduleOne.UI.Phone.Phone\";", StringComparison.Ordinal),
             $"IL2CPP generator output should respect explicit Il2CppTypeName overrides. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
+            il2CppGenerated.Contains("public const string SteamAPIName = \"Il2CppSteamworks.SteamAPI\";", StringComparison.Ordinal),
+            $"IL2CPP generator output should rewrite Steamworks type names to Il2CppSteamworks. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
             il2CppGenerated.Contains("private static readonly global::System.Collections.Generic.Dictionary<string, global::System.Type?> Cache", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("global::System.Type.GetType(runtimeTypeName, throwOnError: false)", StringComparison.Ordinal),
             "Generated type registry should include a compile-time generated reflection cache.");
         Assert(
             runtimeGenerated.Contains("ResolveFromKnownGameAssemblies(runtimeTypeName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("global::System.Reflection.Assembly.Load(assemblyName)", StringComparison.Ordinal) &&
-            runtimeGenerated.Contains("ResolveFromAssembly(\"Assembly-CSharp\", runtimeTypeName)", StringComparison.Ordinal),
+            runtimeGenerated.Contains("ResolveFromAssembly(\"Assembly-CSharp\", runtimeTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("ResolveFromAssembly(\"com.rlabrecque.steamworks.net\", runtimeTypeName)", StringComparison.Ordinal),
             $"Backend-neutral type registry should try known game assemblies when a type is not already loaded. Generated source:{Environment.NewLine}{runtimeGenerated}");
         Assert(
             il2CppGenerated.Contains("internal static class S1InteropObjectCast", StringComparison.Ordinal) &&
@@ -175,6 +180,32 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("method.MakeGenericMethod(targetType)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase", StringComparison.Ordinal),
             $"Generated type registry should include a backend-neutral object cast helper for IL2CPP TryCast<T> proxy unwrapping. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("internal static class S1InteropUnity", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetComponent(object? gameObject, global::System.Type? componentType)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Collections.IEnumerable GetComponents(object? gameObject, global::System.Type? componentType)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Collections.IEnumerable FindObjectsOfType(global::System.Type? objectType)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Collections.IEnumerable FindObjectsOfTypeAll(global::System.Type? objectType)", StringComparison.Ordinal),
+            $"Generated type registry should include backend-neutral Unity lookup helpers so consumer mods do not hand-roll IL2CPP-safe component reflection. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("internal static class S1InteropSteamNetworking", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool IsSteamRunning()", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static void RunCallbacks()", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool AllowP2PPacketRelay(bool allow)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool AcceptP2PSessionWithUser(object? target)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetReliableP2PSendMode()", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryGetAvailableP2PPacketSize(int channel, out uint packetSize)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryReadP2PPacket(int channel, uint maxPacketSize, out object? sender, out byte[] data, out uint packetSize, out bool discarded)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool SendP2PPacket(object? target, byte[]? data, object? sendType, int channel)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static ulong GetSteamIdValue(object? steamId)", StringComparison.Ordinal),
+            $"Generated type registry should include Steamworks P2P packet helpers so consumer mods do not hand-roll IL2CPP byte-buffer reflection. Generated source:{Environment.NewLine}{il2CppGenerated}");
+        Assert(
+            il2CppGenerated.Contains("internal static class S1InteropSteamLobby", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryGetCurrentLobby(out S1InteropSteamLobbySnapshot snapshot)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryGetHostId(S1InteropSteamLobbySnapshot lobby, out object? hostId)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static global::System.Collections.Generic.IEnumerable<object> GetLobbyMembers(S1InteropSteamLobbySnapshot lobby)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool SameSteamId(object? left, object? right)", StringComparison.Ordinal),
+            $"Generated type registry should include Schedule One Steam lobby helpers so consumer mods do not hand-roll backend-specific lobby reflection. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("internal static class S1InteropDelegateBridge", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static TDelegate? Convert<TDelegate>(TDelegate? listener) where TDelegate : class", StringComparison.Ordinal) &&
@@ -234,8 +265,10 @@ internal sealed partial class S1InteropFixtureTests
             "Generated member registry should cache property, field, method overload, and by-ref lookup paths.");
         Assert(
             il2CppGenerated.Contains("public static object? GetInstanceValue(object? instance, string memberName)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? GetStaticValue(global::System.Type? ownerType, string memberName)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("global::System.Reflection.MemberInfo? member = ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames: null, kind);", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("public static bool TrySetInstanceValue(object? instance, string memberName, object? value, S1InteropMemberKind kind)", StringComparison.Ordinal),
+            il2CppGenerated.Contains("public static bool TrySetInstanceValue(object? instance, string memberName, object? value, S1InteropMemberKind kind)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TrySetStaticValue(global::System.Type? ownerType, string memberName, object? value, S1InteropMemberKind kind)", StringComparison.Ordinal),
             $"Generated member registry should include cached instance-type helpers for generic reflection code. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
             il2CppGenerated.Contains("public static bool TryConvertValue(object? value, global::System.Type targetType, out object? converted)", StringComparison.Ordinal) &&
@@ -256,9 +289,13 @@ internal sealed partial class S1InteropFixtureTests
             il2CppGenerated.Contains("global::System.Enum.Parse(conversionType, text, ignoreCase: true)", StringComparison.Ordinal),
             $"Generated member registry should centralize value conversion before field/property writes. Generated source:{Environment.NewLine}{il2CppGenerated}");
         Assert(
-            il2CppGenerated.Contains("if (!TryConvertArguments(method.GetParameters(), args, out object?[] converted))", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("object? result = method.Invoke(instance, converted);", StringComparison.Ordinal) &&
-            il2CppGenerated.Contains("CopyByRefArguments(method.GetParameters(), converted, args);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("global::System.Reflection.ParameterInfo[] parameters = method.GetParameters();", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("if (!TryConvertArguments(parameters, args, out object?[] converted))", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("Record(S1InteropMemberResolutionStatus.ArgumentConversionFailed", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("private static bool TryInvoke(global::System.Reflection.MethodInfo? method, object? instance, out object? result, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("result = method.Invoke(instance, converted);", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("return true;", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("CopyByRefArguments(parameters, converted, args);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("global::System.Type conversionType = parameterType.IsByRef && parameterType.GetElementType() is global::System.Type elementType", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("args[index] = ConvertBackValue(args[index], converted[index]);", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static bool TryConvertBackGuid(object converted, out global::System.Guid guid)", StringComparison.Ordinal) &&
@@ -270,6 +307,9 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, params object?[] args)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("public static object? InvokeInstance(object? instance, string memberName, string[]? parameterTypeNames, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryInvokeInstance(object? instance, string memberName, out object? result, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static object? InvokeStatic(global::System.Type? ownerType, string memberName, params object?[] args)", StringComparison.Ordinal) &&
+            il2CppGenerated.Contains("public static bool TryInvokeStatic(global::System.Type? ownerType, string memberName, out object? result, params object?[] args)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("ResolveMemberCached(instance.GetType(), memberName, parameterTypeNames, S1InteropMemberKind.Method) as global::System.Reflection.MethodInfo", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("private static global::System.Reflection.MemberInfo? ResolveMemberCached(global::System.Type ownerType, string memberName, string[]? parameterTypeNames, S1InteropMemberKind kind)", StringComparison.Ordinal) &&
             il2CppGenerated.Contains("string ownerKey = ownerType.AssemblyQualifiedName ?? ownerType.FullName ?? ownerType.Name;", StringComparison.Ordinal),
@@ -291,6 +331,10 @@ internal sealed partial class S1InteropFixtureTests
             runtimeGenerated.Contains("public static object? InvokePlayerCamera(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.InvokeInstance(instance, methodName, parameterTypeNames, args);", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static T? InvokePlayerCamera<T>(object? instance, string methodName, string[]? parameterTypeNames, params object?[] args) => S1InteropMemberRegistry.CastResult<T>(InvokePlayerCamera(instance, methodName, parameterTypeNames, args));", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static object? Create(string runtimeTypeName, params object?[] args)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static string GetRuntimeGameTypeName(string monoTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static global::System.Type? ResolveRuntimeType(string monoTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? GetSingletonInstance(string monoTypeName)", StringComparison.Ordinal) &&
+            runtimeGenerated.Contains("public static object? GetNetworkSingletonInstance(string monoTypeName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("public static bool IsInstance(object? instance, string runtimeTypeName)", StringComparison.Ordinal) &&
             runtimeGenerated.Contains("constructor.Invoke(converted)", StringComparison.Ordinal),
             $"Backend-neutral type registry should emit object-based type facade helpers that do not require compiling against backend-specific types. Generated source:{Environment.NewLine}{runtimeGenerated}");
@@ -359,7 +403,8 @@ internal sealed partial class S1InteropFixtureTests
                         HarmonyMethod? prefix = null,
                         HarmonyMethod? postfix = null,
                         HarmonyMethod? transpiler = null,
-                        HarmonyMethod? finalizer = null)
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
                     {
                         PatchCount++;
                         LastOriginal = original;
@@ -509,7 +554,8 @@ internal sealed partial class S1InteropFixtureTests
                         HarmonyMethod? prefix = null,
                         HarmonyMethod? postfix = null,
                         HarmonyMethod? transpiler = null,
-                        HarmonyMethod? finalizer = null)
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
                     {
                         throw new System.InvalidOperationException("Synthetic patch failure.");
                     }
@@ -598,7 +644,8 @@ internal sealed partial class S1InteropFixtureTests
                         HarmonyMethod? prefix = null,
                         HarmonyMethod? postfix = null,
                         HarmonyMethod? transpiler = null,
-                        HarmonyMethod? finalizer = null)
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
                     {
                     }
                 }
@@ -672,9 +719,9 @@ internal sealed partial class S1InteropFixtureTests
         string generated = RunTypeRegistryGenerator(source);
 
         Assert(
-            generated.Contains("public string? Insert(int startIndex, string? value) => S1Interop.Generated.S1InteropMemberRegistry.InvokeStringTypeInsert<string>(this.value.Instance, startIndex, value);", StringComparison.Ordinal) &&
+            generated.Contains("public string? Insert(int startIndex, string? argValue) => S1Interop.Generated.S1InteropMemberRegistry.InvokeStringTypeInsert<string>(this.value.Instance, startIndex, argValue);", StringComparison.Ordinal) &&
             !generated.Contains("InvokeStringTypeInsert<string>(value.Instance, startIndex, value)", StringComparison.Ordinal),
-            $"Generated handle methods should qualify the backing field when a runtime method parameter is named value. Generated source:{Environment.NewLine}{generated}");
+            $"Generated handle methods should sanitize runtime parameters named value and qualify the backing field. Generated source:{Environment.NewLine}{generated}");
     }
 
     private void S1InteropTypeRegistryGeneratorDiscoversPublicTypeMembers()
@@ -757,6 +804,11 @@ internal sealed partial class S1InteropFixtureTests
                     public int KeywordParameter(int @class)
                     {
                         return @class;
+                    }
+
+                    public int ReservedNames(int instance, int value)
+                    {
+                        return instance + value;
                     }
 
                     public void Overloaded()
@@ -861,6 +913,11 @@ internal sealed partial class S1InteropFixtureTests
                     public int KeywordParameter(int @class)
                     {
                         return @class;
+                    }
+
+                    public int ReservedNames(int instance, int value)
+                    {
+                        return instance + value;
                     }
 
                     public void Overloaded()
@@ -981,7 +1038,7 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static void StopEngine(Handle instance) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleStopEngine(instance.Value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public static S1Interop.ScheduleOne.Vehicles.VehicleState? GetState(Handle instance) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleGetState<S1Interop.ScheduleOne.Vehicles.VehicleState>(instance.Value.Instance);", StringComparison.Ordinal) &&
             generated.Contains("public static void SetState(Handle instance, S1Interop.ScheduleOne.Vehicles.VehicleState state) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleSetState(instance.Value.Instance, state);", StringComparison.Ordinal) &&
-            generated.Contains("public static int? ClampSpeed(int value) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleClampSpeed<int>(value);", StringComparison.Ordinal),
+            generated.Contains("public static int? ClampSpeed(int argValue) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleClampSpeed<int>(argValue);", StringComparison.Ordinal),
             $"Type facades should add typed method overloads when return and parameter metadata are backend-neutral. Generated source:{Environment.NewLine}{generated}");
         Assert(
             generated.Contains("public string? StartEngine() => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleStartEngine<string>(this.value.Instance);", StringComparison.Ordinal) &&
@@ -992,6 +1049,10 @@ internal sealed partial class S1InteropFixtureTests
         Assert(
             generated.Contains("public static int? KeywordParameter(Handle instance, int @class) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleKeywordParameter<int>(instance.Value.Instance, @class);", StringComparison.Ordinal),
             $"Type facades should preserve valid metadata parameter names and escape C# keywords. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public static int? ReservedNames(Handle instance, int argInstance, int argValue) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleReservedNames<int>(instance.Value.Instance, argInstance, argValue);", StringComparison.Ordinal) &&
+            generated.Contains("public int? ReservedNames(int argInstance, int argValue) => S1Interop.Generated.S1InteropMemberRegistry.InvokeLandVehicleReservedNames<int>(this.value.Instance, argInstance, argValue);", StringComparison.Ordinal),
+            $"Type facades should sanitize game parameter names that collide with generated receiver names. Generated source:{Environment.NewLine}{generated}");
         Assert(
             !generated.Contains("public object? Instance => S1Interop.Generated.S1InteropMemberRegistry.GetInstance(value.Instance);", StringComparison.Ordinal),
             $"Type facade handles should not generate accessors that collide with built-in handle members. Generated source:{Environment.NewLine}{generated}");
@@ -1484,6 +1545,33 @@ internal sealed partial class S1InteropFixtureTests
             """);
         const string source =
             """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
+                    {
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                    }
+                }
+            }
+
             namespace SyntheticMod
             {
                 [S1Interop.S1InteropPatch(
@@ -1509,6 +1597,101 @@ internal sealed partial class S1InteropFixtureTests
                 diagnostic.GetMessage().Contains("MoveItemBehaviour", StringComparison.Ordinal) &&
                 diagnostic.GetMessage().Contains("IL2CPP", StringComparison.Ordinal)),
             $"S1InteropPatch declarations should report S1I003 when a method exists on Mono but is absent from the IL2CPP reference surface. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
+    }
+
+    private void OptionalS1InteropPatchTargetsCanUsePrivateRuntimeMethods()
+    {
+        MetadataReference monoGameReference = CreateMetadataReferenceFromSource(
+            "Assembly-CSharp",
+            """
+            namespace ScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace ScheduleOne.Vehicles.Sound
+            {
+                public sealed class VehicleSound
+                {
+                    private void UpdateIdle(bool engineRunning)
+                    {
+                    }
+                }
+            }
+            """);
+        MetadataReference il2CppGameReference = CreateMetadataReferenceFromSource(
+            "Il2CppAssembly-CSharp",
+            """
+            namespace Il2CppScheduleOne
+            {
+                public sealed class GameManager
+                {
+                }
+            }
+
+            namespace Il2CppScheduleOne.Vehicles.Sound
+            {
+                public sealed class VehicleSound
+                {
+                    private void UpdateIdle(bool engineRunning)
+                    {
+                    }
+                }
+            }
+            """);
+        const string source =
+            """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
+                    {
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                    }
+                }
+            }
+
+            namespace SyntheticMod
+            {
+                [S1Interop.S1InteropPatch(
+                    "ScheduleOne.Vehicles.Sound.VehicleSound",
+                    "UpdateIdle",
+                    ParameterTypeNames = new[] { "bool" },
+                    Required = false)]
+                internal static class VehicleSoundPatch
+                {
+                    [S1Interop.S1InteropPrefix]
+                    private static void Prefix(ref bool engineRunning)
+                    {
+                    }
+                }
+            }
+            """;
+
+        ImmutableArray<Diagnostic> diagnostics = RunS1InteropGeneratorDiagnostics(source, [monoGameReference, il2CppGameReference]);
+
+        Assert(
+            diagnostics.All(diagnostic => diagnostic.Id != "S1I003"),
+            $"Optional S1InteropPatch declarations should allow private Harmony targets that Roslyn metadata cannot prove. Diagnostics: {string.Join(Environment.NewLine, diagnostics)}");
     }
 
     private void S1InteropPatchTargetsWarnForAmbiguousOverloadsWithoutParameterTypes()
@@ -1539,6 +1722,33 @@ internal sealed partial class S1InteropFixtureTests
             """);
         const string source =
             """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
+                    {
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                    }
+                }
+            }
+
             namespace SyntheticMod
             {
                 [S1Interop.S1InteropPatch(
@@ -1595,6 +1805,33 @@ internal sealed partial class S1InteropFixtureTests
             """);
         const string source =
             """
+            namespace HarmonyLib
+            {
+                public sealed class Harmony
+                {
+                    public Harmony(string id)
+                    {
+                    }
+
+                    public void Patch(
+                        System.Reflection.MethodBase original,
+                        HarmonyMethod? prefix = null,
+                        HarmonyMethod? postfix = null,
+                        HarmonyMethod? transpiler = null,
+                        HarmonyMethod? finalizer = null,
+                        HarmonyMethod? ilmanipulator = null)
+                    {
+                    }
+                }
+
+                public sealed class HarmonyMethod
+                {
+                    public HarmonyMethod(System.Reflection.MethodInfo method)
+                    {
+                    }
+                }
+            }
+
             namespace SyntheticMod
             {
                 [S1Interop.S1InteropPatch(
@@ -2079,6 +2316,29 @@ internal sealed partial class S1InteropFixtureTests
                 }
             }
 
+            namespace Il2CppScheduleOne.GameTime
+            {
+                public sealed class TimeManager
+                {
+                    public int DayIndex => 7;
+                }
+            }
+
+            namespace Il2CppScheduleOne.DevUtilities
+            {
+                public class Singleton<T> where T : class
+                {
+                    public static bool InstanceExists => true;
+                    public static T? Instance { get; } = System.Activator.CreateInstance(typeof(T), nonPublic: true) as T;
+                }
+
+                public class NetworkSingleton<T> where T : class
+                {
+                    public static bool InstanceExists => true;
+                    public static T? Instance { get; } = System.Activator.CreateInstance(typeof(T), nonPublic: true) as T;
+                }
+            }
+
             namespace Il2CppSystem
             {
                 public sealed class Guid
@@ -2218,11 +2478,20 @@ internal sealed partial class S1InteropFixtureTests
         Type delegateBridgeType = assembly.GetType("S1Interop.Generated.S1InteropDelegateBridge", throwOnError: true)!;
         Type hudFacadeType = assembly.GetType("S1Interop.ScheduleOne.UI.HUD", throwOnError: true)!;
         Type memberKindType = assembly.GetTypes().Single(type => type.Name == "S1InteropMemberKind");
+        MethodInfo resolveRuntimeType = typeRegistryType.GetMethod("ResolveRuntimeType", [typeof(string)])
+            ?? throw new InvalidOperationException("Generated type registry should expose ResolveRuntimeType.");
+        MethodInfo getSingletonInstance = typeRegistryType.GetMethod("GetSingletonInstance", [typeof(string)])
+            ?? throw new InvalidOperationException("Generated type registry should expose GetSingletonInstance.");
+        MethodInfo getNetworkSingletonInstance = typeRegistryType.GetMethod("GetNetworkSingletonInstance", [typeof(string)])
+            ?? throw new InvalidOperationException("Generated type registry should expose GetNetworkSingletonInstance.");
 
         object? backend = runtimeType.GetProperty("Backend")?.GetValue(null);
         object? isIl2Cpp = runtimeType.GetProperty("IsIl2Cpp")?.GetValue(null);
         object? hudName = typeRegistryType.GetProperty("HudName")?.GetValue(null);
         object? hudType = typeRegistryType.GetProperty("Hud")?.GetValue(null);
+        object? resolvedRuntimeHudType = resolveRuntimeType.Invoke(null, ["ScheduleOne.UI.HUD"]);
+        object? singletonHud = getSingletonInstance.Invoke(null, ["ScheduleOne.UI.HUD"]);
+        object? networkTimeManager = getNetworkSingletonInstance.Invoke(null, ["ScheduleOne.GameTime.TimeManager"]);
         MethodInfo? getHudInstance = memberRegistryType.GetMethods()
             .FirstOrDefault(method => method.Name == "GetHudInstance" && !method.IsGenericMethod && method.GetParameters().Length == 0);
         object? hudInstance = getHudInstance?.Invoke(null, null);
@@ -2231,6 +2500,9 @@ internal sealed partial class S1InteropFixtureTests
         Assert(isIl2Cpp is true, "Backend-neutral runtime IsIl2Cpp should be true for the fake Il2Cpp assembly.");
         Assert(string.Equals(hudName as string, "Il2CppScheduleOne.UI.HUD", StringComparison.Ordinal), $"Backend-neutral HudName should resolve to Il2Cpp type name. HudName={hudName}");
         Assert(hudType is Type resolvedHudType && resolvedHudType.FullName == "Il2CppScheduleOne.UI.HUD", "Backend-neutral type registry should resolve the fake Il2Cpp HUD type.");
+        Assert(resolvedRuntimeHudType is Type runtimeHudType && runtimeHudType.FullName == "Il2CppScheduleOne.UI.HUD", "Generated ResolveRuntimeType should map ScheduleOne type names to active Il2Cpp runtime types.");
+        Assert(singletonHud is not null && singletonHud.GetType().FullName == "Il2CppScheduleOne.UI.HUD", "Generated GetSingletonInstance should resolve ScheduleOne Singleton<T> through the active backend.");
+        Assert(networkTimeManager is not null && networkTimeManager.GetType().FullName == "Il2CppScheduleOne.GameTime.TimeManager", "Generated GetNetworkSingletonInstance should resolve ScheduleOne NetworkSingleton<T> through the active backend.");
         Assert(hudInstance is not null && hudInstance.GetType().FullName == "Il2CppScheduleOne.UI.HUD", "Generated static member helper should return the fake Il2Cpp HUD instance.");
         object hud = hudInstance!;
 
@@ -2483,6 +2755,380 @@ internal sealed partial class S1InteropFixtureTests
         object? delegateSupportCalled = delegateSupportType.GetField("WasCalled")?.GetValue(null);
         Assert(ReferenceEquals(convertedDelegate, action), "Generated delegate bridge should return the converted delegate instance.");
         Assert(delegateSupportCalled is true, "Generated delegate bridge should route IL2CPP delegate conversion through reflected DelegateSupport.ConvertDelegate<T>.");
+    }
+
+    private void BackendNeutralSteamNetworkingHelpersSelectCompatiblePacketOverloads()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("Steamworks.SteamNetworking", Alias = "SteamNetworking")]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+
+            namespace Steamworks
+            {
+                public struct CSteamID
+                {
+                    public ulong m_SteamID;
+
+                    public CSteamID(ulong value)
+                    {
+                        m_SteamID = value;
+                    }
+                }
+
+                public enum EP2PSend
+                {
+                    k_EP2PSendUnreliable,
+                    k_EP2PSendReliable
+                }
+
+                public static class SteamAPI
+                {
+                    public static int CallbackRuns;
+
+                    public static bool IsSteamRunning() => true;
+
+                    public static void RunCallbacks()
+                    {
+                        CallbackRuns++;
+                    }
+                }
+
+                public static class SteamNetworking
+                {
+                    public static byte[] NextPacket = new byte[] { 4, 5, 6 };
+                    public static CSteamID NextSender = new CSteamID(76561198000000001UL);
+                    public static byte[]? LastSent;
+                    public static CSteamID LastTarget;
+                    public static EP2PSend LastSendType;
+                    public static int LastChannel;
+                    public static bool RelayAllowed;
+                    public static CSteamID LastAcceptedSession;
+                    public static int WrongSendOverloadCalls;
+                    public static int WrongReadOverloadCalls;
+
+                    public static bool AllowP2PPacketRelay(bool allow)
+                    {
+                        RelayAllowed = allow;
+                        return true;
+                    }
+
+                    public static bool AcceptP2PSessionWithUser(CSteamID steamIDRemote)
+                    {
+                        LastAcceptedSession = steamIDRemote;
+                        return true;
+                    }
+
+                    public static bool SendP2PPacket(CSteamID steamIDRemote, string pubData, uint cubData, EP2PSend eP2PSendType, int nChannel = 0)
+                    {
+                        WrongSendOverloadCalls++;
+                        return false;
+                    }
+
+                    public static bool SendP2PPacket(CSteamID steamIDRemote, byte[] pubData, uint cubData, EP2PSend eP2PSendType, int nChannel = 0)
+                    {
+                        LastTarget = steamIDRemote;
+                        LastSendType = eP2PSendType;
+                        LastChannel = nChannel;
+                        LastSent = new byte[(int)cubData];
+                        System.Array.Copy(pubData, LastSent, (int)cubData);
+                        return true;
+                    }
+
+                    public static bool IsP2PPacketAvailable(out uint pcubMsgSize, int nChannel = 0)
+                    {
+                        pcubMsgSize = (uint)NextPacket.Length;
+                        return NextPacket.Length > 0;
+                    }
+
+                    public static bool ReadP2PPacket(string pubDest, uint cubDest, out uint pcubMsgSize, out CSteamID psteamIDRemote, int nChannel = 0)
+                    {
+                        WrongReadOverloadCalls++;
+                        pcubMsgSize = 0;
+                        psteamIDRemote = default;
+                        return false;
+                    }
+
+                    public static bool ReadP2PPacket(byte[] pubDest, uint cubDest, out uint pcubMsgSize, out CSteamID psteamIDRemote, int nChannel = 0)
+                    {
+                        int count = System.Math.Min((int)cubDest, NextPacket.Length);
+                        System.Array.Copy(NextPacket, pubDest, count);
+                        pcubMsgSize = (uint)count;
+                        psteamIDRemote = NextSender;
+                        LastChannel = nChannel;
+                        return true;
+                    }
+                }
+            }
+            """;
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.SteamNetworking", "MONO");
+        Type helperType = assembly.GetType("S1Interop.Generated.S1InteropSteamNetworking", throwOnError: true)!;
+        Type steamIdType = assembly.GetType("Steamworks.CSteamID", throwOnError: true)!;
+        Type apiType = assembly.GetType("Steamworks.SteamAPI", throwOnError: true)!;
+        Type networkingType = assembly.GetType("Steamworks.SteamNetworking", throwOnError: true)!;
+
+        object target = Activator.CreateInstance(steamIdType, [76561198000000002UL])!;
+        MethodInfo isSteamRunning = helperType.GetMethod("IsSteamRunning", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose IsSteamRunning.");
+        MethodInfo runCallbacks = helperType.GetMethod("RunCallbacks", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose RunCallbacks.");
+        MethodInfo allowRelay = helperType.GetMethod("AllowP2PPacketRelay", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose AllowP2PPacketRelay.");
+        MethodInfo acceptSession = helperType.GetMethod("AcceptP2PSessionWithUser", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose AcceptP2PSessionWithUser.");
+        MethodInfo getReliableSendMode = helperType.GetMethod("GetReliableP2PSendMode", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose GetReliableP2PSendMode.");
+        object? reliable = getReliableSendMode.Invoke(null, null);
+        MethodInfo send = helperType.GetMethod("SendP2PPacket", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose SendP2PPacket.");
+
+        Assert(isSteamRunning.Invoke(null, null) is true, "Generated Steam networking helper should resolve SteamAPI.IsSteamRunning.");
+        runCallbacks.Invoke(null, null);
+        Assert(apiType.GetField("CallbackRuns")?.GetValue(null) is 1, "Generated Steam networking helper should run SteamAPI callbacks.");
+        Assert(allowRelay.Invoke(null, [true]) is true, "Generated Steam networking helper should enable Steam P2P packet relay.");
+        Assert(networkingType.GetField("RelayAllowed")?.GetValue(null) is true, "Generated Steam networking helper should pass the relay flag.");
+        Assert(reliable is not null && string.Equals(reliable.ToString(), "k_EP2PSendReliable", StringComparison.Ordinal), $"Generated Steam networking helper should resolve EP2PSend reliably. Value={reliable}");
+        Assert(acceptSession.Invoke(null, [target]) is true, "Generated Steam networking helper should accept a P2P session with a backend Steam ID.");
+        Assert(networkingType.GetField("LastAcceptedSession")?.GetValue(null) is object acceptedSession && GetSteamIdField(acceptedSession) == 76561198000000002UL, "Generated Steam networking helper should pass the accepted session target.");
+
+        object? sendResult = send.Invoke(null, [target, new byte[] { 1, 2, 3 }, reliable, 7]);
+
+        Assert(sendResult is true, "Generated Steam networking helper should send through the compatible byte-buffer overload.");
+        Assert(networkingType.GetField("WrongSendOverloadCalls")?.GetValue(null) is 0, "Generated Steam networking helper should skip incompatible same-arity send overloads.");
+        Assert(networkingType.GetField("LastSent")?.GetValue(null) is byte[] sent && sent.SequenceEqual(new byte[] { 1, 2, 3 }), "Generated Steam networking helper should copy packet bytes into the backend buffer.");
+        Assert(networkingType.GetField("LastChannel")?.GetValue(null) is 7, "Generated Steam networking helper should pass the selected P2P channel.");
+
+        MethodInfo read = helperType.GetMethod("TryReadP2PPacket", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose TryReadP2PPacket.");
+        object?[] readArgs = [9, (uint)32, null, null, (uint)0, false];
+        object? readResult = read.Invoke(null, readArgs);
+
+        Assert(readResult is true, "Generated Steam networking helper should read through the compatible byte-buffer overload.");
+        Assert(networkingType.GetField("WrongReadOverloadCalls")?.GetValue(null) is 0, "Generated Steam networking helper should skip incompatible same-arity read overloads.");
+        Assert(readArgs[3] is byte[] readData && readData.SequenceEqual(new byte[] { 4, 5, 6 }), "Generated Steam networking helper should copy backend packet bytes into a managed byte array.");
+        Assert(readArgs[4] is uint packetSize && packetSize == 3, $"Generated Steam networking helper should report available packet size. Size={readArgs[4]}");
+        Assert(readArgs[5] is false, "Generated Steam networking helper should not mark in-limit packets as discarded.");
+
+        MethodInfo getSteamIdValue = helperType.GetMethod("GetSteamIdValue", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam networking helper did not expose GetSteamIdValue.");
+        object? senderValue = getSteamIdValue.Invoke(null, [readArgs[2]]);
+        Assert(senderValue is 76561198000000001UL, $"Generated Steam networking helper should extract CSteamID.m_SteamID values. Value={senderValue}");
+
+        networkingType.GetField("NextPacket")?.SetValue(null, Enumerable.Range(0, 40).Select(value => (byte)value).ToArray());
+        object?[] discardArgs = [9, (uint)8, null, null, (uint)0, false];
+        object? discardResult = read.Invoke(null, discardArgs);
+
+        Assert(discardResult is true, "Generated Steam networking helper should consume oversized packets through the compatible read overload.");
+        Assert(discardArgs[3] is byte[] discardedData && discardedData.Length == 0, "Generated Steam networking helper should not expose oversized packet bytes after discard.");
+        Assert(discardArgs[4] is uint discardedPacketSize && discardedPacketSize == 40, $"Generated Steam networking helper should report the discarded packet size. Size={discardArgs[4]}");
+        Assert(discardArgs[5] is true, "Generated Steam networking helper should mark oversized packets as discarded.");
+
+        static ulong GetSteamIdField(object steamId) =>
+            (ulong)(steamId.GetType().GetField("m_SteamID")?.GetValue(steamId) ?? 0UL);
+    }
+
+    private void BackendNeutralSteamLobbyHelperResolvesCurrentLobbyAndMembers()
+    {
+        const string source =
+            """
+            namespace ScheduleOne.DevUtilities
+            {
+                public class Singleton<T> where T : class
+                {
+                    public static bool InstanceExists => true;
+                    public static T? Instance { get; } = System.Activator.CreateInstance(typeof(T), nonPublic: true) as T;
+                }
+            }
+
+            namespace ScheduleOne.Networking
+            {
+                public sealed class Lobby
+                {
+                    public bool IsInLobby => true;
+                    public bool IsHost => false;
+                    public int PlayerCount => 3;
+                    public Steamworks.CSteamID LobbySteamID => new Steamworks.CSteamID(111UL);
+                    public Steamworks.CSteamID LocalPlayerID => new Steamworks.CSteamID(222UL);
+
+                    private Lobby()
+                    {
+                    }
+                }
+            }
+
+            namespace Steamworks
+            {
+                public struct CSteamID
+                {
+                    public ulong m_SteamID;
+
+                    public CSteamID(ulong value)
+                    {
+                        m_SteamID = value;
+                    }
+                }
+
+                public static class SteamMatchmaking
+                {
+                    public static CSteamID GetLobbyOwner(CSteamID lobbyId) => new CSteamID(lobbyId.m_SteamID + 10UL);
+                    public static int GetNumLobbyMembers(CSteamID lobbyId) => 2;
+                    public static CSteamID GetLobbyMemberByIndex(CSteamID lobbyId, int index) => new CSteamID(lobbyId.m_SteamID + (ulong)index + 20UL);
+                }
+            }
+            """;
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.SteamLobby", "MONO");
+        Type helperType = assembly.GetType("S1Interop.Generated.S1InteropSteamLobby", throwOnError: true)!;
+        Type snapshotType = assembly.GetType("S1Interop.Generated.S1InteropSteamLobbySnapshot", throwOnError: true)!;
+
+        MethodInfo tryGetCurrentLobby = helperType.GetMethod("TryGetCurrentLobby", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam lobby helper did not expose TryGetCurrentLobby.");
+        object?[] snapshotArgs = [null];
+        object? lobbyResult = tryGetCurrentLobby.Invoke(null, snapshotArgs);
+        object snapshot = snapshotArgs[0] ?? throw new InvalidOperationException("TryGetCurrentLobby should populate a lobby snapshot.");
+
+        Assert(lobbyResult is true, "Generated Steam lobby helper should resolve Schedule One's Singleton<Lobby> instance.");
+        Assert(snapshotType.GetProperty("HasValue")?.GetValue(snapshot) is true, "Generated Steam lobby snapshot should report a resolved lobby.");
+        Assert(snapshotType.GetProperty("IsInLobby")?.GetValue(snapshot) is true, "Generated Steam lobby snapshot should expose IsInLobby.");
+        Assert(snapshotType.GetProperty("IsHost")?.GetValue(snapshot) is false, "Generated Steam lobby snapshot should expose IsHost.");
+        Assert(snapshotType.GetProperty("PlayerCount")?.GetValue(snapshot) is 3, "Generated Steam lobby snapshot should expose PlayerCount.");
+
+        MethodInfo tryGetHostId = helperType.GetMethod("TryGetHostId", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam lobby helper did not expose TryGetHostId.");
+        object?[] hostArgs = [snapshot, null];
+        object? hostResult = tryGetHostId.Invoke(null, hostArgs);
+        Assert(hostResult is true, "Generated Steam lobby helper should resolve the lobby host through SteamMatchmaking.");
+
+        MethodInfo getSteamIdValue = helperType.GetMethod("GetSteamIdValue", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam lobby helper did not expose GetSteamIdValue.");
+        object? hostValue = getSteamIdValue.Invoke(null, [hostArgs[1]]);
+        Assert(hostValue is 121UL, $"Generated Steam lobby helper should extract the host CSteamID value. Value={hostValue}");
+
+        MethodInfo getLobbyMembers = helperType.GetMethod("GetLobbyMembers", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated Steam lobby helper did not expose GetLobbyMembers.");
+        object membersValue = getLobbyMembers.Invoke(null, [snapshot])
+            ?? throw new InvalidOperationException("GetLobbyMembers should return an enumerable.");
+        ulong[] members = ((System.Collections.IEnumerable)membersValue)
+            .Cast<object>()
+            .Select(member => (ulong)getSteamIdValue.Invoke(null, [member])!)
+            .ToArray();
+
+        Assert(members.SequenceEqual(new[] { 131UL, 132UL }), $"Generated Steam lobby helper should enumerate Steam lobby members. Members={string.Join(",", members)}");
+    }
+
+    private void BackendNeutralMemberRegistryReportsRuntimeResolutionFailures()
+    {
+        const string source =
+            """
+            [assembly: S1Interop.S1InteropType("ScheduleOne.UI.HUD", Alias = "Hud")]
+            [assembly: S1Interop.S1InteropMember("Hud", "MissingMethod", Alias = "HudMissingMethod", Kind = S1Interop.S1InteropMemberKind.Method)]
+            [assembly: S1Interop.S1InteropMember("Hud", "Overloaded", Alias = "HudOverloaded", Kind = S1Interop.S1InteropMemberKind.Method)]
+            [assembly: S1Interop.S1InteropMember("Hud", "NeedsMissingParameter", Alias = "HudNeedsMissingParameter", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "ScheduleOne.MissingType" })]
+            [assembly: S1Interop.S1InteropMember("Hud", "SetLevel", Alias = "HudSetLevel", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "int" })]
+
+            namespace SyntheticMod
+            {
+                internal static class Core
+                {
+                }
+            }
+
+            namespace ScheduleOne.UI
+            {
+                public sealed class HUD
+                {
+                    public static int StaticScale;
+
+                    public void Overloaded()
+                    {
+                    }
+
+                    public void Overloaded(int value)
+                    {
+                    }
+
+                    public void NeedsMissingParameter(string value)
+                    {
+                    }
+
+                    public string SetLevel(int value)
+                    {
+                        return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+
+                    public static string FormatStatic(int value)
+                    {
+                        StaticScale = value;
+                        return value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                }
+            }
+            """;
+
+        System.Reflection.Assembly assembly = CompileAndLoadS1InteropGeneratedAssembly(source, "SyntheticMod.MemberReports", "MONO");
+        Type memberRegistryType = assembly.GetType("S1Interop.Generated.S1InteropMemberRegistry", throwOnError: true)!;
+        MethodInfo clearReports = memberRegistryType.GetMethod("ClearReports", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Generated member registry did not expose ClearReports.");
+        clearReports.Invoke(null, null);
+
+        object? missingMethod = memberRegistryType.GetProperty("HudMissingMethodMethod")?.GetValue(null);
+        object? overloadedMethod = memberRegistryType.GetProperty("HudOverloadedMethod")?.GetValue(null);
+        object? missingParameterMethod = memberRegistryType.GetProperty("HudNeedsMissingParameterMethod")?.GetValue(null);
+
+        Type hudType = assembly.GetType("ScheduleOne.UI.HUD", throwOnError: true)!;
+        object hud = Activator.CreateInstance(hudType)!;
+        MethodInfo invokeSetLevel = GetNonGenericMethod(memberRegistryType, "InvokeHudSetLevel", typeof(object), typeof(object[]))
+            ?? throw new InvalidOperationException("Generated member registry did not expose InvokeHudSetLevel.");
+        object? badArgumentResult = invokeSetLevel.Invoke(null, [hud, new object?[] { "not-an-int" }]);
+        MethodInfo getStaticValue = GetNonGenericMethod(memberRegistryType, "GetStaticValue", typeof(Type), typeof(string))
+            ?? throw new InvalidOperationException("Generated member registry did not expose GetStaticValue.");
+        MethodInfo trySetStaticValue = GetNonGenericMethod(memberRegistryType, "TrySetStaticValue", typeof(Type), typeof(string), typeof(object))
+            ?? throw new InvalidOperationException("Generated member registry did not expose TrySetStaticValue.");
+        MethodInfo tryInvokeInstance = GetNonGenericMethod(memberRegistryType, "TryInvokeInstance", typeof(object), typeof(string), typeof(object).MakeByRefType(), typeof(object[]))
+            ?? throw new InvalidOperationException("Generated member registry did not expose TryInvokeInstance.");
+        MethodInfo tryInvokeStatic = GetNonGenericMethod(memberRegistryType, "TryInvokeStatic", typeof(Type), typeof(string), typeof(object).MakeByRefType(), typeof(object[]))
+            ?? throw new InvalidOperationException("Generated member registry did not expose TryInvokeStatic.");
+
+        object? setStaticResult = trySetStaticValue.Invoke(null, [hudType, "StaticScale", "12"]);
+        object? staticScale = getStaticValue.Invoke(null, [hudType, "StaticScale"]);
+        object?[] tryInvokeInstanceArgs = [hud, "SetLevel", null, new object?[] { "34" }];
+        object? tryInvokeInstanceResult = tryInvokeInstance.Invoke(null, tryInvokeInstanceArgs);
+        object?[] tryInvokeStaticArgs = [hudType, "FormatStatic", null, new object?[] { "56" }];
+        object? tryInvokeStaticResult = tryInvokeStatic.Invoke(null, tryInvokeStaticArgs);
+
+        Assert(missingMethod is null, "Generated member registry should return null for a missing runtime method.");
+        Assert(overloadedMethod is null, "Generated member registry should return null, not throw, for ambiguous overloads without ParameterTypeNames.");
+        Assert(missingParameterMethod is null, "Generated member registry should return null when a declared parameter type cannot be resolved.");
+        Assert(badArgumentResult is null, "Generated member registry should return null when arguments cannot be converted.");
+        Assert(setStaticResult is true, "Generated member registry should set static values by runtime Type.");
+        Assert(staticScale is 12, $"Generated member registry should get static values by runtime Type. StaticScale={staticScale}");
+        Assert(tryInvokeInstanceResult is true && string.Equals(tryInvokeInstanceArgs[2]?.ToString(), "34", StringComparison.Ordinal), $"Generated member registry should expose bool-returning instance invocation. Result={tryInvokeInstanceResult}, Value={tryInvokeInstanceArgs[2]}");
+        Assert(tryInvokeStaticResult is true && string.Equals(tryInvokeStaticArgs[2]?.ToString(), "56", StringComparison.Ordinal), $"Generated member registry should expose bool-returning static invocation. Result={tryInvokeStaticResult}, Value={tryInvokeStaticArgs[2]}");
+
+        IReadOnlyList<object> reports = GetGeneratedMemberReports(memberRegistryType);
+        Assert(
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "MissingMember", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "MemberName")?.ToString(), "MissingMethod", StringComparison.Ordinal)) &&
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "AmbiguousMember", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "MemberName")?.ToString(), "Overloaded", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "ExceptionTypeName")?.ToString(), "System.Reflection.AmbiguousMatchException", StringComparison.Ordinal)) &&
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "MissingParameterType", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "MemberName")?.ToString(), "NeedsMissingParameter", StringComparison.Ordinal) &&
+                (GetReportValue(report, "ParameterTypeNames")?.ToString() ?? string.Empty).Contains("ScheduleOne.MissingType", StringComparison.Ordinal)) &&
+            reports.Any(report =>
+                string.Equals(GetReportValue(report, "Status")?.ToString(), "ArgumentConversionFailed", StringComparison.Ordinal) &&
+                string.Equals(GetReportValue(report, "MemberName")?.ToString(), "SetLevel", StringComparison.Ordinal)),
+            $"Generated member registry should report missing, ambiguous, parameter-resolution, and conversion failures. Reports:{Environment.NewLine}{string.Join(Environment.NewLine, reports)}");
     }
 
     private void S1InteropGeneratorProducesCompileTimeEventBridges()

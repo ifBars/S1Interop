@@ -27,7 +27,7 @@ The generator is compile-time only. It reads declarations already in the compila
 | Report `S1I001`-`S1I008` diagnostics | Generator package, during compilation. |
 | Resolve Mono/IL2CPP type names at runtime | Generated `S1Interop.Generated.S1InteropRuntime` and `S1InteropTypeRegistry`. |
 
-If your mod references only the generator package, you can author declarations by hand. The CLI is helpful, but not required at runtime.
+If your mod references only the generator package, you can author declarations by hand. You can also reference it just for diagnostics and generated runtime helpers. The CLI is helpful, but not required at runtime.
 
 ## Generated source files
 
@@ -51,7 +51,7 @@ Internal infrastructure shared by every facade and by migration-rewritten call s
 
 - `S1InteropRuntime` and `S1InteropRuntimeBackend`: detect or constant-bind the active backend (`Mono`, `Il2Cpp`, or `Unknown`). When the build target is known at compile time, `Backend` is emitted as a `const`; otherwise it is resolved at runtime through type and assembly probes.
 - `S1InteropTypeRegistry`: the type-name and resolution cache. Exposes per-alias `*Name`, `*MonoName`, `*Il2CppName`, `Resolve`, `Create`, `IsInstance`, `As*`, `TryAs*`, `Is*`, `Get*`, `TrySet*`, `Invoke*`, and `Invoke*<T>` members.
-- `S1InteropMemberRegistry`: reflection-based get/set/invoke helpers used by the registry and facades.
+- `S1InteropMemberRegistry`: reflection-based get/set/invoke helpers used by the registry and facades. It also records runtime resolution reports when a helper cannot resolve a type, member, overload signature, or argument conversion.
 - `S1InteropHarmonyPatcher`: emitted only when `[S1InteropPatch]` is used. It is internal generated infrastructure, not an author-facing `PatchAll` API. It records per-patch status so missing IL2CPP targets and Harmony failures are visible.
 - `S1InteropObject<TTag>`: the generic backend-neutral handle backing every facade `Handle`.
 - `S1InteropObjectCast`: object/proxy unwrapping helper referenced by `S1I007` diagnostics.
@@ -80,6 +80,19 @@ Each facade exposes:
 - Named member accessors discovered from reference metadata or declared via `S1InteropMember`. Metadata-backed scalar, string, object, void method shapes, declared enum mirrors, and game-object values with declared facades get concrete signatures, including explicit member declarations when the referenced Mono and IL2CPP metadata resolve one compatible target. Read-only discovered values get getters without named `TrySet...` helpers; undeclared game wrapper types, collections, by-ref parameters, generated backing fields, ambiguous overloads, and unresolved explicit declarations stay on object/generic fallback helpers.
 
 Generated facades are `internal` by default. The generator does not shorten namespaces: `ScheduleOne.Vehicles.LandVehicle` always becomes `S1Interop.ScheduleOne.Vehicles.LandVehicle`, never `S1Interop.Vehicles.LandVehicle`.
+
+## Runtime member reports
+
+If a generated member helper returns `null` or `false`, check `S1Interop.Generated.S1InteropMemberRegistry.Reports`. Reports are recorded for failed runtime lookups and calls, including:
+
+- `MissingOwnerType`: the active backend type name did not resolve.
+- `MissingMember`: the field, property, or method was not present on the resolved type.
+- `MissingParameterType`: one of the declared `ParameterTypeNames` could not be resolved for the active backend.
+- `AmbiguousMember`: reflection found more than one possible target, usually because an overloaded method was declared without `ParameterTypeNames`.
+- `ArgumentConversionFailed`: S1Interop found the method or setter, but the supplied value could not be converted to the runtime signature.
+- `InvocationFailed`, `ValueAccessFailed`, `ValueSetFailed`, and `ResolutionFailed`: reflection reached the target but the active backend rejected the operation.
+
+For IL2CPP, `MissingMember` can mean the member was renamed, stripped, moved to a generated wrapper shape S1Interop does not know about yet, or inlined so aggressively that patching a lower-level helper is the wrong target. Treat the report as the starting point: verify the current IL2CPP wrapper metadata and pick a higher-level method when the original member no longer exists or no longer fires.
 
 ## How declarations map to generated output
 

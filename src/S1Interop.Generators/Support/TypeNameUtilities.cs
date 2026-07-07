@@ -57,6 +57,11 @@ internal static class TypeNameUtilities
             return "Il2Cpp" + monoTypeName;
         }
 
+        if (monoTypeName.StartsWith("Steamworks.", StringComparison.Ordinal))
+        {
+            return "Il2Cpp" + monoTypeName;
+        }
+
         return monoTypeName;
     }
 

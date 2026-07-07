@@ -41,6 +41,8 @@ internal static class GeneratorConstants
     [
         "Assembly-CSharp",
         "Il2CppAssembly-CSharp",
-        "Il2CppScheduleOne.Core"
+        "Il2CppScheduleOne.Core",
+        "com.rlabrecque.steamworks.net",
+        "Il2Cppcom.rlabrecque.steamworks.net"
     ];
 }

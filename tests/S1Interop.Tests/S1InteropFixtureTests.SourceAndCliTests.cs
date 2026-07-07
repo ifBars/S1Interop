@@ -2079,19 +2079,20 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 solutionSource.Contains("Debug|Any CPU = Debug|Any CPU", StringComparison.Ordinal) &&
                 solutionSource.Contains("Release|Any CPU = Release|Any CPU", StringComparison.Ordinal) &&
-                solutionSource.Contains("Debug Il2Cpp|Any CPU = Debug Il2Cpp|Any CPU", StringComparison.Ordinal) &&
-                solutionSource.Contains("Release Il2Cpp|Any CPU = Release Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                !solutionSource.Contains("Debug Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                !solutionSource.Contains("Release Il2Cpp|Any CPU", StringComparison.Ordinal) &&
                 solutionSource.Contains($"{projectName}.csproj", StringComparison.Ordinal),
-                "Generated solution should expose Mono-default and IL2CPP reference configurations for Visual Studio and Rider.");
+                "Generated solution should expose one normal Debug/Release build for the backend-neutral shipping assembly.");
             Assert(
                 projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
                 projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
                 projectSource.Contains(S1InteropPackageInfo.GeneratorsPackageId, StringComparison.Ordinal) &&
                 projectSource.Contains($"PrivateAssets=\"{S1InteropPackageInfo.PrivateAssets}\"", StringComparison.Ordinal) &&
                 projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
-                projectSource.Contains("<Configurations>Debug;Release;Debug Il2Cpp;Release Il2Cpp</Configurations>", StringComparison.Ordinal) &&
-                projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'=='' and ('$(Configuration)'=='Debug Il2Cpp' or '$(Configuration)'=='Release Il2Cpp')\">Il2Cpp</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
+                projectSource.Contains("<Configurations>Debug;Release</Configurations>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropTargetRuntime Condition=\"'$(S1InteropTargetRuntime)'==''\">Unknown</S1InteropTargetRuntime>", StringComparison.Ordinal) &&
                 projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'==''\">Mono</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
+                projectSource.Contains("<BaseOutputPath Condition=\"'$(BaseOutputPath)'=='' and '$(S1InteropTargetRuntime)'=='Unknown'\">bin\\Single\\</BaseOutputPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<GamePath Condition=\"'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'\">$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<ManagedPath Condition=\"'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''\">$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
@@ -2100,7 +2101,7 @@ internal sealed partial class S1InteropFixtureTests
                 projectSource.Contains("<Reference Include=\"Assembly-CSharp\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"ScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'!='Il2Cpp'\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"Il2CppScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'=='Il2Cpp'\">", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and select Mono or IL2CPP game references without forcing backend-specific generated code.");
+                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and default to a Mono-reference backend-neutral single output.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
                 coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
@@ -2124,9 +2125,10 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 readmeSource.Contains("## First local setup", StringComparison.Ordinal) &&
                 readmeSource.Contains("Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.", StringComparison.Ordinal) &&
-                readmeSource.Contains("These configurations are validation targets for the same source.", StringComparison.Ordinal) &&
+                readmeSource.Contains("one backend-neutral assembly built against Mono references with runtime backend detection", StringComparison.Ordinal) &&
+                readmeSource.Contains("-p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp", StringComparison.Ordinal) &&
                 readmeSource.Contains("s1interop sdkgen . --apply", StringComparison.Ordinal),
-                "Generated README should guide first-time modders through local setup, safety boundaries, validation targets, and SDK generation.");
+                "Generated README should guide first-time modders through local setup, safety boundaries, single-assembly builds, validation targets, and SDK generation.");
 
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
             File.WriteAllText(
@@ -2166,6 +2168,7 @@ internal sealed partial class S1InteropFixtureTests
                         "--nologo",
                         "-v:minimal",
                         "-p:S1InteropReferenceRuntime=Il2Cpp",
+                        "-p:S1InteropTargetRuntime=Il2Cpp",
                         $"-p:Il2CppGamePath={il2CppGamePath}",
                         $"-p:RestoreAdditionalProjectSources={packageSource}");
                     Assert(il2CppScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local IL2CPP game path without changing source. Output: {il2CppScaffoldBuild.Output}");

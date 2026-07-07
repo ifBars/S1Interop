@@ -244,7 +244,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         builder.AppendLine();
         builder.AppendLine("            try");
         builder.AppendLine("            {");
-        builder.AppendLine("                harmony.Patch(original, prefix: prefix, postfix: postfix, transpiler: null, finalizer: finalizer);");
+        builder.AppendLine("                harmony.Patch(original, prefix: prefix, postfix: postfix, transpiler: null, finalizer: finalizer, ilmanipulator: null);");
         builder.AppendLine("                Record(S1InteropPatchStatus.Applied, targetTypeName, targetMethodName, patchTypeName, null, required);");
         builder.AppendLine("            }");
         builder.AppendLine("            catch (System.Exception exception)");

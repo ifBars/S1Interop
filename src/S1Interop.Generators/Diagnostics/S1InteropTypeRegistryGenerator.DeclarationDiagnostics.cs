@@ -19,7 +19,6 @@ public sealed partial class S1InteropTypeRegistryGenerator
             .Distinct(S1InteropTypeDiagnosticTargetComparer.Instance)
             .ToImmutableArray();
         ImmutableArray<S1InteropMemberDiagnosticTarget> memberTargets = GetDeclaredMemberDiagnosticTargets(compilation)
-            .AddRange(patchTargets.Select(patch => new S1InteropMemberDiagnosticTarget(patch.TargetMemberEntry, patch.Location)))
             .Distinct(S1InteropMemberDiagnosticTargetComparer.Instance)
             .ToImmutableArray();
         if (typeTargets.IsDefaultOrEmpty && memberTargets.IsDefaultOrEmpty)
@@ -85,6 +84,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
             }
         }
 
+        ReportPatchMissingMemberDiagnostics(context, compilation, patchTargets, entriesByAlias, hasMonoSurface, hasIl2CppSurface);
         ReportPatchTargetRiskDiagnostics(context, compilation, patchTargets, entriesByAlias, hasMonoSurface, hasIl2CppSurface);
     }
 
@@ -222,6 +222,68 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 member.Kind == SymbolKind.Property) ||
                 methodMembers.Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias))
         };
+    }
+
+    private static void ReportPatchMissingMemberDiagnostics(
+        SourceProductionContext context,
+        Compilation compilation,
+        ImmutableArray<S1InteropPatchEntry> patches,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
+        bool hasMonoSurface,
+        bool hasIl2CppSurface)
+    {
+        foreach (S1InteropPatchEntry patch in patches)
+        {
+            if (!entriesByAlias.TryGetValue(patch.TargetMemberEntry.OwnerAlias, out S1InteropTypeEntry ownerEntry))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    MemberOwnerNotFoundDiagnostic,
+                    patch.Location,
+                    patch.TargetMemberEntry.MemberName,
+                    patch.TargetMemberEntry.OwnerAlias));
+                continue;
+            }
+
+            bool monoHasMember = hasMonoSurface && TryHasMember(compilation, ownerEntry.MonoTypeName, patch.TargetMemberEntry, RuntimeBackend.Mono, entriesByAlias);
+            bool il2CppHasMember = hasIl2CppSurface && TryHasMember(compilation, ownerEntry.Il2CppTypeName, patch.TargetMemberEntry, RuntimeBackend.Il2Cpp, entriesByAlias);
+            bool anyVisibleMember = monoHasMember || il2CppHasMember;
+
+            if (hasMonoSurface && !monoHasMember && (patch.Required || anyVisibleMember))
+            {
+                ReportMissingPatchMemberDiagnostic(context, patch, ownerEntry.MonoTypeName, "Mono");
+            }
+
+            if (hasIl2CppSurface && !il2CppHasMember && (patch.Required || anyVisibleMember))
+            {
+                ReportMissingPatchMemberDiagnostic(context, patch, ownerEntry.Il2CppTypeName, "IL2CPP");
+            }
+        }
+    }
+
+    private static bool TryHasMember(
+        Compilation compilation,
+        string runtimeTypeName,
+        S1InteropMemberEntry entry,
+        RuntimeBackend runtime,
+        IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
+    {
+        INamedTypeSymbol? ownerType = compilation.GetTypeByMetadataName(runtimeTypeName);
+        return ownerType is not null && HasMember(ownerType, entry, runtime, entriesByAlias);
+    }
+
+    private static void ReportMissingPatchMemberDiagnostic(
+        SourceProductionContext context,
+        S1InteropPatchEntry patch,
+        string runtimeTypeName,
+        string runtimeName)
+    {
+        context.ReportDiagnostic(Diagnostic.Create(
+            MemberNotFoundDiagnostic,
+            patch.Location,
+            patch.TargetMemberEntry.MemberName,
+            patch.TargetMemberEntry.OwnerAlias,
+            runtimeTypeName,
+            runtimeName));
     }
 
     private static bool ParameterTypesMatch(
@@ -405,10 +467,21 @@ public sealed partial class S1InteropTypeRegistryGenerator
         method.Name.StartsWith("remove_", StringComparison.Ordinal) ||
         method.Name.StartsWith("op_", StringComparison.Ordinal);
 
-    private static bool HasAggressiveInliningOrOptimization(IMethodSymbol method) =>
-        method.GetAttributes().Any(attribute =>
+    private static bool HasAggressiveInliningOrOptimization(IMethodSymbol method)
+    {
+        const int aggressiveInlining = 256;
+        const int aggressiveOptimization = 512;
+        int implementationFlags = (int)method.MethodImplementationFlags;
+        if ((implementationFlags & aggressiveInlining) != 0 ||
+            (implementationFlags & aggressiveOptimization) != 0)
+        {
+            return true;
+        }
+
+        return method.GetAttributes().Any(attribute =>
             string.Equals(attribute.AttributeClass?.ToDisplayString(), "System.Runtime.CompilerServices.MethodImplAttribute", StringComparison.Ordinal) &&
             attribute.ConstructorArguments.Any(IsAggressiveMethodImplOption));
+    }
 
     private static bool IsAggressiveMethodImplOption(TypedConstant constant)
     {

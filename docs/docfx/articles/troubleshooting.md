@@ -26,6 +26,19 @@ After adding the reference, run a full build so the generator emits the declarat
 > [!NOTE]
 > Generated symbols are emitted into the same compilation as the rest of your project. They are not a separate assembly and are not referenced from a runtime package. The `S1Interop.Generators` package ships only the generator DLL under `analyzers/dotnet/cs`.
 
+## Generated helper returns null or false
+
+**Cause:** The helper compiled, but the active backend could not complete the runtime lookup or call. Common cases are a method renamed by a game update, an IL2CPP wrapper member that is not present, an overloaded method missing `ParameterTypeNames`, a parameter type that does not resolve on IL2CPP, or a value that cannot be converted to the runtime signature.
+
+**Fix:** Inspect `S1Interop.Generated.S1InteropMemberRegistry.Reports` after the failed call. Check the latest report's `Status`, `OwnerTypeName`, `MemberName`, and `ParameterTypeNames`.
+
+- `MissingMember` means the current backend type does not expose that member. Verify the current Mono and IL2CPP reference assemblies.
+- `AmbiguousMember` means you probably need `ParameterTypeNames`.
+- `MissingParameterType` means a declared overload parameter does not map to a runtime type.
+- `ArgumentConversionFailed` means the target resolved, but the value you passed could not cross the backend boundary.
+
+On IL2CPP, do not assume a Mono member still exists or still gets called. If the wrapper metadata is missing or the method is tiny enough to inline, patch or call a higher-level method that you can verify in the IL2CPP branch.
+
 ## S1I001: game type not found
 
 **Cause:** The generator validated an `S1InteropType` declaration against your referenced Mono or IL2CPP assemblies and could not locate the type. The most common reasons are:

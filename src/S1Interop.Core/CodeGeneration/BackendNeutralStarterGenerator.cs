@@ -15,8 +15,9 @@ public sealed class BackendNeutralStarterGenerator
     public string GenerateSource()
     {
         var builder = new StringBuilder();
-        builder.AppendLine("// Backend-neutral S1Interop declarations for this mod.");
-        builder.AppendLine("// Prefer S1InteropType declarations or generated sdkgen output for game API coverage.");
+        builder.AppendLine("// Optional S1Interop declarations for this mod.");
+        builder.AppendLine("// Leave this file empty if you only want S1Interop diagnostics or built-in runtime helpers.");
+        builder.AppendLine("// Add S1InteropType declarations or generated sdkgen output when you want game API facades.");
         builder.AppendLine("// Use S1InteropMember only for private members, ambiguous overloads, or migration-specific overrides.");
         builder.AppendLine();
         builder.AppendLine("// Examples:");

@@ -66,12 +66,18 @@ public sealed class BackendNeutralProjectScaffolder
             <LangVersion>10.0</LangVersion>
             <Nullable>enable</Nullable>
             <ImplicitUsings>enable</ImplicitUsings>
-            <Configurations>Debug;Release;Debug Il2Cpp;Release Il2Cpp</Configurations>
+            <Configurations>Debug;Release</Configurations>
             <RootNamespace>{projectName}</RootNamespace>
             <AssemblyName>{projectName}</AssemblyName>
             <Version>0.1.0</Version>
-            <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'=='' and ('$(Configuration)'=='Debug Il2Cpp' or '$(Configuration)'=='Release Il2Cpp')">Il2Cpp</S1InteropReferenceRuntime>
+            <S1InteropTargetRuntime Condition="'$(S1InteropTargetRuntime)'==''">Unknown</S1InteropTargetRuntime>
             <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'==''">Mono</S1InteropReferenceRuntime>
+            <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' and '$(S1InteropTargetRuntime)'=='Unknown'">obj\Single\</BaseIntermediateOutputPath>
+            <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'==''">obj\$(S1InteropReferenceRuntime)\</BaseIntermediateOutputPath>
+            <IntermediateOutputPath Condition="'$(S1InteropTargetRuntime)'=='Unknown'">obj\Single\$(Configuration)\$(TargetFramework)\</IntermediateOutputPath>
+            <IntermediateOutputPath Condition="'$(IntermediateOutputPath)'==''">obj\$(S1InteropReferenceRuntime)\$(Configuration)\$(TargetFramework)\</IntermediateOutputPath>
+            <BaseOutputPath Condition="'$(BaseOutputPath)'=='' and '$(S1InteropTargetRuntime)'=='Unknown'">bin\Single\</BaseOutputPath>
+            <BaseOutputPath Condition="'$(BaseOutputPath)'==''">bin\$(S1InteropReferenceRuntime)\</BaseOutputPath>
             <GamePath Condition="'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(Il2CppGamePath)</GamePath>
             <GamePath Condition="'$(GamePath)'==''">$(MonoGamePath)</GamePath>
             <ManagedPath Condition="'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''">$(GamePath)\MelonLoader\Il2CppAssemblies</ManagedPath>
@@ -112,6 +118,7 @@ public sealed class BackendNeutralProjectScaffolder
           </ItemGroup>
 
           <Target Name="ValidateS1InteropLocalPaths" BeforeTargets="ResolveReferences">
+            <Error Text="Backend-neutral single-assembly builds must use S1InteropTargetRuntime=Unknown with S1InteropReferenceRuntime=Mono. IL2CPP reference builds are validation-only; pass -p:S1InteropTargetRuntime=Il2Cpp with -p:S1InteropReferenceRuntime=Il2Cpp when you intentionally want that check." Condition="'$(S1InteropTargetRuntime)'=='Unknown' and '$(S1InteropReferenceRuntime)'!='Mono'" />
             <Error Text="Missing MelonLoader at $(MelonLoaderPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(MelonLoaderPath)'=='' or !Exists('$(MelonLoaderPath)\MelonLoader.dll')" />
             <Error Text="Missing Unity assemblies at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath, or pass -p:MonoGamePath=..." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\UnityEngine.CoreModule.dll')" />
             <Error Text="Missing Schedule One game assembly at $(ManagedPath). Copy local.build.props.example to local.build.props and set MonoGamePath/Il2CppGamePath, or pass the game path as an MSBuild property." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\Assembly-CSharp.dll')" />
@@ -130,8 +137,6 @@ public sealed class BackendNeutralProjectScaffolder
         [
             "Debug",
             "Release",
-            "Debug Il2Cpp",
-            "Release Il2Cpp"
         ];
         var builder = new StringBuilder();
         builder.AppendLine("Microsoft Visual Studio Solution File, Format Version 12.00");
@@ -207,6 +212,8 @@ public sealed class BackendNeutralProjectScaffolder
 
         Backend-neutral Schedule One mod scaffold created by S1Interop.
 
+        This scaffold is the one-DLL path. Existing mods can also use S1Interop for diagnostics-only adoption, dual-runtime migration, or a few generated helpers without using this full shape.
+
         ## First local setup
 
         1. Copy `local.build.props.example` to `local.build.props`.
@@ -216,24 +223,28 @@ public sealed class BackendNeutralProjectScaffolder
 
         `local.build.props` is ignored so machine-specific paths do not get committed. Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.
 
-        Open `{{projectName}}.sln` in Visual Studio or Rider. `Debug` and `Release` use Mono references.
-        `Debug Il2Cpp` and `Release Il2Cpp` use IL2CPP references while keeping the same source and output assembly logic.
+        Open `{{projectName}}.sln` in Visual Studio or Rider. `Debug` and `Release` produce the same kind of DLL you ship: one backend-neutral assembly built against Mono references with runtime backend detection.
 
         ```powershell
         dotnet build .\{{projectName}}.sln -c Debug
-        dotnet build .\{{projectName}}.sln -c "Debug Il2Cpp"
         ```
 
-        These configurations are validation targets for the same source. You should not need separate Mono and IL2CPP implementations for ordinary backend-neutral code.
+        If you intentionally want a compile-only IL2CPP reference check while developing S1Interop declarations, pass explicit properties and do not ship that output:
+
+        ```powershell
+        dotnet build .\{{projectName}}.sln -c Debug -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp
+        ```
+
+        You should not need separate Mono and IL2CPP implementations for ordinary backend-neutral code.
 
         This is still a normal MelonLoader mod. Add S1API, MAPI, SteamNetworkLib, bGUI, or dedicated server references when those libraries fit your mod. Use S1Interop for the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` calls that would otherwise need backend-specific conditionals.
 
         ## Writing your first game-facing code
 
         Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
-        Prefer `S1InteropType` declarations and generated SDK output. Use explicit member declarations only for private members, ambiguous overloads, or migration-specific overrides.
+        Leave the file empty if you only want diagnostics and built-in helper generation. Prefer `S1InteropType` declarations and generated SDK output when you want facade access. Use explicit member declarations only for private members, ambiguous overloads, or migration-specific overrides.
 
-        To seed a generated backend-neutral SDK from your local game references instead of writing type declarations by hand, run:
+        To seed generated facade declarations from your local game references instead of writing type declarations by hand, run:
 
         ```powershell
         s1interop sdkgen . --full-sdk --apply
@@ -249,11 +260,12 @@ public sealed class BackendNeutralProjectScaffolder
 
         ```powershell
         s1interop analyze .
+        s1interop lint .
         s1interop sdkgen . --apply
         s1interop sdkgen . --full-sdk --apply
         ```
 
-        Use `sdkgen . --apply` once your source references the game types it needs. Use `--full-sdk` for an exploratory blank project, then keep type/member declarations narrow as the mod settles.
+        Use `analyze` and `lint` whenever you want feedback without file edits. Use `sdkgen . --apply` once your source references the game types it needs. Use `--full-sdk` for an exploratory blank project, then keep type/member declarations narrow as the mod settles.
         """;
 
     private static string SanitizeIdentifier(string value)

@@ -4,6 +4,8 @@ Use this path when an existing Mono mod should move toward one assembly that run
 
 Backend-neutral source moves away from direct `ScheduleOne.*` or `Il2CppScheduleOne.*` calls and uses generated facades under `S1Interop.ScheduleOne.*`. Mono and IL2CPP configurations remain useful as validation targets.
 
+This is not the only S1Interop path. If you want diagnostics while keeping manual runtime branches, use [Use cases](use-cases.md#diagnostics-only-use). If you want separate Mono and IL2CPP outputs first, use [Migrate to dual-runtime](migrate-to-dual-runtime.md).
+
 ## 1. Analyze the mod
 
 ```powershell
@@ -93,6 +95,8 @@ dotnet build
 ```
 
 If both Mono and IL2CPP references are configured, generator diagnostics can catch bad type names, bad member overrides, and known IL2CPP boundary cases at compile time. See [Diagnostics](diagnostics.md).
+
+You can stop here if diagnostics were the goal. You do not need to generate or rewrite facades until you want S1Interop to own a specific game access seam.
 
 ## Current limits
 

@@ -4,8 +4,9 @@ The API reference is for tooling integrations. It is not the main path for writi
 
 Use the conceptual guides for workflows and architecture, then use the generated API reference for exact signatures, stable result contracts, and XML documentation.
 
-If you are writing a mod, start with the CLI and generated SDK docs:
+If you are writing a mod, start with the workflow docs:
 
+- [Use cases](use-cases.md) for deciding which parts of S1Interop you need.
 - [New projects](new-projects.md) for backend-neutral scaffolding.
 - [Backend-neutral SDK](backend-neutral-sdk.md) for generated facades.
 - [Migration](migrating-mono-mods.md) for existing Mono mods.

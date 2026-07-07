@@ -14,14 +14,25 @@ Choose based on how much runtime-specific code your mod has:
 
 Both paths produce a rollback manifest so you can undo the migration if you change your mind.
 
+## Do I need the whole S1Interop workflow?
+
+No. Pick the parts that solve your current problem.
+
+- Use `analyze`, `lint`, and `build-hook` if you want guardrails while keeping manual Mono/IL2CPP code.
+- Use `migrate --dual-runtime` if you want separate Mono and IL2CPP outputs from one source tree.
+- Use declarations and `S1Interop.Generators` if you want generated helpers, diagnostics, patch targets, or facades.
+- Use `sdkgen` when you want S1Interop to write facade declarations from source usage or local metadata.
+
+See [Use cases](use-cases.md).
+
 ## Do I need both the CLI and the generator package?
 
-Most mods use both:
+Many mods use both, but they do different jobs:
 
 - The **CLI** (`S1Interop`) writes declaration files, migrates source, updates project files, and verifies results in sandboxes. It runs on demand from a terminal and never runs during compilation.
 - The **generator package** (`S1Interop.Generators`) reads those declarations and emits facades, runtime helpers, and diagnostics during every build and IDE design-time compilation of your mod project.
 
-If your project already has declarations and only needs the generated SDK surface, reference just `S1Interop.Generators` and author declarations by hand.
+If your project already has declarations and only needs generated output or diagnostics, reference just `S1Interop.Generators` and author declarations by hand.
 
 > [!NOTE]
 > The `S1Interop.Generators` package ships only a Roslyn analyzer DLL under `analyzers/dotnet/cs`. It does not add a runtime assembly to your mod's output.
@@ -33,6 +44,11 @@ No. If S1Interop cannot prove a rewrite is safe, it produces a source-risk repor
 - Advanced mods that use Harmony transpilers, reflection, or tightly coupled IL2CPP patterns may still need explicit `S1InteropMember` declarations or small manual source edits.
 - Unsupported patterns surface as diagnostics (`S1I004`-`S1I008`) or source-risk entries.
 
+## Do I have to use the generated SDK?
+
+No. The generated SDK is one use case. You can keep hand-written backend branches and still use S1Interop diagnostics, build hooks, patch target attributes, object/delegate bridges, Steam P2P helpers, or selected member bindings.
+
+Use generated facades when they remove real duplicated backend code. Skip them where your manual runtime split is clearer.
 
 ## Does S1Interop redistribute Schedule One game files?
 
@@ -48,7 +64,9 @@ The `local.build.props` file that holds your install paths is gitignored precise
 
 No. S1Interop is a generated interop layer, not a gameplay API.
 
-Use S1API when you want item, NPC, shop, saveable, or UI workflows. Use MAPI when you want building/model construction. Use SteamNetworkLib when you want Steam lobby or P2P helpers. Use DedicatedServerMod APIs for headless server/client extension points.
+Use S1API when you want item, NPC, shop, saveable, or UI workflows. Use MAPI when you want building/model construction. Use SteamNetworkLib when you want a higher-level networking client, sync vars, DTOs, chunking, or a message protocol. Use DedicatedServerMod APIs for headless server/client extension points.
+
+S1Interop can still help networking mods at the low level. Its generated runtime helpers cover backend-neutral Steamworks packet buffers, relay/session calls, callback pumping, reliable send-mode lookup, Steam IDs, and Schedule One lobby member lookup. Your mod should not need separate Mono and IL2CPP reflection paths for those seams.
 
 Use S1Interop when your mod or helper library still needs direct access to `ScheduleOne.*` or `Il2CppScheduleOne.*` types and you do not want every consumer to hand-maintain Mono and IL2CPP conditionals.
 

@@ -2,6 +2,8 @@
 
 `sdkgen` is the CLI command that writes the generated declarations powering the backend-neutral SDK. It produces declaration files on disk; the `S1Interop.Generators` Roslyn package then consumes those declarations at build time. See [Generated output](generator-package.md) for the compile-time side.
 
+Use `sdkgen` when you want generated facades or broad type registration. You do not need it for diagnostics-only adoption, manual Mono/IL2CPP branches, or `migrate --dual-runtime` unless you also want generated helpers for specific game access.
+
 For existing source, use the narrow mode:
 
 ```powershell
@@ -10,7 +12,7 @@ s1interop sdkgen . --apply
 
 This inspects source usage, aliases, namespace imports, string-held game type names, and local reference metadata. It generates the types the project appears to need.
 
-For a blank or exploratory project, use the full SDK mode:
+For a blank or exploratory project that wants broad local type coverage, use the full SDK mode:
 
 ```powershell
 s1interop sdkgen . --full-sdk --apply
