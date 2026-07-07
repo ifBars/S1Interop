@@ -12,8 +12,16 @@ public sealed class HarmonyMethodTargetCatalog
         @"^(?<indent>\s*)(?:(?:var|(?:System\.Reflection\.)?MethodInfo\??)\s+)?(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*AccessTools\.Method\s*\(",
         RegexOptions.Compiled);
 
+    private static readonly Regex TypeOfGetMethodStartRegex = new(
+        @"^(?<indent>\s*)(?:(?:var|(?:System\.Reflection\.)?MethodInfo\??)\s+)?(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*typeof\s*\(\s*(?<type>[A-Za-z_][A-Za-z0-9_.]*)\s*\)\s*\.\s*GetMethod\s*\(",
+        RegexOptions.Compiled);
+
     private static readonly Regex UsingRegex = new(
         @"^\s*using\s+(?<namespace>ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;",
+        RegexOptions.Compiled);
+
+    private static readonly Regex UsingAliasRegex = new(
+        @"^\s*using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;",
         RegexOptions.Compiled);
 
     private static readonly Regex TypeOfRegex = new(
@@ -73,7 +81,8 @@ public sealed class HarmonyMethodTargetCatalog
         for (int index = 0; index < lines.Length; index++)
         {
             Match startMatch = MethodStartRegex.Match(lines[index]);
-            if (!startMatch.Success)
+            Match typeOfGetMethodStartMatch = TypeOfGetMethodStartRegex.Match(lines[index]);
+            if (!startMatch.Success && !typeOfGetMethodStartMatch.Success)
             {
                 continue;
             }
@@ -84,7 +93,7 @@ public sealed class HarmonyMethodTargetCatalog
             }
 
             MatchCollection typeMatches = TypeOfRegex.Matches(block);
-            if (typeMatches.Count < 2)
+            if (typeMatches.Count < 1)
             {
                 continue;
             }
@@ -117,13 +126,10 @@ public sealed class HarmonyMethodTargetCatalog
                 parameterTypeNames.Add(parameterTypeName);
             }
 
-            if (parameterTypeNames.Count == 0)
-            {
-                continue;
-            }
-
             string ownerAlias = GetSimpleTypeName(ownerTypeName);
-            string variableName = startMatch.Groups["variable"].Value;
+            string variableName = startMatch.Success
+                ? startMatch.Groups["variable"].Value
+                : typeOfGetMethodStartMatch.Groups["variable"].Value;
             targets.Add(new HarmonyMethodTarget(
                 Path.GetFullPath(sourceFile),
                 index + 1,
@@ -171,6 +177,13 @@ public sealed class HarmonyMethodTargetCatalog
         var usings = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in lines)
         {
+            Match aliasMatch = UsingAliasRegex.Match(line);
+            if (aliasMatch.Success)
+            {
+                usings[aliasMatch.Groups["alias"].Value] = NormalizeScheduleOneTypeName(aliasMatch.Groups["type"].Value);
+                continue;
+            }
+
             Match match = UsingRegex.Match(line);
             if (!match.Success)
             {
@@ -184,6 +197,11 @@ public sealed class HarmonyMethodTargetCatalog
 
         return usings;
     }
+
+    private static string NormalizeScheduleOneTypeName(string typeName) =>
+        typeName.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal)
+            ? typeName["Il2Cpp".Length..]
+            : typeName;
 
     private static bool TryReadInvocationBlock(IReadOnlyList<string> lines, int startLine, out int endLine, out string block)
     {
@@ -248,6 +266,11 @@ public sealed class HarmonyMethodTargetCatalog
         string sourceType,
         IReadOnlyDictionary<string, string> scheduleOneUsings)
     {
+        if (sourceType.StartsWith("Il2CppScheduleOne.", StringComparison.Ordinal))
+        {
+            return sourceType["Il2Cpp".Length..];
+        }
+
         if (sourceType.StartsWith("ScheduleOne.", StringComparison.Ordinal))
         {
             return sourceType;
@@ -261,6 +284,11 @@ public sealed class HarmonyMethodTargetCatalog
             {
                 return $"{namespaceName}.{simpleName}";
             }
+        }
+
+        if (scheduleOneUsings.TryGetValue(sourceType, out string? typeName))
+        {
+            return typeName;
         }
 
         return simpleName;

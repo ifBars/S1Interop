@@ -69,7 +69,7 @@ Do not try to move an entire mature mod in one pass. Start with the direct game-
 - `using ScheduleOne.*` paired with `using Il2CppScheduleOne.*` under conditionals;
 - casts between `object`, Unity objects, and generated IL2CPP wrappers;
 - public fields or properties that are read from both backends;
-- cached `FieldInfo`, `PropertyInfo`, or property accessor bindings, including simple `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `AccessTools.Field(typeof(...), "...")`, `AccessTools.Property(typeof(...), "...")`, `AccessTools.PropertyGetter(typeof(...), "...")`, and `AccessTools.PropertySetter(typeof(...), "...")` calls;
+- cached `FieldInfo`, `PropertyInfo`, `MethodInfo`, or property accessor bindings, including simple `typeof(...).GetField(...)`, `typeof(...).GetProperty(...)`, `typeof(...).GetMethod(...)`, `AccessTools.Field(typeof(...), "...")`, `AccessTools.Property(typeof(...), "...")`, `AccessTools.PropertyGetter(typeof(...), "...")`, `AccessTools.PropertySetter(typeof(...), "...")`, and `AccessTools.Method(typeof(...), "...")` calls;
 - enum names used in Harmony patches or configuration;
 - constructor calls where Mono and IL2CPP wrappers differ;
 - string-held type names used for Harmony targets or reflection.

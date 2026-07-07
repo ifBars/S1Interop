@@ -289,7 +289,11 @@ public sealed class MigrationPlanner
         MemberAccessTarget[] generatedMemberAccessTargets = new MemberAccessTargetCatalog()
             .Discover(project.ProjectPath)
             .ToArray();
+        HarmonyMethodTarget[] generatedHarmonyMethodTargets = new HarmonyMethodTargetCatalog()
+            .Discover(project.ProjectPath)
+            .ToArray();
         AddGeneratedMemberAccessTargetOperations(project, operations, generatedMemberAccessTargets);
+        AddGeneratedHarmonyMethodTargetOperations(project, operations, generatedHarmonyMethodTargets);
 
         if (options.IncludeSourceRisks && project.SourceInterop is not null && project.SourceInterop.SourceRisks.Count > 0)
         {
@@ -419,7 +423,7 @@ public sealed class MigrationPlanner
                         null,
                         "low",
                         true,
-                        "Install the S1Interop Roslyn generator package required by generated Harmony method target attributes."));
+                        "Install the S1Interop Roslyn generator package required by generated method target attributes."));
                 }
 
                 operations.Add(new MigrationOperation(
@@ -428,7 +432,7 @@ public sealed class MigrationPlanner
                     null,
                     "low",
                     true,
-                    "Generate overload-specific S1InteropMember declarations for Harmony AccessTools.Method targets."));
+                    "Generate S1InteropMember declarations for typed method metadata targets."));
 
                 foreach (string sourceFile in automaticHarmonyOverloadRisks
                              .Select(risk => risk.FilePath)
@@ -441,7 +445,7 @@ public sealed class MigrationPlanner
                         null,
                         "low",
                         true,
-                        "Rewrite simple AccessTools.Method overload bindings to generated S1InteropMemberRegistry MethodInfo properties."));
+                        "Rewrite simple AccessTools.Method and typeof(...).GetMethod bindings to generated S1InteropMemberRegistry MethodInfo properties."));
                 }
             }
 
@@ -614,6 +618,50 @@ public sealed class MigrationPlanner
                 "low",
                 true,
                 "Rewrite simple typed field/property reflection fallback getters through generated S1InteropMemberRegistry accessors."));
+        }
+    }
+
+    private static void AddGeneratedHarmonyMethodTargetOperations(
+        ProjectAnalysis project,
+        List<MigrationOperation> operations,
+        IReadOnlyList<HarmonyMethodTarget> targets)
+    {
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        if (!operations.Any(operation => operation.RuleId == "install_s1interop_generator_package"))
+        {
+            operations.Add(new MigrationOperation(
+                "install_s1interop_generator_package",
+                project.ProjectPath,
+                null,
+                "low",
+                true,
+                "Install the S1Interop Roslyn generator package required by generated method target attributes."));
+        }
+
+        operations.Add(new MigrationOperation(
+            "generate_harmony_method_targets",
+            HarmonyMethodTargetGenerator.GetSourcePath(project.ProjectPath),
+            null,
+            "low",
+            true,
+            "Generate S1InteropMember declarations for typed method metadata targets."));
+
+        foreach (string sourceFile in targets
+                     .Select(target => target.SourceFilePath)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            operations.Add(new MigrationOperation(
+                "rewrite_harmony_overload_bindings",
+                sourceFile,
+                null,
+                "low",
+                true,
+                "Rewrite simple AccessTools.Method and typeof(...).GetMethod bindings to generated S1InteropMemberRegistry MethodInfo properties."));
         }
     }
 

@@ -47,13 +47,18 @@ public sealed class HarmonyOverloadBindingRewriter
             }
 
             string startLine = rewrittenLines[startIndex];
-            int accessToolsIndex = startLine.IndexOf("AccessTools.Method", StringComparison.Ordinal);
-            if (accessToolsIndex < 0 || !startLine.Contains(target.VariableName, StringComparison.Ordinal))
+            int rewriteIndex = startLine.IndexOf("AccessTools.Method", StringComparison.Ordinal);
+            if (rewriteIndex < 0)
+            {
+                rewriteIndex = startLine.IndexOf("typeof", StringComparison.Ordinal);
+            }
+
+            if (rewriteIndex < 0 || !startLine.Contains(target.VariableName, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            string prefix = startLine[..accessToolsIndex];
+            string prefix = startLine[..rewriteIndex];
             string replacement = $"{prefix}S1Interop.Generated.S1InteropMemberRegistry.{target.MethodAlias}Method;";
             rewrittenLines.RemoveRange(startIndex, endIndex - startIndex + 1);
             rewrittenLines.Insert(startIndex, replacement);

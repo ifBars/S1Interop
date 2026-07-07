@@ -358,6 +358,7 @@ internal sealed partial class S1InteropFixtureTests
                 using ScheduleOne.ItemFramework;
                 using ScheduleOne.Management;
                 using ScheduleOne.NPCs.Behaviour;
+                using S1Vehicles = ScheduleOne.Vehicles;
 
                 namespace HarmonyBindingMod;
 
@@ -376,6 +377,13 @@ internal sealed partial class S1InteropFixtureTests
                         );
 
                         harmony.Patch(method, prefix: new HarmonyMethod(typeof(MoveItemPatch), nameof(Prefix)));
+                    }
+
+                    public static void CacheSimpleMethods()
+                    {
+                        var setOwnedColor = typeof(S1Vehicles.LandVehicle).GetMethod("SetOwnedColor",
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        var markLoaded = AccessTools.Method(typeof(MoveItemBehaviour), "MarkLoadedFromSave");
                     }
 
                     private static bool Prefix(ref string invalidReason) => true;
@@ -1197,6 +1205,7 @@ internal sealed partial class S1InteropFixtureTests
                 using ScheduleOne.ItemFramework;
                 using ScheduleOne.Management;
                 using ScheduleOne.NPCs.Behaviour;
+                using S1Vehicles = ScheduleOne.Vehicles;
 
                 namespace HarmonyBindingMod;
 
@@ -1215,6 +1224,13 @@ internal sealed partial class S1InteropFixtureTests
                         );
 
                         harmony.Patch(method, prefix: new HarmonyMethod(typeof(MoveItemPatch), nameof(Prefix)));
+                    }
+
+                    public static void CacheSimpleMethods()
+                    {
+                        var setOwnedColor = typeof(S1Vehicles.LandVehicle).GetMethod("SetOwnedColor",
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        var markLoaded = AccessTools.Method(typeof(MoveItemBehaviour), "MarkLoadedFromSave");
                     }
 
                     private static bool Prefix(ref string invalidReason) => true;
@@ -1239,16 +1255,22 @@ internal sealed partial class S1InteropFixtureTests
             string generated = File.ReadAllText(targetSource);
             Assert(
                 generated.Contains("[assembly: S1Interop.S1InteropType(\"MoveItemBehaviour\", Alias = \"MoveItemBehaviour\")]", StringComparison.Ordinal) &&
-                generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\" })]", StringComparison.Ordinal),
+                generated.Contains("[assembly: S1Interop.S1InteropType(\"ScheduleOne.Vehicles.LandVehicle\", Alias = \"LandVehicle\")]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"IsDestinationValid\", Alias = \"IsDestinationValid\", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { \"TransitRoute\", \"ItemInstance\", \"string&\" })]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropMember(\"MoveItemBehaviour\", \"MarkLoadedFromSave\", Alias = \"MarkLoadedFromSave\", Kind = S1Interop.S1InteropMemberKind.Method)]", StringComparison.Ordinal) &&
+                generated.Contains("[assembly: S1Interop.S1InteropMember(\"LandVehicle\", \"SetOwnedColor\", Alias = \"SetOwnedColor\", Kind = S1Interop.S1InteropMemberKind.Method)]", StringComparison.Ordinal),
                 $"Generated Harmony target attributes are incomplete. Generated source:{Environment.NewLine}{generated}");
 
             string migratedSource = File.ReadAllText(tempSource);
             Assert(
-                migratedSource.Contains("var method = S1Interop.Generated.S1InteropMemberRegistry.IsDestinationValidMethod;", StringComparison.Ordinal),
+                migratedSource.Contains("var method = S1Interop.Generated.S1InteropMemberRegistry.IsDestinationValidMethod;", StringComparison.Ordinal) &&
+                migratedSource.Contains("var setOwnedColor = S1Interop.Generated.S1InteropMemberRegistry.SetOwnedColorMethod;", StringComparison.Ordinal) &&
+                migratedSource.Contains("var markLoaded = S1Interop.Generated.S1InteropMemberRegistry.MarkLoadedFromSaveMethod;", StringComparison.Ordinal),
                 $"Harmony AccessTools.Method block should be rewritten to generated MethodInfo target. Migrated source:{Environment.NewLine}{migratedSource}");
             Assert(
-                !migratedSource.Contains("AccessTools.Method", StringComparison.Ordinal),
-                "Rewritten Harmony source should not keep the old AccessTools.Method block.");
+                !migratedSource.Contains("AccessTools.Method", StringComparison.Ordinal) &&
+                !migratedSource.Contains(".GetMethod(\"SetOwnedColor\"", StringComparison.Ordinal),
+                "Rewritten Harmony source should not keep the old method reflection blocks.");
             Assert(
                 File.ReadAllText(tempProject).Contains("S1Interop.Generators", StringComparison.Ordinal),
                 "Project should reference the S1Interop generator package after migration.");
