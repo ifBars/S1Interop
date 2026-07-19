@@ -5,6 +5,9 @@ using System.Text.RegularExpressions;
 
 namespace S1Interop.Core.CodeGeneration;
 
+/// <summary>
+/// Plans backend-neutral SDK declarations from project source usage and local reference metadata.
+/// </summary>
 public sealed partial class SdkFacadeGenerator
 {
     private static readonly Regex ScheduleOneUsingRegex = new(
@@ -27,11 +30,22 @@ public sealed partial class SdkFacadeGenerator
         @"(?<![A-Za-z0-9_\.])(?<type>[A-Z][A-Za-z0-9_]*)(?:\s*<[^;\r\n{}()]+>)?\s+[A-Za-z_@][A-Za-z0-9_]*|(?<![A-Za-z0-9_\.])(?<type>[A-Z][A-Za-z0-9_]*)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*|\b(?:new|typeof)\s*\(?\s*(?<type>[A-Z][A-Za-z0-9_]*)|<\s*(?<type>[A-Z][A-Za-z0-9_]*)\s*>",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Creates a usage-driven facade plan for an analyzed project.
+    /// </summary>
+    /// <param name="project">The project analysis to inspect for namespaces and game type usage.</param>
+    /// <returns>A plan describing the generated declaration path and detected SDK coverage.</returns>
     public SdkFacadePlan Plan(ProjectAnalysis project)
     {
         return Plan(project, SdkFacadeGeneratorOptions.Default);
     }
 
+    /// <summary>
+    /// Creates a facade plan using explicit SDK generation options.
+    /// </summary>
+    /// <param name="project">The project analysis to inspect.</param>
+    /// <param name="options">Options that select usage-driven or broad namespace registration.</param>
+    /// <returns>A plan describing the generated declaration path and requested SDK coverage.</returns>
     public SdkFacadePlan Plan(ProjectAnalysis project, SdkFacadeGeneratorOptions options)
     {
         string projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;

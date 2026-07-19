@@ -1,23 +1,29 @@
-- name: Overview
-  href: index.md
-- name: Get started
+- name: Start here
   items:
-    - name: Introduction
+    - name: Documentation home
+      href: index.md
+    - name: What S1Interop does
       href: introduction.md
+    - name: Install S1Interop
+      href: getting-started.md
+    - name: Build your first mod
+      href: first-mod.md
+    - name: Common tasks
+      href: common-tasks.md
+    - name: Choose an adoption path
+      href: adoption-guide.md
+    - name: S1API and S1Interop
+      href: s1api-and-s1interop.md
+    - name: Local game paths
+      href: local-paths.md
+- name: Learn the model
+  items:
     - name: Core concepts
       href: core-concepts.md
     - name: Architecture
       href: architecture.md
-    - name: Use cases
+    - name: Ways to use S1Interop
       href: use-cases.md
-    - name: Adoption guide
-      href: adoption-guide.md
-    - name: S1API and S1Interop
-      href: s1api-and-s1interop.md
-    - name: Installation
-      href: getting-started.md
-    - name: Local game paths
-      href: local-paths.md
 - name: CLI reference
   items:
     - name: Commands
@@ -36,7 +42,7 @@
       href: harmony-patching.md
     - name: Diagnostics
       href: diagnostics.md
-- name: Workflows
+- name: Project workflows
   items:
     - name: New projects
       href: new-projects.md

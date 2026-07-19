@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Rewrites supported UnityEvent listener calls through the generated backend-neutral listener bridge.
+/// </summary>
 public sealed class UnityEventListenerRewriter
 {
     private static readonly Regex ListenerCallRegex = new(
@@ -28,6 +31,11 @@ public sealed class UnityEventListenerRewriter
         @"^\s*(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+(?:UnityEngine\.Events\.)?UnityAction(?:<[^>]+>)?\s*\(\s*(?<listener>[A-Za-z_][A-Za-z0-9_]*)\s*\)\s*;",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Checks whether a source risk contains a supported UnityEvent listener call.
+    /// </summary>
+    /// <param name="risk">The source risk to inspect.</param>
+    /// <returns>True when the recorded call can be rewritten safely; otherwise, false.</returns>
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!risk.Kind.Equals("DirectUnityEventListener", StringComparison.OrdinalIgnoreCase))
@@ -44,6 +52,11 @@ public sealed class UnityEventListenerRewriter
         return TryRewriteLine(ExtractSourceLine(risk.Evidence), systemActionNames, wrappedUnityActionNames, out _);
     }
 
+    /// <summary>
+    /// Rewrites supported listener calls and removes local wrapper declarations that become unused.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <returns>The rewritten source, or the original source when no supported pattern is found.</returns>
     public string RewriteSource(string source)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

@@ -3,25 +3,49 @@ using System.Xml.Linq;
 
 namespace S1Interop.Core.Migration;
 
+/// <summary>
+/// Adds IL2CPP configurations and reference groups to an existing Mono-oriented project document.
+/// </summary>
 public static class DualRuntimeProjectScaffolder
 {
     private static readonly Regex ConfigurationConditionRegex = new(
         @"\$\(\s*Configuration\s*\)\s*'?\s*={1,2}\s*(?:'(?<name>[^'|]+)(?:\|[^']*)?'|(?<name>[^'""\)\s|]+))",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// Checks whether a project has a Mono source configuration but no IL2CPP configuration.
+    /// </summary>
+    /// <param name="project">The analyzed project.</param>
+    /// <returns>True when IL2CPP configurations can be scaffolded from an existing Mono configuration; otherwise, false.</returns>
     public static bool NeedsIl2CppConfigurations(ProjectAnalysis project) =>
         project.Configurations.Any(IsSourceMonoConfiguration) &&
         project.Configurations.All(configuration =>
             configuration.Runtime != RuntimeKind.Il2Cpp &&
             !IsIl2CppConfiguration(configuration.Name));
 
+    /// <summary>
+    /// Checks whether a configuration can be used as the Mono source for a generated IL2CPP configuration.
+    /// </summary>
+    /// <param name="configuration">The analyzed configuration.</param>
+    /// <returns>True when the configuration is classified as Mono and is not named like an IL2CPP configuration; otherwise, false.</returns>
     public static bool IsSourceMonoConfiguration(ConfigurationAnalysis configuration) =>
         configuration.Runtime == RuntimeKind.Mono &&
         !IsIl2CppConfiguration(configuration.Name);
 
+    /// <summary>
+    /// Adds missing IL2CPP configurations inferred from all Mono configurations in a project document.
+    /// </summary>
+    /// <param name="document">The project XML document to update.</param>
+    /// <returns>True when the document changed; false when no IL2CPP configuration needed to be added.</returns>
     public static bool Apply(XDocument document) =>
         Apply(document, monoConfigurations: null);
 
+    /// <summary>
+    /// Adds missing IL2CPP configurations for selected Mono source configurations.
+    /// </summary>
+    /// <param name="document">The project XML document to update.</param>
+    /// <param name="monoConfigurations">The Mono configuration names to copy, or null to infer them from the document.</param>
+    /// <returns>True when the document changed; false when no IL2CPP configuration needed to be added.</returns>
     public static bool Apply(XDocument document, IReadOnlyList<string>? monoConfigurations)
     {
         IReadOnlyList<string> configurations = GetConfigurationNames(document);

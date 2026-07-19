@@ -42,6 +42,8 @@ See [Architecture](docs/docfx/articles/architecture.md) for the full SDK generat
 The full docs site lives under [`docs/docfx`](docs/docfx):
 
 - [Introduction](docs/docfx/articles/introduction.md)
+- [Build your first mod](docs/docfx/articles/first-mod.md)
+- [Common tasks](docs/docfx/articles/common-tasks.md)
 - [Architecture](docs/docfx/articles/architecture.md)
 - [Use cases](docs/docfx/articles/use-cases.md)
 - [Core concepts](docs/docfx/articles/core-concepts.md)
@@ -77,7 +79,7 @@ Choose the workflow first:
 
 | You are... | First command after install |
 | --- | --- |
-| New to Schedule One modding | `s1interop new .\MyFirstMod --apply` |
+| New to Schedule I modding | Follow [Build your first mod](docs/docfx/articles/first-mod.md) |
 | Bringing an existing Mono, dual-config, S1API, or hybrid mod | `s1interop analyze .` |
 | Keeping manual backend code but wanting guardrails | `s1interop lint .` |
 | Exploring local game API coverage | `s1interop sdkgen . --full-sdk --apply` |
@@ -126,7 +128,7 @@ If S1Interop creates `local.build.props`, copy or edit the generated file and se
 <Il2CppGamePath>...</Il2CppGamePath>
 ```
 
-For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, fill in both game paths, and open the generated `.sln` in Visual Studio or Rider.
+For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`. The normal one-DLL build needs `MonoGamePath`; add `Il2CppGamePath` when you are ready for the optional IL2CPP reference build. Then open the generated `.sln` in Visual Studio or Rider.
 
 When using local unpublished packages, also set:
 

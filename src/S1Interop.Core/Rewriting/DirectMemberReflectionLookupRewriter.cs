@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Replaces supported direct field and property metadata lookups with generated member metadata.
+/// </summary>
 public sealed class DirectMemberReflectionLookupRewriter
 {
     private static readonly Regex ReflectionLookupReceiverRegex = new(
@@ -20,6 +23,11 @@ public sealed class DirectMemberReflectionLookupRewriter
         @"\.GetProperty\s*\([^)]*\)\s*\.\s*(?<accessor>GetMethod|SetMethod)\b",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Checks whether a recorded reflection lookup has a discovered typed target and a supported statement shape.
+    /// </summary>
+    /// <param name="risk">The source risk to inspect.</param>
+    /// <returns>True when the recorded lookup can be rewritten safely; otherwise, false.</returns>
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!IsSupportedRiskKind(risk) || !File.Exists(risk.FilePath))
@@ -35,6 +43,13 @@ public sealed class DirectMemberReflectionLookupRewriter
         return CanRewriteLine(source, risk.Line, targets);
     }
 
+    /// <summary>
+    /// Rewrites supported member metadata lookups in one source file.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="sourcePath">The path used to match source locations in <paramref name="projectTargets"/>.</param>
+    /// <param name="projectTargets">The discovered member targets for the project.</param>
+    /// <returns>The rewritten source, or the original source when no matching lookup can be changed safely.</returns>
     public string RewriteSource(string source, string sourcePath, IReadOnlyList<MemberAccessTarget> projectTargets)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

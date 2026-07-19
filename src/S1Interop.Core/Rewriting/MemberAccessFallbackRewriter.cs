@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Replaces supported reflection helper get and set calls with generated facade member access.
+/// </summary>
 public sealed class MemberAccessFallbackRewriter
 {
     private static readonly Regex DynamicInstanceLookupPattern = new(
@@ -56,6 +59,11 @@ public sealed class MemberAccessFallbackRewriter
         "virtual"
     };
 
+    /// <summary>
+    /// Checks whether a field-or-property fallback risk can be represented by a generated member target.
+    /// </summary>
+    /// <param name="risk">The source risk to inspect.</param>
+    /// <returns>True when the recorded access has a safe generated replacement; otherwise, false.</returns>
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!risk.Kind.Equals("FieldPropertyReflectionFallback", StringComparison.OrdinalIgnoreCase) ||
@@ -77,6 +85,13 @@ public sealed class MemberAccessFallbackRewriter
                CanRewriteDynamicHelperMethod(source, risk.Line);
     }
 
+    /// <summary>
+    /// Rewrites supported reflection helper calls in one source file.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="sourcePath">The path used to match source locations in <paramref name="projectTargets"/>.</param>
+    /// <param name="projectTargets">The discovered member targets for the project.</param>
+    /// <returns>The rewritten source, or the original source when no matching helper call can be changed safely.</returns>
     public string RewriteSource(string source, string sourcePath, IReadOnlyList<MemberAccessTarget> projectTargets)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

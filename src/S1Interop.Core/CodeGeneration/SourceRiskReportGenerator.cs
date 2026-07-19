@@ -2,19 +2,40 @@ using System.Text;
 
 namespace S1Interop.Core.CodeGeneration;
 
+/// <summary>
+/// Renders migration operations that require manual source review as a Markdown report.
+/// </summary>
 public sealed class SourceRiskReportGenerator
 {
+    /// <summary>
+    /// Gets the generated source-risk report file name.
+    /// </summary>
     public const string ReportFileName = "S1Interop.SourceRisks.md";
 
+    /// <summary>
+    /// Gets the source-risk report path for a project.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>The report path under the project's <c>S1Interop.Generated</c> directory.</returns>
     public static string GetReportPath(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
         return Path.Combine(projectDirectory, "S1Interop.Generated", ReportFileName);
     }
 
+    /// <summary>
+    /// Checks whether a project migration plan contains source-risk operations.
+    /// </summary>
+    /// <param name="projectPlan">The project plan to inspect.</param>
+    /// <returns>True when at least one operation has a <c>source_risk_</c> rule ID; otherwise, false.</returns>
     public static bool HasSourceRiskOperations(ProjectMigrationPlan projectPlan) =>
         projectPlan.Operations.Any(IsSourceRiskOperation);
 
+    /// <summary>
+    /// Generates a Markdown report for source risks in a project migration plan.
+    /// </summary>
+    /// <param name="projectPlan">The project plan whose source-risk operations should be reported.</param>
+    /// <returns>A complete Markdown report ordered by risk and source location.</returns>
     public string GenerateReport(ProjectMigrationPlan projectPlan)
     {
         string projectDirectory = Path.GetDirectoryName(projectPlan.ProjectPath)!;

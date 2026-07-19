@@ -3,11 +3,24 @@ using System.Text.RegularExpressions;
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Rewrites unconditional Mono <c>ScheduleOne</c> using directives for dual-runtime or generated-facade source.
+/// </summary>
 public static class ScheduleOneUsingRewriter
 {
+    /// <summary>
+    /// Selects how Mono using directives are represented after rewriting.
+    /// </summary>
     public enum RewriteMode
     {
+        /// <summary>
+        /// Emits conditional Mono and IL2CPP using directives.
+        /// </summary>
         ConditionalizeAll,
+
+        /// <summary>
+        /// Prefers the generated S1Interop facade namespace and keeps aliases conditional when necessary.
+        /// </summary>
         PreferGlobalFacade
     }
 
@@ -19,6 +32,11 @@ public static class ScheduleOneUsingRewriter
         @"^(?<indent>\s*)using\s+(?<alias>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<target>ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;\s*$",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Finds project C# files with unconditional <c>ScheduleOne</c> using directives outside preprocessor blocks.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>Matching source file paths ordered for stable migration output.</returns>
     public static IReadOnlyList<string> FindFilesWithUnconditionalScheduleOneUsings(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
@@ -34,6 +52,11 @@ public static class ScheduleOneUsingRewriter
             .ToArray();
     }
 
+    /// <summary>
+    /// Rewrites a source file in place using <see cref="RewriteMode.ConditionalizeAll"/>.
+    /// </summary>
+    /// <param name="filePath">The C# source file to rewrite.</param>
+    /// <returns>True when the file was changed; false when it was missing or already required no changes.</returns>
     public static bool RewriteFile(string filePath)
     {
         if (!File.Exists(filePath))
@@ -52,11 +75,22 @@ public static class ScheduleOneUsingRewriter
         return true;
     }
 
+    /// <summary>
+    /// Rewrites C# source using <see cref="RewriteMode.ConditionalizeAll"/>.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <returns>The rewritten source.</returns>
     public static string RewriteSource(string source)
     {
         return RewriteSource(source, RewriteMode.ConditionalizeAll);
     }
 
+    /// <summary>
+    /// Rewrites unconditional Schedule I game using directives with the selected strategy.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="mode">The rewrite strategy.</param>
+    /// <returns>The rewritten source while preserving the original newline style.</returns>
     public static string RewriteSource(string source, RewriteMode mode)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

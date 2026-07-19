@@ -2,16 +2,32 @@ using System.Text;
 
 namespace S1Interop.Core.CodeGeneration;
 
+/// <summary>
+/// Generates S1Interop type and member declarations for discovered field and property accesses.
+/// </summary>
 public sealed class MemberAccessTargetGenerator
 {
+    /// <summary>
+    /// Gets the generated member access declaration file name.
+    /// </summary>
     public const string SourceFileName = "S1Interop.MemberAccessTargets.g.cs";
 
+    /// <summary>
+    /// Gets the generated member access declaration path for a project.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>The path under the project's <c>S1Interop.Generated</c> directory.</returns>
     public static string GetSourcePath(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
         return Path.Combine(projectDirectory, "S1Interop.Generated", SourceFileName);
     }
 
+    /// <summary>
+    /// Generates type and member declarations for the supplied access targets.
+    /// </summary>
+    /// <param name="targets">The discovered field and property access targets to declare.</param>
+    /// <returns>The complete generated C# source.</returns>
     public string GenerateSource(IReadOnlyList<MemberAccessTarget> targets)
     {
         var builder = new StringBuilder();

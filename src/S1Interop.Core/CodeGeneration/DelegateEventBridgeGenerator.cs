@@ -2,16 +2,31 @@ using System.Text;
 
 namespace S1Interop.Core.CodeGeneration;
 
+/// <summary>
+/// Generates the delegate combine and remove helper used by migrated event assignments.
+/// </summary>
 public sealed class DelegateEventBridgeGenerator
 {
+    /// <summary>
+    /// Gets the generated delegate bridge file name.
+    /// </summary>
     public const string SourceFileName = "S1Interop.DelegateEventBridge.g.cs";
 
+    /// <summary>
+    /// Gets the generated delegate bridge path for a project.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>The path under the project's <c>S1Interop.Generated</c> directory.</returns>
     public static string GetSourcePath(string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
         return Path.Combine(projectDirectory, "S1Interop.Generated", SourceFileName);
     }
 
+    /// <summary>
+    /// Generates the backend-neutral delegate event bridge source.
+    /// </summary>
+    /// <returns>The complete generated C# source.</returns>
     public string GenerateSource()
     {
         var builder = new StringBuilder();

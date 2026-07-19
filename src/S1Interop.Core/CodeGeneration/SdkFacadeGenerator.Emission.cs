@@ -4,6 +4,11 @@ namespace S1Interop.Core.CodeGeneration;
 
 public sealed partial class SdkFacadeGenerator
 {
+    /// <summary>
+    /// Generates assembly-level declarations for an SDK facade plan.
+    /// </summary>
+    /// <param name="plan">The planned namespaces and type aliases to emit.</param>
+    /// <returns>The complete generated C# source.</returns>
     public string GenerateSource(SdkFacadePlan plan)
     {
         var builder = new StringBuilder();

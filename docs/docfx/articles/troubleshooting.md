@@ -1,6 +1,32 @@
 # Troubleshooting
 
-Start here when something is silently wrong: no generated symbols, failed restores, stale IDE state, or migration rollback trouble.
+Start with the exact error text. The first sections cover installation and scaffold builds; later sections cover generated code and migrations.
+
+## "s1interop" is not recognized
+
+**Cause:** The global .NET tool is not installed, or the current terminal has not picked up the global tools path.
+
+**Fix:** Check the installed tools:
+
+```powershell
+dotnet tool list --global
+```
+
+If `s1interop` is listed, close and reopen PowerShell. If it is not listed, repeat [Install the command](getting-started.md#3-install-the-command).
+
+## "Missing MelonLoader at ..."
+
+**Cause:** `MonoGamePath` is empty or points below the game root. The scaffold expects a folder containing `Schedule I.exe`, `Schedule I_Data`, and `MelonLoader`.
+
+**Fix:** Open `local.build.props` and correct `MonoGamePath`. Do not point it at `Schedule I_Data`, `Managed`, or `MelonLoader` directly.
+
+The same path mistake can produce `Missing Unity assemblies`, `Missing Schedule One game assembly`, or `Missing ScheduleOne.Core`. See [Local game paths](local-paths.md#which-folder-to-use) for the expected folder layout.
+
+## Runtime shows Unknown
+
+**Cause:** A backend-neutral build could not find the well-known Schedule I type or assembly names used by the generated runtime probe.
+
+**Fix:** Confirm the DLL is running under MelonLoader inside Schedule I, not in a standalone test process. Check `MelonLoader\Latest.log` for assembly-load failures and make sure the DLL came from the normal `bin\Single` build. If the game or generated IL2CPP assembly names changed, keep the log because the probe list may need a S1Interop update.
 
 ## "type or namespace 'S1InteropType' could not be found"
 
@@ -26,6 +52,20 @@ After adding the reference, run a full build so the generator emits the declarat
 > [!NOTE]
 > Generated symbols are emitted into the same compilation as the rest of your project. They are not a separate assembly and are not referenced from a runtime package. The `S1Interop.Generators` package ships only the generator DLL under `analyzers/dotnet/cs`.
 
+## Generated code does not match the current source
+
+**Cause:** You rebuilt a local alpha package without changing its version, but NuGet reused the older `S1Interop.Generators` package already stored on your machine. This can make a newly packed generator behave differently from the source you just built.
+
+**Fix:** Close the IDE, remove only the cached copy of this alpha package, then restore it from the local feed:
+
+```powershell
+$cachedPackage = Join-Path $env:USERPROFILE ".nuget\packages\s1interop.generators\0.1.0-alpha.1"
+Remove-Item -LiteralPath $cachedPackage -Recurse
+dotnet restore
+```
+
+This deletes generated package-cache files, not your mod source. `dotnet restore` recreates them from `S1InteropGeneratorPackageSource`. Do not clear the entire NuGet cache for this problem.
+
 ## Generated helper returns null or false
 
 **Cause:** The helper compiled, but the active backend could not complete the runtime lookup or call. Common cases are a method renamed by a game update, an IL2CPP wrapper member that is not present, an overloaded method missing `ParameterTypeNames`, a parameter type that does not resolve on IL2CPP, or a value that cannot be converted to the runtime signature.
@@ -41,14 +81,14 @@ On IL2CPP, do not assume a Mono member still exists or still gets called. If the
 
 ## S1I001: game type not found
 
-**Cause:** The generator validated an `S1InteropType` declaration against your referenced Mono or IL2CPP assemblies and could not locate the type. The most common reasons are:
+**Cause:** The generator validated an `S1InteropType` declaration against an available Mono or IL2CPP reference surface and could not locate the type. The most common reasons are:
 
-- `MonoGamePath` or `Il2CppGamePath` is not set in `local.build.props`, so no game assembly surface is available.
-- The type name in the declaration does not match the actual runtime type name in the game assembly.
+- The type name in the declaration does not match the actual Mono runtime type name.
+- The selected reference surface is older or newer than the game version the declaration was written against.
 
 **Fix:**
 
-1. Open `local.build.props` (copy from `local.build.props.example` if it does not exist yet) and verify both paths point to your Schedule One installs:
+1. Open `local.build.props` (copy from `local.build.props.example` if it does not exist yet) and verify the path for the build you are running points to the correct Schedule I install:
 
 ```xml
 <Project>

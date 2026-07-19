@@ -1,21 +1,22 @@
 # S1Interop docs
 
-Build, migrate, analyze, and validate Schedule One mods that need direct game access on Mono, IL2CPP, or both.
+S1Interop helps a Schedule I mod call game code without spreading Mono and IL2CPP differences through the whole project. It can also inspect an existing mod, point out risky interop code, and test migrations in a temporary copy.
 
-S1Interop is modular. You can use diagnostics only, add dual-runtime build support, generate a few helper bindings, or move a mod toward one backend-neutral DLL.
+If this is your first mod, follow these pages in order:
 
-## Start here
+1. [What S1Interop does](introduction.md)
+2. [Install S1Interop](getting-started.md)
+3. [Build your first mod](first-mod.md)
+4. [Common tasks](common-tasks.md)
 
-| Page | Use it when |
-| --- | --- |
-| [Introduction](introduction.md) | What S1Interop is and where it fits beside S1API, MAPI, and other modding libraries. |
-| [Core concepts](core-concepts.md) | The vocabulary: facade, `Handle`, declarations, registry, and `S1InteropObject<TTag>`. |
-| [Architecture](architecture.md) | How `sdkgen`, declarations, the generator, and the single DLL runtime flow fit together. |
-| [Use cases](use-cases.md) | Pick the parts of S1Interop you actually need. |
-| [Adoption guide](adoption-guide.md) | Pick a path for a new mod, existing Mono mod, S1API mod, or mixed Mono/IL2CPP project. |
-| [S1API and S1Interop](s1api-and-s1interop.md) | Decide what stays in S1API and what should move behind generated interop. |
-| [Installation](getting-started.md) | Build the local alpha packages and install the CLI. |
-| [Local game paths](local-paths.md) | Configure local Mono and IL2CPP game references without committing machine paths. |
+The first mod is intentionally tiny: it builds one DLL and prints the active backend when Schedule I loads it. The common tasks page then adds one generated game type and an IL2CPP reference check.
+
+## Coming from an existing mod
+
+- [Choose an adoption path](adoption-guide.md) before changing files.
+- [Ways to use S1Interop](use-cases.md) if you only need diagnostics or dual-runtime builds.
+- [Migration overview](migrating-mono-mods.md) for the backend-neutral and dual-runtime paths.
+- [S1API and S1Interop](s1api-and-s1interop.md) if a higher-level API already owns most of the mod.
 
 ## CLI reference
 
@@ -26,7 +27,7 @@ The `s1interop` command handles project analysis, scaffolding, migration plans, 
 | [Commands](commands.md) | Command syntax and options. |
 | [SDK generation](sdk-generation.md) | Generate declarations from source usage or local game metadata. |
 
-## Generator package
+## Generated code
 
 The `S1Interop.Generators` package runs during compilation and emits the backend-neutral surface your mod uses.
 
@@ -37,7 +38,7 @@ The `S1Interop.Generators` package runs during compilation and emits the backend
 | [Declarations](backend-neutral-declarations.md) | Attribute reference for types, members, patches, and bridges. |
 | [Diagnostics](diagnostics.md) | Compiler diagnostics for declarations and IL2CPP boundary risks. |
 
-## Workflows
+## Project workflows
 
 End-to-end paths that combine CLI commands and generated code.
 

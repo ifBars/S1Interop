@@ -6,8 +6,9 @@ Use the conceptual guides for workflows and architecture, then use the generated
 
 If you are writing a mod, start with the workflow docs:
 
+- [Build your first mod](first-mod.md) for a complete scaffold, build, and install path.
+- [Common tasks](common-tasks.md) for the first generated game type and IL2CPP reference check.
 - [Use cases](use-cases.md) for deciding which parts of S1Interop you need.
-- [New projects](new-projects.md) for backend-neutral scaffolding.
 - [Backend-neutral SDK](backend-neutral-sdk.md) for generated facades.
 - [Migration](migrating-mono-mods.md) for existing Mono mods.
 - [Diagnostics](diagnostics.md) for compile-time checks.

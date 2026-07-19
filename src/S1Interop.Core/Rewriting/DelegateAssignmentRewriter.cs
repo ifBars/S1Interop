@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Rewrites supported <see cref="Delegate.Combine(Delegate, Delegate)"/> and <see cref="Delegate.Remove(Delegate, Delegate)"/> assignments through the generated delegate event bridge.
+/// </summary>
 public sealed class DelegateAssignmentRewriter
 {
     private static readonly Regex AssignmentRegex = new(
@@ -12,6 +15,11 @@ public sealed class DelegateAssignmentRewriter
         @"^(?<path>.+\.cs):(?<line>\d+):\s*(?<source>.+)$",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Checks whether a source risk contains a supported delegate combine or remove assignment.
+    /// </summary>
+    /// <param name="risk">The source risk to inspect.</param>
+    /// <returns>True when the recorded line can be rewritten safely; otherwise, false.</returns>
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!risk.Kind.Equals("DirectDelegateCombine", StringComparison.OrdinalIgnoreCase))
@@ -22,6 +30,11 @@ public sealed class DelegateAssignmentRewriter
         return TryRewriteLine(ExtractSourceLine(risk.Evidence), out _);
     }
 
+    /// <summary>
+    /// Rewrites supported delegate assignments in C# source while preserving its newline style.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <returns>The rewritten source, or the original source when no supported pattern is found.</returns>
     public string RewriteSource(string source)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

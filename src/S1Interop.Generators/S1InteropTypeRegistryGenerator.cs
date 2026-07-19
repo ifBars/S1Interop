@@ -10,9 +10,16 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace S1Interop.Generators;
 
+/// <summary>
+/// Generates S1Interop declarations, runtime registries, type facades, patch bindings, bridge helpers, and interop diagnostics for a consuming mod project.
+/// </summary>
 [Generator]
 public sealed partial class S1InteropTypeRegistryGenerator : IIncrementalGenerator
 {
+    /// <summary>
+    /// Registers the incremental source and diagnostic pipelines used by the generator.
+    /// </summary>
+    /// <param name="context">The Roslyn incremental generator initialization context.</param>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(static output =>

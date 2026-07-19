@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Analysis;
 
+/// <summary>
+/// Discovers field and property reflection patterns that can move to generated S1Interop member declarations.
+/// </summary>
 public sealed class MemberAccessTargetCatalog
 {
     private static readonly HashSet<string> ExcludedDirectoryNames = new(
@@ -73,6 +76,11 @@ public sealed class MemberAccessTargetCatalog
         "MelonLoader."
     ];
 
+    /// <summary>
+    /// Discovers supported member access targets across a project's C# source and existing generated declarations.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>Unique member targets with generated owner and member aliases.</returns>
     public IReadOnlyList<MemberAccessTarget> Discover(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -92,6 +100,11 @@ public sealed class MemberAccessTargetCatalog
         return CreateUniqueAliases(sourceTargets);
     }
 
+    /// <summary>
+    /// Discovers supported field and property access targets in one C# source file.
+    /// </summary>
+    /// <param name="sourceFile">The C# source file to inspect.</param>
+    /// <returns>The member targets found in the file, or an empty list when the file does not exist.</returns>
     public IReadOnlyList<MemberAccessTarget> DiscoverFileTargets(string sourceFile)
     {
         if (!File.Exists(sourceFile))

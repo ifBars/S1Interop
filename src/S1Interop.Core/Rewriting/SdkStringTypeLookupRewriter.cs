@@ -2,12 +2,21 @@
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Replaces supported string-based game type lookups with generated registry properties.
+/// </summary>
 public static class SdkStringTypeLookupRewriter
 {
     private static readonly Regex TypeLookupRegex = new(
         @"(?<call>AccessTools\.TypeByName|(?:System\.)?Type\.GetType)\s*\(\s*(?<literal>@?""(?<type>(?:Il2Cpp)?ScheduleOne(?:\.[A-Za-z_][A-Za-z0-9_]*){2,})"")\s*(?:,\s*(?:throwOnError\s*:\s*)?false)?\s*\)",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Finds project C# files containing string-based type lookups covered by unique SDK aliases.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>Matching source file paths ordered for stable migration output.</returns>
     public static IReadOnlyList<string> FindFilesWithRewritableTypeLookups(
         string projectPath,
         IReadOnlyList<SdkTypeAlias> aliases)
@@ -26,6 +35,12 @@ public static class SdkStringTypeLookupRewriter
             .ToArray();
     }
 
+    /// <summary>
+    /// Rewrites supported <c>AccessTools.TypeByName</c> and <c>Type.GetType</c> calls.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>The rewritten source, leaving ambiguous or unknown type names unchanged.</returns>
     public static string RewriteSource(string source, IReadOnlyList<SdkTypeAlias> aliases)
     {
         if (aliases.Count == 0)

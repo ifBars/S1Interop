@@ -1,12 +1,12 @@
 # Core concepts
 
-Start here for the terms used throughout the S1Interop docs.
+Read this page when the beginner guides start using a term you do not know. You do not need to memorize it before building the first mod.
 
 For the high-level "what is S1Interop" pitch, see [Introduction](introduction.md). For the full generated-symbol reference, see [Generated output](generator-package.md).
 
 ## Runtimes and backends
 
-Schedule One ships both a Mono build and an IL2CPP build, and players may run either one. Without S1Interop, you usually maintain separate mod assemblies: one referencing `Assembly-CSharp.dll` and one referencing `Il2CppAssembly-CSharp.dll`.
+Schedule I's public `none` and `beta` branches use IL2CPP. The `alternate` and `alternate-beta` branches use Mono. Both reference surfaces contain an `Assembly-CSharp.dll`, but they come from different folders and expose game types differently.
 
 S1Interop can move that split behind generated facades, but that is not the only use case. It can also analyze existing projects, add build-time diagnostics, scaffold dual-runtime builds, or generate a small helper surface while you keep manual backend code.
 
@@ -14,7 +14,8 @@ S1Interop can move that split behind generated facades, but that is not the only
 
 | Aspect | Mono | IL2CPP |
 | --- | --- | --- |
-| **Game assembly** | `Assembly-CSharp.dll` | `Il2CppAssembly-CSharp.dll` |
+| **Game reference folder** | `Schedule I_Data\Managed` | `MelonLoader\Il2CppAssemblies` |
+| **Main game assembly** | `Assembly-CSharp.dll` | `Assembly-CSharp.dll` plus generated wrapper assemblies such as `Il2CppScheduleOne.Core.dll` |
 | **Game type namespace** | `ScheduleOne.*` | `Il2CppScheduleOne.*` |
 | **Interop layer** | Ordinary managed .NET | Il2CppInterop-generated wrapper types |
 | **Harmony patching** | Standard `MethodBase` | Proxy-aware; transpilers restricted |
@@ -56,8 +57,8 @@ When the build target is known at compile time through the MSBuild property or p
 
 | Term | Meaning |
 | --- | --- |
-| **Mono** | The managed runtime Schedule One ships with in its default build. Mod assemblies reference `Assembly-CSharp.dll` and use ordinary managed types under `ScheduleOne.*`. |
-| **IL2CPP** | The alternate runtime Schedule One ships for IL2CPP builds. Mod assemblies reference `Il2CppAssembly-CSharp.dll` and use Il2CppInterop-generated wrapper types under `Il2CppScheduleOne.*`. |
+| **Mono** | The managed backend used by the `alternate` and `alternate-beta` Steam branches. Mod projects read normal managed assemblies from `Schedule I_Data\Managed` and use game types under `ScheduleOne.*`. |
+| **IL2CPP** | The backend used by the public `none` and `beta` Steam branches. MelonLoader generates managed interop assemblies under `MelonLoader\Il2CppAssemblies`; game wrappers use namespaces such as `Il2CppScheduleOne.*`. |
 | **Backend** | The active runtime for a given compilation or process: `Mono`, `Il2Cpp`, or `Unknown` (when the generator cannot tell). S1Interop resolves the backend at compile time when preprocessor symbols or the `S1InteropTargetRuntime` MSBuild property are set, and falls back to runtime probes otherwise. |
 | **Backend-neutral** | Source that compiles and runs against either backend from one assembly, using generated `S1Interop.ScheduleOne.*` facades instead of direct `ScheduleOne.*` or `Il2CppScheduleOne.*` references. A backend-neutral project may still keep Mono and IL2CPP build configurations as validation targets for the same source. |
 

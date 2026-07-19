@@ -1,6 +1,6 @@
-# Adoption guide
+# Choose an adoption path
 
-Pick the smallest S1Interop path that fits your mod.
+Pick the smallest S1Interop path that solves the problem in front of you.
 
 - Existing mod: analyze first, then choose diagnostics, dual-runtime migration, generated helpers, or backend-neutral facades.
 - New mod: scaffold a MelonLoader project when you want one backend-neutral DLL from the start.
@@ -42,37 +42,11 @@ For Harmony targets that change between Mono and IL2CPP, use [backend-neutral Ha
 
 ## First-time modder path
 
-1. Install the .NET SDK 8.0 or later.
-2. Build and install the local alpha CLI from [Installation](getting-started.md).
-3. Create a mod scaffold:
+Follow [Build your first mod](first-mod.md). It covers installation checks, project creation, local game paths, a copyable `ModCore.cs`, the DLL output path, deployment, and the expected MelonLoader message.
 
-```powershell
-s1interop new .\MyFirstScheduleOneMod --apply
-```
+The scaffold starts with generated runtime helpers and an empty declarations file. Game facades under `S1Interop.ScheduleOne.*` appear after you add a declaration or run `sdkgen`, then build. [Common tasks](common-tasks.md) shows that next step with one `PlayerCamera` facade.
 
-4. Copy `local.build.props.example` to `local.build.props`.
-5. Set `MonoGamePath` to an `alternate` or `alternate-beta` branch install and `Il2CppGamePath` to a public `none` or `beta` branch install.
-6. Build the shipping DLL:
-
-```powershell
-dotnet build .\MyFirstScheduleOneMod.sln -c Debug
-```
-
-The output under `bin\Single\Debug` is the DLL you deploy to both Mono and IL2CPP installs. If you want an IL2CPP reference compile while writing declarations, run it explicitly and do not ship that output:
-
-```powershell
-dotnet build .\MyFirstScheduleOneMod.sln -c Debug -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp
-```
-
-7. Add game API coverage as you need it:
-
-```powershell
-s1interop sdkgen . --apply
-```
-
-For an exploratory project, use `--full-sdk` once to seed broad type registration. After that, keep declarations narrow.
-
-The scaffold is still a normal MelonLoader mod: `ModCore.cs`, `[MelonInfo]`, `[MelonGame]`, Harmony references, a `.sln`, and local path props. It starts with `S1Interop.ScheduleOne.*` facades available.
+Do not start with `--full-sdk`. It is useful for broad local API exploration, but a first mod is easier to understand when it declares one type at a time.
 
 ## Existing mod developer path
 

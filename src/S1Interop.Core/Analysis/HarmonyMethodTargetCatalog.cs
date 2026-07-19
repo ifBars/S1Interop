@@ -2,6 +2,9 @@
 
 namespace S1Interop.Core.Analysis;
 
+/// <summary>
+/// Discovers simple Harmony method lookups that can move to generated S1Interop method declarations.
+/// </summary>
 public sealed class HarmonyMethodTargetCatalog
 {
     private static readonly HashSet<string> ExcludedDirectoryNames = new(
@@ -53,6 +56,11 @@ public sealed class HarmonyMethodTargetCatalog
         "void"
     };
 
+    /// <summary>
+    /// Discovers supported Harmony method targets across a project's C# source files.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <returns>Unique method targets with generated owner and method aliases.</returns>
     public IReadOnlyList<HarmonyMethodTarget> Discover(string projectPath)
     {
         string fullProjectPath = Path.GetFullPath(projectPath);
@@ -68,6 +76,11 @@ public sealed class HarmonyMethodTargetCatalog
         return CreateUniqueAliases(sourceFiles.SelectMany(DiscoverFileTargets).ToArray());
     }
 
+    /// <summary>
+    /// Discovers supported Harmony method targets in one C# source file.
+    /// </summary>
+    /// <param name="sourceFile">The C# source file to inspect.</param>
+    /// <returns>The method targets found in the file, or an empty list when the file does not exist.</returns>
     public IReadOnlyList<HarmonyMethodTarget> DiscoverFileTargets(string sourceFile)
     {
         if (!File.Exists(sourceFile))

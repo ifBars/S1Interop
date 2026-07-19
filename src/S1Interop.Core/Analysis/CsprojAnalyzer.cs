@@ -3,6 +3,9 @@ using System.Xml.Linq;
 
 namespace S1Interop.Core.Analysis;
 
+/// <summary>
+/// Reads a C# project and classifies its configurations, references, packages, and source interop risks.
+/// </summary>
 public sealed class CsprojAnalyzer
 {
     private static readonly Regex SimpleConfigurationConditionRegex = new(
@@ -27,6 +30,11 @@ public sealed class CsprojAnalyzer
 
     private static readonly string[] CanonicalRuntimeSymbols = ["MONO", "IL2CPP"];
 
+    /// <summary>
+    /// Analyzes one C# project, including imported MSBuild files and source-level runtime evidence.
+    /// </summary>
+    /// <param name="projectPath">The path to the <c>.csproj</c> file.</param>
+    /// <returns>The configuration classifications, diagnostics, and source interop analysis for the project.</returns>
     public ProjectAnalysis AnalyzeProject(string projectPath)
     {
         string fullPath = Path.GetFullPath(projectPath);

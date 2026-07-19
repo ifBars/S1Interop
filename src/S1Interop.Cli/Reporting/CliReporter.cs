@@ -1,7 +1,14 @@
 using S1Interop.Core.Contracts;
 
+/// <summary>
+/// Writes human-readable S1Interop analysis, migration, and verification results to the console.
+/// </summary>
 public static class CliReporter
 {
+    /// <summary>
+    /// Prints a workspace analysis with project configurations, evidence, and diagnostics.
+    /// </summary>
+    /// <param name="analysis">The workspace analysis to print.</param>
     public static void PrintTextReport(WorkspaceAnalysis analysis)
     {
         Console.WriteLine($"S1Interop analysis: {analysis.Projects.Count} project(s)");
@@ -33,6 +40,10 @@ public static class CliReporter
         }
     }
 
+    /// <summary>
+    /// Prints the planned operations for each project in a migration plan.
+    /// </summary>
+    /// <param name="plan">The migration plan to print.</param>
     public static void PrintMigrationPlan(MigrationPlan plan)
     {
         int operationCount = plan.Projects.Sum(project => project.Operations.Count);
@@ -59,6 +70,10 @@ public static class CliReporter
         }
     }
 
+    /// <summary>
+    /// Prints changed files, skipped operations, and rollback information from an applied migration.
+    /// </summary>
+    /// <param name="result">The migration apply result to print.</param>
     public static void PrintApplyResult(MigrationApplyResult result)
     {
         Console.WriteLine($"S1Interop migration applied: {result.Operations.Count} operation(s)");
@@ -71,6 +86,10 @@ public static class CliReporter
         }
     }
 
+    /// <summary>
+    /// Prints before-and-after diagnostics and build results for one sandbox verification.
+    /// </summary>
+    /// <param name="result">The project verification result to print.</param>
     public static void PrintVerificationResult(MigrationVerificationResult result)
     {
         string status = result.Success ? "passed" : "failed";
@@ -98,6 +117,10 @@ public static class CliReporter
         }
     }
 
+    /// <summary>
+    /// Prints sandbox verification results for every project discovered in a workspace.
+    /// </summary>
+    /// <param name="result">The workspace verification result to print.</param>
     public static void PrintWorkspaceVerificationResult(WorkspaceMigrationVerificationResult result)
     {
         string status = result.Success ? "passed" : "failed";

@@ -3,6 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Replaces supported direct Mono and IL2CPP type references with generated SDK facade names.
+/// </summary>
 public static class SdkTypeAliasRewriter
 {
     private enum RewriteState
@@ -14,6 +17,12 @@ public static class SdkTypeAliasRewriter
         CharLiteral
     }
 
+    /// <summary>
+    /// Finds project C# files containing direct type references covered by unique SDK aliases.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>Matching source file paths ordered for stable migration output.</returns>
     public static IReadOnlyList<string> FindFilesWithRewritableTypeAliases(string projectPath, IReadOnlyList<SdkTypeAlias> aliases)
     {
         string projectDirectory = Path.GetDirectoryName(projectPath)!;
@@ -30,6 +39,12 @@ public static class SdkTypeAliasRewriter
             .ToArray();
     }
 
+    /// <summary>
+    /// Rewrites direct game type names in code while leaving using directives, comments, strings, and character literals unchanged.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>The rewritten source.</returns>
     public static string RewriteSource(string source, IReadOnlyList<SdkTypeAlias> aliases)
     {
         if (aliases.Count == 0)

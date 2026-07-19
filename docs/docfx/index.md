@@ -3,52 +3,51 @@ _layout: landing
 ---
 
 <section class="s1interop-hero">
-  <p class="s1interop-eyebrow">Schedule One interop tooling</p>
-  <h1>Move Mono mods toward IL2CPP without turning every source file into runtime glue.</h1>
-  <p class="s1interop-lead">S1Interop analyzes Schedule One mod projects, generates backend-neutral SDK facades, migrates safe source patterns, and verifies the result in disposable sandboxes.</p>
+  <p class="s1interop-eyebrow">Schedule I modding</p>
+  <h1>Call Schedule I game code from one mod without hand-writing every Mono and IL2CPP difference.</h1>
+  <p class="s1interop-lead">S1Interop creates small MelonLoader projects, generates backend-neutral game-type facades, checks existing mods for interop problems, and tests migrations in temporary copies.</p>
   <div class="s1interop-actions">
-    <a class="s1interop-action s1interop-action-primary" href="articles/adoption-guide.md">Choose your path</a>
-    <a class="s1interop-action" href="articles/s1api-and-s1interop.md">S1API comparison</a>
-    <a class="s1interop-action" href="articles/getting-started.md">Install</a>
-    <a class="s1interop-action" href="articles/core-concepts.md">Core concepts</a>
-    <a class="s1interop-action" href="articles/backend-neutral-sdk.md">Backend-neutral SDK</a>
+    <a class="s1interop-action s1interop-action-primary" href="articles/first-mod.md">Build your first mod</a>
+    <a class="s1interop-action" href="articles/introduction.md">What S1Interop does</a>
+    <a class="s1interop-action" href="articles/getting-started.md">Install S1Interop</a>
+    <a class="s1interop-action" href="articles/adoption-guide.md">I already have a mod</a>
   </div>
 </section>
 
 <section class="s1interop-section">
   <div class="s1interop-section-heading">
-    <p class="s1interop-eyebrow">Use cases</p>
-    <h2>Pick the path that matches the mod in front of you.</h2>
+    <p class="s1interop-eyebrow">Start small</p>
+    <h2>Get one result, then add the next piece.</h2>
   </div>
 
   <div class="s1interop-card-grid">
-    <a class="s1interop-card" href="articles/adoption-guide.md">
-      <h3>Choose the right first command</h3>
-      <p>Separate first-time mod scaffolds, existing mod migration, SDK generation, and sandbox verification before editing a project.</p>
+    <a class="s1interop-card" href="articles/first-mod.md">
+      <h3>Build and load one DLL</h3>
+      <p>Create a project, set local paths, build it, copy the DLL into Mods, and check the exact log message.</p>
+    </a>
+    <a class="s1interop-card" href="articles/common-tasks.md">
+      <h3>Add one game type</h3>
+      <p>Generate a PlayerCamera facade, check the IL2CPP reference surface, or analyze an existing mod.</p>
     </a>
     <a class="s1interop-card" href="articles/s1api-and-s1interop.md">
-      <h3>Use the right layer</h3>
-      <p>Keep S1API for curated content workflows. Use S1Interop for generated direct game access, migration, and low-level backend glue.</p>
+      <h3>Know when to use S1API</h3>
+      <p>Keep items, NPCs, quests, UI, and save workflows in S1API. Use S1Interop for the direct game access left over.</p>
     </a>
-    <a class="s1interop-card" href="articles/new-projects.md">
-      <h3>Start backend-neutral</h3>
-      <p>Create a new project with Mono and IL2CPP configurations, local path props, and generated SDK declarations from the start.</p>
+    <a class="s1interop-card" href="articles/adoption-guide.md">
+      <h3>Work with an existing mod</h3>
+      <p>Start with read-only analysis, then choose diagnostics, separate runtime builds, or a backend-neutral migration.</p>
     </a>
-    <a class="s1interop-card" href="articles/migrate-to-backend-neutral.md">
-      <h3>Migrate an existing mod</h3>
-      <p>Move a Mono-only project toward one backend-neutral assembly using generated SDK declarations and compile-time checks.</p>
-    </a>
-    <a class="s1interop-card" href="articles/diagnostics.md">
-      <h3>Catch IL2CPP failures earlier</h3>
-      <p>Move known runtime-only failures, such as unsafe buffers and IL2CPP boundary collections, into compiler diagnostics.</p>
+    <a class="s1interop-card" href="articles/troubleshooting.md">
+      <h3>Fix the first error</h3>
+      <p>Match missing paths, package restores, generated symbols, runtime detection, and migration failures to concrete checks.</p>
     </a>
   </div>
 </section>
 
 <section class="s1interop-section">
   <div class="s1interop-section-heading">
-    <p class="s1interop-eyebrow">Current alpha</p>
-    <h2>Useful now, still honest about the rough edges.</h2>
+    <p class="s1interop-eyebrow">Go deeper</p>
+    <h2>Read these when the basic project works.</h2>
   </div>
 
   <div class="s1interop-card-grid s1interop-card-grid-wide">

@@ -76,7 +76,7 @@ See [S1API and S1Interop](s1api-and-s1interop.md).
 
 Declaration diagnostics only fire when Mono or IL2CPP reference assemblies are present in the compilation. When `MonoGamePath` and `Il2CppGamePath` are not configured, the generator has no game assembly surface to validate against and stays quiet so package-restore and docs-only builds do not fail.
 
-**Fix:** Copy `local.build.props.example` to `local.build.props` and fill in both paths:
+**Fix:** Copy `local.build.props.example` to `local.build.props` and fill in the path for each reference build you plan to run:
 
 ```xml
 <Project>
@@ -87,7 +87,7 @@ Declaration diagnostics only fire when Mono or IL2CPP reference assemblies are p
 </Project>
 ```
 
-Once both paths resolve to real game installs, `S1I001`-`S1I003` will fire on any declaration whose type or member cannot be found in those assemblies.
+Once the selected build resolves a real game reference surface, `S1I001`-`S1I003` can report declarations whose types or members are missing from that surface. Run both the normal Mono-reference build and the optional IL2CPP-reference build when you want validation against both.
 
 ## Can I use sdkgen without running the CLI first?
 

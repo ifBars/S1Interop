@@ -3,6 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Rewrites supported game object construction and method calls through generated type facades.
+/// </summary>
 public static class SdkTypeFacadeInvocationRewriter
 {
     private enum RewriteState
@@ -26,6 +29,12 @@ public static class SdkTypeFacadeInvocationRewriter
         @"new\s+Il2CppSystem\.Collections\.Generic\.List\s*<(?<type>[^;\r\n<>]+)>\s*\(",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Finds project C# files containing construction or invocation shapes covered by unique SDK aliases.
+    /// </summary>
+    /// <param name="projectPath">The path to the owning <c>.csproj</c> file.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>Matching source file paths ordered for stable migration output.</returns>
     public static IReadOnlyList<string> FindFilesWithRewritableInvocations(
         string projectPath,
         IReadOnlyList<SdkTypeAlias> aliases)
@@ -44,6 +53,12 @@ public static class SdkTypeFacadeInvocationRewriter
             .ToArray();
     }
 
+    /// <summary>
+    /// Rewrites supported construction and method invocation expressions while leaving comments and literals unchanged.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="aliases">The planned Mono and IL2CPP type aliases.</param>
+    /// <returns>The rewritten source.</returns>
     public static string RewriteSource(string source, IReadOnlyList<SdkTypeAlias> aliases)
     {
         if (aliases.Count == 0)

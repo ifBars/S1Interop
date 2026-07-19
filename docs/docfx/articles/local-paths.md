@@ -1,47 +1,79 @@
+---
+title: Local game paths
+description: Point a mod project at local Mono and IL2CPP game installs without committing machine-specific paths.
+uid: s1interop.local-paths
+---
+
 # Local game paths
 
-Schedule One install paths are machine-specific. Keep them out of source control.
+A mod project compiles against DLLs from your own Schedule I install. Those folders differ on every machine, so S1Interop keeps them in `local.build.props`, which the scaffold ignores in git.
 
-S1Interop uses ignored local props files for developer-specific paths:
+## Which folder to use
 
-```xml
-<Project>
-  <PropertyGroup>
-    <MonoGamePath>...</MonoGamePath>
-    <Il2CppGamePath>...</Il2CppGamePath>
-  </PropertyGroup>
-</Project>
-```
+Set each property to the game root: the folder containing `Schedule I.exe`, `Schedule I_Data`, and `MelonLoader`.
 
-Use the branch names already common in Schedule One modding:
-
-| Steam branch | Usual backend | Typical path property |
+| Steam branch | Backend | Property |
 | --- | --- | --- |
-| `none` / public default | IL2CPP | `Il2CppGamePath` |
+| `none` (the public default) | IL2CPP | `Il2CppGamePath` |
 | `beta` | IL2CPP | `Il2CppGamePath` |
 | `alternate` | Mono | `MonoGamePath` |
 | `alternate-beta` | Mono | `MonoGamePath` |
 
-For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, set both paths, and open the generated solution in Visual Studio or Rider.
+Steam normally keeps one branch in its install folder. If you develop against both backends, keep separate copies and give each one a clear folder name.
 
-For existing migrated projects, S1Interop tries to create or repair the same stable path slots. Custom configurations such as `MonoStable` or `Il2cppDevelopment` should still read from `MonoGamePath` and `Il2CppGamePath`.
+## Configure a new project
 
-Many existing S1 mods use names such as `ScheduleOnePath`, `GameInstallPath`, `S1MonoDir`, or `S1IL2CPPDir`. You do not have to rewrite the whole project around S1Interop names, but new generated or migrated files should converge on `MonoGamePath` and `Il2CppGamePath`. Keep compatibility aliases in local props or project files while migrating older build scripts.
+Copy the committed example:
 
-## Verification paths
+```powershell
+Copy-Item .\local.build.props.example .\local.build.props
+```
 
-Build verification can receive paths directly:
+Then edit the copy:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <MonoGamePath>D:\Games\Schedule I_alternate</MonoGamePath>
+    <Il2CppGamePath>D:\Games\Schedule I_public</Il2CppGamePath>
+    <S1InteropGeneratorPackageSource>C:\Code\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+    <RestoreAdditionalProjectSources Condition="'$(S1InteropGeneratorPackageSource)'!=''">$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+</Project>
+```
+
+The normal backend-neutral build uses `MonoGamePath`. `Il2CppGamePath` is needed only for an IL2CPP reference build or migration verification that checks IL2CPP.
+
+The generator package source is required while S1Interop packages are local and unpublished. It points NuGet at the folder containing `S1Interop.Generators.0.1.0-alpha.1.nupkg`.
+
+## What S1Interop reads below each path
+
+For Mono, the scaffold resolves game and Unity references from:
+
+```text
+<MonoGamePath>\Schedule I_Data\Managed
+```
+
+For IL2CPP, it resolves generated wrapper references from:
+
+```text
+<Il2CppGamePath>\MelonLoader\Il2CppAssemblies
+```
+
+It resolves MelonLoader from `MelonLoader\net35` for Mono and `MelonLoader\net6` for IL2CPP. If the IL2CPP assemblies folder is missing, launch that game install with MelonLoader once and check `MelonLoader\Latest.log`.
+
+## Pass paths to sandbox verification
+
+You can provide paths for one verification run without editing a props file:
 
 ```powershell
 s1interop verify-migration . --dual-runtime --build `
-  --mono-game-path "<your Mono Schedule I install>" `
-  --il2cpp-game-path "<your IL2CPP Schedule I install>"
+  --mono-game-path "D:\Games\Schedule I_alternate" `
+  --il2cpp-game-path "D:\Games\Schedule I_public"
 ```
 
-Do not commit `local.build.props`. If a generated or migrated project needs an unpublished local generator package, set `S1InteropGeneratorPackageSource` in the same ignored file:
+The verifier uses those paths in its temporary project copy. It does not copy game assemblies into your repository.
 
-```xml
-<S1InteropGeneratorPackageSource>...\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
-```
+## Keep local files local
 
-Generated projects map that property into `RestoreAdditionalProjectSources`, which keeps IDE and command-line restores pointed at the local alpha package without committing a NuGet source.
+Do not commit `local.build.props`, game assemblies, generated IL2CPP wrappers, decompiled output, or game assets. If an older mod already uses names such as `GameInstallPath` or `ScheduleOnePath`, you can keep compatibility aliases while migrating; generated S1Interop files use `MonoGamePath` and `Il2CppGamePath`.

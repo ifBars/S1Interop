@@ -1,7 +1,15 @@
 ﻿namespace S1Interop.Core.Rewriting;
 
+/// <summary>
+/// Replaces supported Harmony overload lookups with generated method metadata bindings.
+/// </summary>
 public sealed class HarmonyOverloadBindingRewriter
 {
+    /// <summary>
+    /// Checks whether a source risk matches a discovered Harmony method target.
+    /// </summary>
+    /// <param name="risk">The source risk to inspect.</param>
+    /// <returns>True when a target starts on the recorded source line; otherwise, false.</returns>
     public static bool CanRewrite(SourceRisk risk)
     {
         if (!risk.Kind.Equals("HarmonyOverloadBinding", StringComparison.OrdinalIgnoreCase) ||
@@ -15,6 +23,13 @@ public sealed class HarmonyOverloadBindingRewriter
             .Any(target => target.StartLine == risk.Line);
     }
 
+    /// <summary>
+    /// Rewrites supported Harmony method lookups in one source file.
+    /// </summary>
+    /// <param name="source">The original C# source.</param>
+    /// <param name="sourcePath">The path used to match source locations in <paramref name="projectTargets"/>.</param>
+    /// <param name="projectTargets">The discovered Harmony targets for the project.</param>
+    /// <returns>The rewritten source, or the original source when no matching lookup can be changed safely.</returns>
     public string RewriteSource(string source, string sourcePath, IReadOnlyList<HarmonyMethodTarget> projectTargets)
     {
         string newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

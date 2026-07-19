@@ -217,8 +217,8 @@ public sealed class BackendNeutralProjectScaffolder
         ## First local setup
 
         1. Copy `local.build.props.example` to `local.build.props`.
-        2. Set `MonoGamePath` to your Mono `alternate` or `alternate-beta` Schedule I install.
-        3. Set `Il2CppGamePath` to your IL2CPP public `none` or `beta` Schedule I install.
+        2. Set `MonoGamePath` to your Mono `alternate` or `alternate-beta` Schedule I install. The normal one-DLL build needs this path.
+        3. Set `Il2CppGamePath` when you have a separate IL2CPP public `none` or `beta` install and want to run the optional IL2CPP reference check.
         4. If you are using an unpublished/local build of S1Interop, set `{S1InteropPackageInfo.GeneratorsPackageSourceProperty}` to the folder containing `{S1InteropPackageInfo.GeneratorsPackageId}.*.nupkg`.
 
         `local.build.props` is ignored so machine-specific paths do not get committed. Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.
@@ -228,6 +228,8 @@ public sealed class BackendNeutralProjectScaffolder
         ```powershell
         dotnet build .\{{projectName}}.sln -c Debug
         ```
+
+        A successful build writes the shipping DLL to `bin\Single\Debug\netstandard2.1\{{projectName}}.dll`.
 
         If you intentionally want a compile-only IL2CPP reference check while developing S1Interop declarations, pass explicit properties and do not ship that output:
 
@@ -241,10 +243,10 @@ public sealed class BackendNeutralProjectScaffolder
 
         ## Writing your first game-facing code
 
-        Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule One APIs.
+        Add game type declarations in `S1Interop.Generated/S1Interop.BackendNeutral.cs` as your mod touches Schedule I APIs.
         Leave the file empty if you only want diagnostics and built-in helper generation. Prefer `S1InteropType` declarations and generated SDK output when you want facade access. Use explicit member declarations only for private members, ambiguous overloads, or migration-specific overrides.
 
-        To seed generated facade declarations from your local game references instead of writing type declarations by hand, run:
+        To seed broad type registration from your local game references, run:
 
         ```powershell
         s1interop sdkgen . --full-sdk --apply
@@ -254,7 +256,7 @@ public sealed class BackendNeutralProjectScaffolder
         [assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera", Alias = "PlayerCamera")]
         ```
 
-        Use generated facades under `S1Interop.ScheduleOne.*` when you want one assembly to resolve Mono or IL2CPP game types at runtime.
+        Build after adding a declaration. The generator then creates the matching facade under `S1Interop.ScheduleOne.*` so one assembly can resolve the Mono or IL2CPP game type at runtime.
 
         ## Useful next commands
 

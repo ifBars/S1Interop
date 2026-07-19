@@ -1,79 +1,73 @@
-# Introduction
+---
+title: What S1Interop does
+description: Understand the problem S1Interop solves, when to use it, and what it leaves to other modding libraries.
+uid: s1interop.introduction
+---
 
-S1Interop gives Schedule One mods tools for the Mono/IL2CPP boundary.
+# What S1Interop does
 
-You can use it for project analysis, build-time diagnostics, dual-runtime migration, generated SDK facades, rollbackable migrations, sandbox verification, backend-neutral Harmony targets, or small runtime helpers. These parts work together, but you do not have to adopt all of them.
+Schedule I has two game backends that matter to modders:
 
-Keep S1API, MAPI, SteamNetworkLib, and dedicated server APIs where they own the gameplay workflow. Use S1Interop for direct `ScheduleOne.*` / `Il2CppScheduleOne.*` access, type lookup, member binding, casts, delegates, and validation.
+- the public `none` and `beta` Steam branches use IL2CPP;
+- the `alternate` and `alternate-beta` branches use Mono.
 
-Start with [Use cases](use-cases.md) if you are deciding how much of S1Interop to adopt.
+The same game class has a different C# shape on each backend. A Mono mod might use `ScheduleOne.PlayerScripts.PlayerCamera`; an IL2CPP mod sees an Il2CppInterop wrapper such as `Il2CppScheduleOne.PlayerScripts.PlayerCamera`. Casts, delegates, reflection, and Harmony targets can differ too.
 
-If you are already using S1API, start with [S1API and S1Interop](s1api-and-s1interop.md).
+S1Interop puts that low-level difference behind generated code. Your mod can use a facade such as `S1Interop.ScheduleOne.PlayerScripts.PlayerCamera`, while the generated code resolves the real Mono or IL2CPP type when the mod runs.
 
-## Two packages, one workflow
+## When to use it
 
-S1Interop ships as two packages.
+S1Interop is useful when you want to:
 
-| Package | Id | What it is | When it runs |
-| --- | --- | --- | --- |
-| CLI tool | `S1Interop` | A .NET global tool that provides the `s1interop` command. It analyzes projects, plans and applies migrations, generates SDK declaration files, and verifies results in sandboxes. | On demand from a terminal. |
-| Generator | `S1Interop.Generators` | A Roslyn source generator and analyzer package. It reads the declarations written by the CLI (or by hand) and emits generated source, diagnostics, and runtime helpers during compilation. | During every build and IDE design-time compilation of a mod project that references it. |
+- start a MelonLoader mod that ships one DLL for Mono and IL2CPP;
+- inspect an existing mod before adding IL2CPP support;
+- keep separate Mono and IL2CPP builds but catch unsafe code earlier;
+- generate type and member bindings instead of maintaining two reflection paths;
+- resolve a Harmony target on either backend;
+- try a migration in a temporary copy before touching the real project.
 
-Many projects use both. The CLI writes declarations and migration edits; the generator turns those declarations into compiled helpers and diagnostics.
+You can adopt one part. An existing mod can use only `analyze` and `lint`; it does not have to switch to generated facades.
 
-Some projects use only part of this:
+## What it does not do
 
-- diagnostics only, while keeping manual Mono/IL2CPP code;
-- `migrate --dual-runtime`, without moving to a generated SDK yet;
-- a few declarations or helpers for patches, events, casts, Steamworks, or member bindings;
-- full backend-neutral facades for one shipping DLL.
+S1Interop does not create items, NPCs, quests, phone apps, buildings, multiplayer rules, or save systems. Use a higher-level library when one already owns that job:
 
-## What the CLI does
+- S1API for gameplay and content workflows;
+- MAPI for buildings, procedural meshes, and models;
+- SteamNetworkLib for higher-level multiplayer messaging and synchronization;
+- DedicatedServerMod APIs for server and client addon lifecycles.
 
-The CLI handles project-level work outside the compiler:
+S1Interop can sit beside those libraries when a mod still needs one direct game call or patch.
 
-- `analyze`: inspect projects, references, configurations, and source risks.
-- `new`: scaffold a backend-neutral project.
-- `init`: add backend-neutral declarations and generator support to an existing project.
-- `sdkgen`: generate or update backend-neutral SDK declarations from source usage or local game references.
-- `migrate`: plan and apply dual-runtime or backend-neutral migrations.
-- `verify-migration`: run migrations in a disposable sandbox, optionally with builds.
-- `lint` and `build-hook`: report and validate without writing source.
+It also does not convert every mod automatically. Unsafe or ambiguous changes are reported for review. The tool does not redistribute game assemblies, generated IL2CPP wrappers, decompiled code, or game assets.
 
-It writes files and records rollback manifests under `s1interop-runs/<run-id>/`. See [Commands](commands.md) for the full command surface.
+## The CLI and the generator
 
-## What the generator package does
+S1Interop has two packages because they run at different times.
 
-The generator runs during compilation. Once a project references `S1Interop.Generators`, each build:
+| Package | What it does | When it runs |
+| --- | --- | --- |
+| `S1Interop` | Provides the `s1interop` command. It analyzes projects, creates scaffolds, plans and applies migrations, writes declarations, and verifies temporary copies. | When you run a terminal command. |
+| `S1Interop.Generators` | Reads declarations and generates facades, runtime helpers, patch bindings, and compiler diagnostics inside the mod assembly. | While the mod project builds. |
 
-- reads `S1InteropType`, `S1InteropNamespace`, `S1InteropMember`, and bridge attributes from assembly-level declarations;
-- emits the `S1Interop.Generated` runtime registry, type handles, member accessors, and bridge helpers;
-- emits `S1Interop.ScheduleOne.*` type facades with `Handle`, `As`, `TryAs`, `Is`, `Create`, and member accessors;
-- reports `S1I001`-`S1I003` declaration diagnostics, `S1I004`-`S1I007` IL2CPP boundary diagnostics, and `S1I008` patch-target review warnings.
+The generator is a build dependency. Players do not install a separate S1Interop runtime DLL for a generated mod.
 
-Generated symbols appear after a build or IDE design-time build. See [Generated output](generator-package.md) for the full surface and build timing.
+## A small example
 
-For the vocabulary behind these terms (`S1InteropObject<TTag>`, facade, `Handle`, Tag, registry), see [Core concepts](core-concepts.md).
-
-## What S1Interop is not
-
-S1Interop does not convert every mod with one command, reverse IL2CPP into Mono, or guess through every runtime difference. It also never redistributes Schedule One assemblies, IL2CPP wrappers, decompiled source, or game assets.
-
-Backend-neutral does not mean "no per-runtime validation." Keep Mono and IL2CPP build configurations as validation targets for the same source.
-
-## Working shape
-
-Declare a game type once, then work through a generated facade that mirrors the original namespace under `S1Interop`:
+This declaration asks for a facade around one game type:
 
 ```csharp
-[assembly: S1Interop.S1InteropType("ScheduleOne.Vehicles.LandVehicle")]
+[assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera")]
 ```
+
+After a build, mod code can use the generated facade:
 
 ```csharp
-using S1Interop.ScheduleOne.Vehicles;
+using S1Interop.ScheduleOne.PlayerScripts;
 
-LandVehicle.Handle vehicle = LandVehicle.As(rawVehicle);
-string? name = vehicle.VehicleName?.ToString();
+string runtimeTypeName = PlayerCamera.TypeName;
 ```
 
-`S1InteropMember` is the override path for private members, ambiguous overloads, pinned Harmony targets, and reflection seams that the type facade cannot safely infer yet. See [Declarations](backend-neutral-declarations.md) for the full attribute reference.
+The facade keeps the mod source the same. Its runtime type name changes to match Mono or IL2CPP.
+
+New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go to [Choose an adoption path](adoption-guide.md).
