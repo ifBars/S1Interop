@@ -3,7 +3,7 @@
   topicHref: articles/index.md
 - name: API
   href: api/
-  topicHref: articles/api-reference.md
+  topicHref: api/S1Interop.Core.yml
 - name: Contributors
   href: contributors/
   topicHref: contributors/index.md
