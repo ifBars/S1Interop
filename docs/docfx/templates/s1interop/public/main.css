@@ -342,6 +342,7 @@ pre {
   border: 1px solid var(--s1interop-border);
   border-radius: 8px;
   background: var(--s1interop-code) !important;
+  padding: 1rem;
 }
 
 pre code {
