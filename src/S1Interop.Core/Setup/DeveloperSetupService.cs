@@ -20,7 +20,6 @@ public sealed record DeveloperSetupReport(
     string LocalPropsPath,
     string? MonoGamePath,
     string? Il2CppGamePath,
-    string? GeneratorPackageSource,
     bool Ready,
     bool CanApply,
     bool LocalPropsExists,
@@ -42,8 +41,7 @@ public sealed class DeveloperSetupService
     public DeveloperSetupReport Inspect(
         string path,
         string? monoGamePath = null,
-        string? il2CppGamePath = null,
-        string? generatorPackageSource = null)
+        string? il2CppGamePath = null)
     {
         string projectDirectory = ResolveProjectDirectory(path);
         string localPropsPath = Path.Combine(projectDirectory, LocalPropsFileName);
@@ -57,17 +55,11 @@ public sealed class DeveloperSetupService
             il2CppGamePath,
             GetProperty(existingProperties, "Il2CppGamePath"),
             DiscoverGameInstalls().FirstOrDefault(IsIl2CppInstall));
-        string? resolvedPackageSource = ResolveDirectory(
-            generatorPackageSource,
-            GetProperty(existingProperties, S1InteropPackageInfo.GeneratorsPackageSourceProperty),
-            DiscoverGeneratorPackageSource(projectDirectory));
-
         var checks = new List<DeveloperSetupCheck>
         {
             ValidateProjectDirectory(projectDirectory),
             ValidateMonoInstall(resolvedMonoPath),
             ValidateIl2CppInstall(resolvedIl2CppPath),
-            ValidateGeneratorPackageSource(resolvedPackageSource),
             ValidateIgnoreSafety(projectDirectory, localPropsPath)
         };
 
@@ -82,7 +74,7 @@ public sealed class DeveloperSetupService
         }
 
         bool ready = checks
-            .Where(check => check.Id is "project" or "mono" or "generator_package" or "ignore_safety")
+            .Where(check => check.Id is "project" or "mono" or "ignore_safety")
             .All(check => check.Status == "ready");
         bool canApply = ready && !localPropsExists;
 
@@ -91,7 +83,6 @@ public sealed class DeveloperSetupService
             localPropsPath,
             resolvedMonoPath,
             resolvedIl2CppPath,
-            resolvedPackageSource,
             ready,
             canApply,
             localPropsExists,
@@ -116,14 +107,7 @@ public sealed class DeveloperSetupService
                 new XElement(
                     "PropertyGroup",
                     new XElement("MonoGamePath", report.MonoGamePath),
-                    new XElement("Il2CppGamePath", report.Il2CppGamePath ?? string.Empty),
-                    new XElement(S1InteropPackageInfo.GeneratorsPackageSourceProperty, report.GeneratorPackageSource),
-                    new XElement(
-                        S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty,
-                        new XAttribute(
-                            "Condition",
-                            $"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''"),
-                        $"$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})"))));
+                    new XElement("Il2CppGamePath", report.Il2CppGamePath ?? string.Empty))));
 
         try
         {
@@ -221,27 +205,6 @@ public sealed class DeveloperSetupService
                 required ? "missing" : "optional",
                 $"{displayName} path is incomplete at {path}. Missing: {string.Join(", ", missingFiles)}.",
                 remediation);
-    }
-
-    private static DeveloperSetupCheck ValidateGeneratorPackageSource(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
-        {
-            return new DeveloperSetupCheck(
-                "generator_package",
-                "missing",
-                "The local S1Interop.Generators package source was not detected.",
-                "Pack S1Interop.Generators, then pass --generator-package-source <artifacts\\packages>. setup does not install or pack software.");
-        }
-
-        string packageFileName = $"{S1InteropPackageInfo.GeneratorsPackageId}.{S1InteropPackageInfo.GeneratorsPackageVersion}.nupkg";
-        return File.Exists(Path.Combine(path, packageFileName))
-            ? new DeveloperSetupCheck("generator_package", "ready", $"Generator package source is ready at {path}.")
-            : new DeveloperSetupCheck(
-                "generator_package",
-                "missing",
-                $"No exact {packageFileName} package was found in {path}.",
-                "Run dotnet pack for S1Interop.Generators into this folder, then rerun doctor.");
     }
 
     private static DeveloperSetupCheck ValidateIgnoreSafety(string projectDirectory, string localPropsPath) =>
@@ -355,19 +318,4 @@ public sealed class DeveloperSetupService
     private static bool IsIl2CppInstall(string path) =>
         File.Exists(Path.Combine(path, "MelonLoader", "Il2CppAssemblies", "Il2CppScheduleOne.Core.dll"));
 
-    private static string? DiscoverGeneratorPackageSource(string projectDirectory)
-    {
-        string[] candidates =
-        [
-            Path.Combine(projectDirectory, "artifacts", "packages"),
-            Path.GetFullPath(Path.Combine(projectDirectory, "..", "S1Interop", "artifacts", "packages")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "artifacts", "packages"))
-        ];
-        return candidates.FirstOrDefault(path =>
-            Directory.Exists(path) &&
-            Directory.EnumerateFiles(
-                path,
-                $"{S1InteropPackageInfo.GeneratorsPackageId}.{S1InteropPackageInfo.GeneratorsPackageVersion}.nupkg",
-                SearchOption.TopDirectoryOnly).Any());
-    }
 }

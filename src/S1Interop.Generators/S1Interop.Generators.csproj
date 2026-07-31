@@ -12,7 +12,8 @@
     <PackageId>S1Interop.Generators</PackageId>
     <Version>0.1.0-alpha.1</Version>
     <Authors>ifBars</Authors>
-    <Description>Roslyn generators for Schedule One Mono and IL2CPP interop helpers.</Description>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <Description>Roslyn diagnostics and opt-in generated interop helpers for Schedule One Mono and IL2CPP mods.</Description>
     <PackageTags>schedule-one;il2cpp;melonloader;modding;roslyn;source-generator</PackageTags>
     <RepositoryUrl>https://github.com/ifBars/S1Interop</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ifBars/S1Interop</PackageProjectUrl>

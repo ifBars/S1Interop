@@ -67,7 +67,6 @@ s1interop doctor .
 - exactly one project exists in the target directory;
 - the Mono install has the managed game and MelonLoader references;
 - the optional IL2CPP install has generated wrapper assemblies and MelonLoader references;
-- the local alpha generator package exists;
 - `local.build.props` is covered by `.gitignore`.
 
 It is always read-only.
@@ -77,8 +76,7 @@ If a path is not detected, pass it explicitly:
 ```powershell
 s1interop doctor . `
   --mono-game-path "D:\Games\Schedule I_alternate" `
-  --il2cpp-game-path "D:\Games\Schedule I_public" `
-  --generator-package-source "C:\Code\S1Interop\artifacts\packages"
+  --il2cpp-game-path "D:\Games\Schedule I_public"
 ```
 
 Only Mono is required for the first Mono build. IL2CPP is optional until you want to build and test the public branch.

@@ -1,0 +1,91 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Validate and publish packages
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Validate tag and package versions
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $cliProject = [xml](Get-Content -Raw "src\S1Interop.Cli\S1Interop.Cli.csproj")
+          $generatorProject = [xml](Get-Content -Raw "src\S1Interop.Generators\S1Interop.Generators.csproj")
+          $cliVersion = [string]$cliProject.Project.PropertyGroup.Version
+          $generatorVersion = [string]$generatorProject.Project.PropertyGroup.Version
+          if ($cliVersion -ne $version -or $generatorVersion -ne $version) {
+            throw "Tag version $version does not match CLI $cliVersion and generator $generatorVersion."
+          }
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Restore
+        run: dotnet restore S1Interop.sln
+
+      - name: Build
+        run: dotnet build S1Interop.sln --no-restore --configuration Release
+
+      - name: Portable tests
+        run: dotnet run --project tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          dotnet pack src\S1Interop.Cli\S1Interop.Cli.csproj --no-build --configuration Release --output artifacts\packages
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet pack src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output artifacts\packages
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Smoke packaged CLI
+        shell: pwsh
+        run: |
+          dotnet tool install S1Interop --tool-path .\.tools --add-source artifacts\packages --version $env:PACKAGE_VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.tools\s1interop --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.tools\s1interop --help
+
+      - name: Publish NuGet packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "artifacts\packages\S1Interop.Generators.$env:PACKAGE_VERSION.nupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet nuget push "artifacts\packages\S1Interop.$env:PACKAGE_VERSION.nupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releaseArgs = @(
+            "release", "create", "${{ github.ref_name }}",
+            "artifacts\packages\S1Interop.$env:PACKAGE_VERSION.nupkg",
+            "artifacts\packages\S1Interop.Generators.$env:PACKAGE_VERSION.nupkg",
+            "--verify-tag",
+            "--title", "S1Interop $env:PACKAGE_VERSION",
+            "--generate-notes"
+          )
+          if ($env:PACKAGE_VERSION.Contains("-")) {
+            $releaseArgs += "--prerelease"
+          }
+          & gh @releaseArgs

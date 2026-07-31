@@ -41,16 +41,6 @@ public static class S1InteropPackageInfo
     public const string AnalyzerIncludeAssets = "runtime; build; native; contentfiles; analyzers; buildtransitive";
 
     /// <summary>
-    /// Gets the MSBuild property name that can point to a local generator package feed.
-    /// </summary>
-    public const string GeneratorsPackageSourceProperty = "S1InteropGeneratorPackageSource";
-
-    /// <summary>
-    /// Gets the MSBuild property name used to append local restore sources for generated projects.
-    /// </summary>
-    public const string RestoreAdditionalProjectSourcesProperty = "RestoreAdditionalProjectSources";
-
-    /// <summary>
     /// Creates a unique local generator package version for sandbox or unpublished-package validation.
     /// </summary>
     /// <param name="timestamp">The timestamp to embed in the local version suffix.</param>

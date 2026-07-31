@@ -266,7 +266,7 @@ Migration moves committed Schedule One install paths into `local.build.props`. R
 
 Project files should keep configuration-local `GamePath` aliases that point at those runtime properties. This keeps Visual Studio, Rider, and command-line overrides predictable for custom configurations such as `MonoStable`, `MonoDevelopment`, `Il2cppStable`, and `Il2cppDevelopment`.
 
-Generated local props also include `S1InteropGeneratorPackageSource` and the corresponding `RestoreAdditionalProjectSources` bridge. That keeps unpublished alpha generator packages restorable from IDE builds without committing machine-local package feeds.
+Generated local props contain only machine-local game paths. Published `S1Interop.Generators` packages restore through the normal NuGet.org source. Tests and source-development validation may pass an explicit temporary restore source on the command line without adding it to generated projects.
 
 ## Packaging
 

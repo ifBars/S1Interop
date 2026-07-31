@@ -7,8 +7,8 @@ internal static class CliHelp
             S1Interop
 
             Usage:
-              s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--format text|json]
-              s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--dry-run|--apply] [--format text|json]
+              s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--format text|json]
+              s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--dry-run|--apply] [--format text|json]
               s1interop analyze [path=.] [--configuration name] [--format text|json]
               s1interop new <path> [--backend-neutral] [--dry-run|--apply] [--format text|json]
               s1interop init [path=.] [--dry-run|--apply] [--format text|json]
@@ -21,7 +21,7 @@ internal static class CliHelp
               s1interop --version
 
             What it does:
-              doctor detects and validates local game references and the alpha generator package feed without changing files.
+              doctor detects and validates local game references without changing files.
               setup previews or writes an ignored local.build.props file; it never installs software or edits committed project files.
               analyze/lint inspect .csproj files and infer Mono, IL2CPP, and CrossCompat configurations without requiring generated facades.
               new creates a dual-runtime starter by default; --backend-neutral opts into the experimental one-DLL facade scaffold.

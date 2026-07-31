@@ -288,12 +288,9 @@ public sealed class BackendNeutralProjectScaffolder
         $"""
         <Project>
           <PropertyGroup>
-            <!-- Local-only paths and package feeds. Copy this file to local.build.props and keep that file out of source control. -->
+            <!-- Local-only game paths. Copy this file to local.build.props and keep that file out of source control. -->
             <MonoGamePath>C:\Path\To\Schedule I_alternate</MonoGamePath>
             <Il2CppGamePath>C:\Path\To\Schedule I_public</Il2CppGamePath>
-            <!-- Required only while using unpublished/local S1Interop.Generators packages. -->
-            <{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>C:\Path\To\S1Interop\artifacts\packages</{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>
-            <{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition="'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>
           </PropertyGroup>
         </Project>
         """;
@@ -326,7 +323,7 @@ public sealed class BackendNeutralProjectScaffolder
         s1interop setup . --apply
         ```
 
-        Pass `--mono-game-path`, `--il2cpp-game-path`, or `--generator-package-source` when detection needs help. `setup` writes only the ignored `local.build.props`, never installs software, and never overwrites an existing file. Mono is enough for the first build; add the IL2CPP path before treating the experiment as validated.
+        Pass `--mono-game-path` or `--il2cpp-game-path` when detection needs help. `setup` writes only the ignored `local.build.props`, never installs software, and never overwrites an existing file. Mono is enough for the first build; add the IL2CPP path before treating the experiment as validated.
 
         Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.
 

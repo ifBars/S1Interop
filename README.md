@@ -2,6 +2,8 @@
 
 S1Interop helps Schedule I mod developers catch Mono/IL2CPP problems earlier and change projects more safely.
 
+Licensed under [GPL-3.0-only](LICENSE).
+
 Its dependable early value is:
 
 - compile-time diagnostics for known IL2CPP boundary problems;
@@ -90,23 +92,15 @@ See [Choose an adoption path](docs/docfx/articles/adoption-guide.md), [Use cases
 
 ## Install the current alpha
 
-The current alpha is built from this repository. You need .NET SDK 8 or newer:
+S1Interop is distributed as a .NET tool on NuGet.org. You need .NET SDK 8 or newer:
 
 ```powershell
-dotnet restore .\S1Interop.sln
-dotnet build .\S1Interop.sln -c Release
-dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
-dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
-dotnet tool install --global S1Interop --add-source .\artifacts\packages --version 0.1.0-alpha.1
+dotnet tool install --global S1Interop --version 0.1.0-alpha.1
 s1interop --version
 s1interop --help
 ```
 
-Use `dotnet tool update` instead of `install` when that version is already installed. `doctor` and `setup` can accept the package folder explicitly:
-
-```powershell
-s1interop doctor . --generator-package-source C:\Code\S1Interop\artifacts\packages
-```
+Use `dotnet tool update --global S1Interop --version 0.1.0-alpha.1` when that version is already installed. Generated projects restore `S1Interop.Generators` from NuGet.org through their normal `PackageReference`; local game configuration contains only game paths.
 
 Full installation details are in [Install S1Interop](docs/docfx/articles/getting-started.md).
 

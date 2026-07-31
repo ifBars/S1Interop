@@ -42,6 +42,12 @@ internal sealed partial class S1InteropFixtureTests
             contradictoryMutationFlags.ExitCode == 2 &&
             contradictoryMutationFlags.Output.Contains("--dry-run and --apply are mutually exclusive", StringComparison.Ordinal),
             $"Contradictory mutation flags should fail before dispatch. Output: {contradictoryMutationFlags.Output}");
+
+        ProcessResult removedPackageSource = RunCli("doctor", "--generator-package-source", "C:\\local-feed");
+        Assert(
+            removedPackageSource.ExitCode == 2 &&
+            removedPackageSource.Output.Contains("Unknown option '--generator-package-source'", StringComparison.Ordinal),
+            $"The published-package workflow should reject the removed local package-source flag. Output: {removedPackageSource.Output}");
     }
 
     private void DoctorAndSetupConfigureOnlyIgnoredLocalInputs()
@@ -50,10 +56,8 @@ internal sealed partial class S1InteropFixtureTests
         string projectDirectory = Path.Combine(tempRoot, "GuidedMod");
         string monoGamePath = Path.Combine(tempRoot, "Schedule I_alternate");
         string il2CppGamePath = Path.Combine(tempRoot, "Schedule I_public");
-        string packageSource = Path.Combine(tempRoot, "packages");
         string localPropsPath = Path.Combine(projectDirectory, "local.build.props");
         Directory.CreateDirectory(projectDirectory);
-        Directory.CreateDirectory(packageSource);
         try
         {
             File.WriteAllText(
@@ -72,19 +76,13 @@ internal sealed partial class S1InteropFixtureTests
                 Path.Combine("MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll"),
                 Path.Combine("MelonLoader", "Il2CppAssemblies", "Il2CppScheduleOne.Core.dll"),
                 Path.Combine("MelonLoader", "net6", "MelonLoader.dll"));
-            File.WriteAllText(
-                Path.Combine(packageSource, $"{S1InteropPackageInfo.GeneratorsPackageId}.{S1InteropPackageInfo.GeneratorsPackageVersion}.nupkg"),
-                string.Empty);
-
             string[] inputs =
             [
                 projectDirectory,
                 "--mono-game-path",
                 monoGamePath,
                 "--il2cpp-game-path",
-                il2CppGamePath,
-                "--generator-package-source",
-                packageSource
+                il2CppGamePath
             ];
             ProcessResult doctor = RunCli(["doctor", .. inputs]);
             Assert(
@@ -101,9 +99,7 @@ internal sealed partial class S1InteropFixtureTests
                 "--mono-game-path",
                 monoGamePath,
                 "--il2cpp-game-path",
-                Path.Combine(tempRoot, "missing-il2cpp"),
-                "--generator-package-source",
-                packageSource);
+                Path.Combine(tempRoot, "missing-il2cpp"));
             Assert(
                 missingIl2Cpp.ExitCode == 0 &&
                 missingIl2Cpp.Output.Contains("[optional] il2cpp", StringComparison.Ordinal) &&
@@ -124,8 +120,8 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 localProps.Contains($"<MonoGamePath>{monoGamePath}</MonoGamePath>", StringComparison.Ordinal) &&
                 localProps.Contains($"<Il2CppGamePath>{il2CppGamePath}</Il2CppGamePath>", StringComparison.Ordinal) &&
-                localProps.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>{packageSource}</{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal),
-                "setup should write only the validated local game and package inputs.");
+                !localProps.Contains("RestoreAdditionalProjectSources", StringComparison.Ordinal),
+                "setup should write only the validated local game paths.");
 
             ProcessResult overwrite = RunCli(["setup", .. inputs, "--apply"]);
             Assert(
@@ -2250,10 +2246,9 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
                 localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
-                localPropsExampleSource.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal) &&
-                localPropsExampleSource.Contains($"<{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty} Condition=\"'$({S1InteropPackageInfo.GeneratorsPackageSourceProperty})'!=''\">$({S1InteropPackageInfo.GeneratorsPackageSourceProperty});$({S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty})</{S1InteropPackageInfo.RestoreAdditionalProjectSourcesProperty}>", StringComparison.Ordinal) &&
+                !localPropsExampleSource.Contains("RestoreAdditionalProjectSources", StringComparison.Ordinal) &&
                 gitignoreSource.Contains("local.build.props", StringComparison.Ordinal),
-                "Generated local path scaffolding should show both runtime game paths and the optional local generator package feed while keeping local.build.props ignored.");
+                "Generated local path scaffolding should show both runtime game paths without requiring a local package feed.");
             Assert(
                 readmeSource.Contains("## First local setup", StringComparison.Ordinal) &&
                 readmeSource.Contains("s1interop doctor .", StringComparison.Ordinal) &&
@@ -2264,16 +2259,16 @@ internal sealed partial class S1InteropFixtureTests
                 "Generated README should guide first-time modders through safe setup, explicit runtime builds, and the experimental facade boundary.");
 
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
-            File.WriteAllText(
-                localPropsPath,
-                localPropsExampleSource.Replace(
-                    @"C:\Path\To\S1Interop\artifacts\packages",
-                    packageSource,
-                    StringComparison.Ordinal));
-            ProcessResult restore = RunDotNet("restore", solutionPath, "--nologo", "-v:minimal");
+            File.WriteAllText(localPropsPath, localPropsExampleSource);
+            ProcessResult restore = RunDotNet(
+                "restore",
+                solutionPath,
+                "--nologo",
+                "-v:minimal",
+                $"-p:RestoreAdditionalProjectSources={packageSource}");
             Assert(
                 restore.ExitCode == 0,
-                $"Generated local.build.props should feed the local generator package source to restore without extra command-line restore sources. Output: {restore.Output}");
+                $"Generated project should restore from an explicit test-only package source. Output: {restore.Output}");
 
             string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
             string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";

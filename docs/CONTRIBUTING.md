@@ -82,6 +82,20 @@ test(S1Interop): add quick fixture lane
 docs(S1Interop): document architecture boundaries
 ```
 
+## Publishing a Release
+
+Releases are tag-driven. Keep the CLI project, generator project, and `S1InteropPackageInfo` on the same version, merge the release commit to `main`, then push a matching `v<version>` tag.
+
+The `Publish release` workflow:
+
+1. rejects a tag that does not match both package projects;
+2. runs the Release build and portable tests;
+3. packs and smoke-installs the CLI;
+4. publishes `S1Interop` and `S1Interop.Generators` to NuGet.org;
+5. creates a GitHub release with both `.nupkg` files.
+
+Prerelease versions such as `0.1.0-alpha.1` produce a GitHub prerelease. Do not reuse a published NuGet version; bump every version source before creating the next tag.
+
 ## Pull Request Checklist
 
 - The change is scoped to one behavior or documentation concern.

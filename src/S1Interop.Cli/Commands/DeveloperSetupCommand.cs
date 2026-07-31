@@ -12,8 +12,7 @@ internal static class DeveloperSetupCommand
             report = service.Inspect(
                 command.Path,
                 command.MonoGamePath,
-                command.Il2CppGamePath,
-                command.GeneratorPackageSource);
+                command.Il2CppGamePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

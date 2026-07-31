@@ -8,8 +8,8 @@ Unknown options, missing option values, and invalid option values fail before co
 Use only the commands that fit your project. `analyze`, `lint`, and `build-hook` are useful even when you keep manual Mono/IL2CPP code. `migrate --dual-runtime` can add separate runtime builds without requiring a generated SDK. `sdkgen` is for projects that want generated facade declarations.
 
 ```text
-s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--format text|json]
-s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--dry-run|--apply] [--format text|json]
+s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--format text|json]
+s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--dry-run|--apply] [--format text|json]
 s1interop analyze [path=.] [--configuration name] [--format text|json]
 s1interop new <path> [--backend-neutral] [--dry-run|--apply] [--format text|json]
 s1interop init [path=.] [--dry-run|--apply] [--format text|json]
@@ -26,7 +26,7 @@ s1interop --version
 
 | Command | Use it for |
 | --- | --- |
-| `doctor` | Detect and validate a project, local game references, MelonLoader surfaces, ignored local configuration, and the local alpha generator package. It is always read-only. |
+| `doctor` | Detect and validate a project, local game references, MelonLoader surfaces, and ignored local configuration. It is always read-only. |
 | `setup` | Preview or write only `local.build.props`. It refuses missing prerequisites, unignored targets, and existing local configuration. It never installs software or edits committed project files. |
 | `analyze` | Inspect projects, runtime references, configurations, packages, and source risks without changing files. |
 | `new` | Create the recommended explicit Mono/IL2CPP project scaffold. `--backend-neutral` selects the experimental one-DLL facade scaffold. |

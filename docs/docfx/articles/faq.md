@@ -115,15 +115,13 @@ Replace `<run-id>` with the directory name created by the `--apply` run you want
 
 ## What is local.build.props and why is it gitignored?
 
-`local.build.props` is a machine-specific MSBuild props file that holds your Schedule One install paths and, optionally, a pointer to a local NuGet feed for unpublished alpha packages:
+`local.build.props` is a machine-specific MSBuild props file that holds your Schedule One install paths:
 
 ```xml
 <Project>
   <PropertyGroup>
     <MonoGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I</MonoGamePath>
     <Il2CppGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I IL2CPP</Il2CppGamePath>
-    <!-- Optional: point at a local alpha package feed -->
-    <S1InteropGeneratorPackageSource>..\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
   </PropertyGroup>
 </Project>
 ```

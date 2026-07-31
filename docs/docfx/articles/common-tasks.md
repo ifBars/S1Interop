@@ -10,23 +10,21 @@ Start here after the [first mod walkthrough](first-mod.md). The supported path k
 
 ## Recheck local prerequisites
 
-Run the read-only doctor whenever the game, MelonLoader, or local generator package changes:
+Run the read-only doctor whenever the game or MelonLoader changes:
 
 ```powershell
 s1interop doctor .
 ```
 
-It checks the project, ignored local configuration, game executables, managed game references, MelonLoader references, and the exact local generator package. It does not install software or edit the project.
+It checks the project, ignored local configuration, game executables, managed game references, and MelonLoader references. Package restore uses NuGet.org normally. Doctor does not install software or edit the project.
 
 If a valid input moved, preview and then apply only the ignored local file:
 
 ```powershell
 s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
-  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" `
-  --generator-package-source "C:\src\S1Interop\artifacts\packages"
+  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I"
 s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
-  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" `
-  --generator-package-source "C:\src\S1Interop\artifacts\packages" --apply
+  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" --apply
 ```
 
 `setup` refuses to write unless `local.build.props` is ignored. It never overwrites an existing local file.

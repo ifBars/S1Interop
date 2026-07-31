@@ -200,7 +200,7 @@ See [Diagnostics](diagnostics.md) for the full table.
 
 | File | Purpose | Committed? |
 | --- | --- | --- |
-| `local.build.props` | Machine-specific Mono and IL2CPP game paths, plus optional `S1InteropGeneratorPackageSource` for unpublished local packages. | No (gitignored). |
+| `local.build.props` | Machine-specific Mono and IL2CPP game paths. | No (gitignored). |
 | `local.build.props.example` | Template committed by `s1interop new` and migration. Copy to `local.build.props` and fill in. | Yes. |
 | `s1interop-runs/<run-id>/` | Backups and rollback manifest for each applied migration. | No (gitignored). |
 | `s1interop-cache/` | CLI cache for analysis and generation. | No (gitignored). |
@@ -229,7 +229,7 @@ See [Local game paths](local-paths.md) for the property reference.
 
 ## Next steps
 
-- [Installation](getting-started.md) to build and pack the local alpha packages.
+- [Installation](getting-started.md) to install the published alpha tool.
 - [Local game paths](local-paths.md) to configure Mono and IL2CPP references.
 - [Commands](commands.md) for the CLI reference.
 - [Generated output](generator-package.md) for the full generated-symbol reference.

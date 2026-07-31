@@ -36,15 +36,13 @@ Then edit the copy:
   <PropertyGroup>
     <MonoGamePath>D:\Games\Schedule I_alternate</MonoGamePath>
     <Il2CppGamePath>D:\Games\Schedule I_public</Il2CppGamePath>
-    <S1InteropGeneratorPackageSource>C:\Code\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
-    <RestoreAdditionalProjectSources Condition="'$(S1InteropGeneratorPackageSource)'!=''">$(S1InteropGeneratorPackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
   </PropertyGroup>
 </Project>
 ```
 
 The normal backend-neutral build uses `MonoGamePath`. `Il2CppGamePath` is needed only for an IL2CPP reference build or migration verification that checks IL2CPP.
 
-The generator package source is required while S1Interop packages are local and unpublished. It points NuGet at the folder containing `S1Interop.Generators.0.1.0-alpha.1.nupkg`.
+`S1Interop.Generators` restores from NuGet.org through the generated project’s normal `PackageReference`; this machine-local file contains only game paths.
 
 ## What S1Interop reads below each path
 

@@ -15,7 +15,8 @@
     <PackageId>S1Interop</PackageId>
     <Version>0.1.0-alpha.1</Version>
     <Authors>ifBars</Authors>
-    <Description>Schedule One Mono-to-IL2CPP mod migration toolchain.</Description>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <Description>Schedule One mod diagnostics, safe migration, and Mono/IL2CPP validation toolchain.</Description>
     <PackageTags>schedule-one;il2cpp;melonloader;modding;dotnet</PackageTags>
     <RepositoryUrl>https://github.com/ifBars/S1Interop</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ifBars/S1Interop</PackageProjectUrl>

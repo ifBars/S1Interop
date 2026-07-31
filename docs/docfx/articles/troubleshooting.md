@@ -12,7 +12,7 @@ Start with the exact error text. The first sections cover installation and scaff
 dotnet tool list --global
 ```
 
-If `s1interop` is listed, close and reopen PowerShell. If it is not listed, repeat [Install the command](getting-started.md#3-install-the-command).
+If `s1interop` is listed, close and reopen PowerShell. If it is not listed, repeat [Install the command](getting-started.md#2-install-the-command).
 
 ## "Missing MelonLoader at ..."
 
@@ -41,7 +41,7 @@ The same path mistake can produce `Missing Unity assemblies`, `Missing Schedule 
 After adding the reference, run a full build so the generator emits the declaration attributes and your project can recognise them.
 
 > [!NOTE]
-> If you are using an unpublished local build, you also need `S1InteropGeneratorPackageSource` configured in `local.build.props` so the package restore can find the local feed. See [package restore failure](#package-restore-fails-for-s1interopgenerators) below.
+> Published releases restore `S1Interop.Generators` from NuGet.org. Contributors validating an unpublished package should pass a temporary restore source on the command line rather than adding it to `local.build.props`.
 
 ## Generated type or member missing from IntelliSense
 
@@ -64,7 +64,7 @@ Remove-Item -LiteralPath $cachedPackage -Recurse
 dotnet restore
 ```
 
-This deletes generated package-cache files, not your mod source. `dotnet restore` recreates them from `S1InteropGeneratorPackageSource`. Do not clear the entire NuGet cache for this problem.
+This deletes generated package-cache files, not your mod source. `dotnet restore` recreates them from configured NuGet sources. Do not clear the entire NuGet cache for this problem.
 
 ## Generated helper returns null or false
 
@@ -106,24 +106,24 @@ On IL2CPP, do not assume a Mono member still exists or still gets called. If the
 
 ## Package restore fails for S1Interop.Generators
 
-**Cause:** NuGet cannot find `S1Interop.Generators` because the local alpha package is not in any configured feed and `S1InteropGeneratorPackageSource` is not set in `local.build.props`.
+**Cause:** NuGet.org is unavailable, disabled, or the requested prerelease version is not visible to the current NuGet configuration.
 
 **Fix:**
 
-1. Pack both packages into the same output folder:
+1. Confirm NuGet.org is enabled:
 
 ```powershell
-dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
-dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
+dotnet nuget list source
 ```
 
-2. Add `S1InteropGeneratorPackageSource` to your `local.build.props` pointing at that folder:
+2. Clear stale caches and restore:
 
-```xml
-<S1InteropGeneratorPackageSource>..\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+```powershell
+dotnet nuget locals all --clear
+dotnet restore
 ```
 
-Generated and migrated projects already bridge that property into `RestoreAdditionalProjectSources`, so Visual Studio, Rider, and `dotnet build` pick up the local package without committing a machine-specific NuGet source to version control.
+Contributors testing an unpublished build should pass their temporary package folder as an explicit command-line restore source. Do not add package-feed paths to `local.build.props`.
 
 > [!WARNING]
 > Do not commit `local.build.props`. It holds machine-specific paths that differ between developers. Commit only `local.build.props.example`.

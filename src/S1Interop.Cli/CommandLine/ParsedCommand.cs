@@ -13,7 +13,6 @@ internal sealed record ParsedCommand(
     bool BackendNeutral,
     string? Il2CppGamePath,
     string? MonoGamePath,
-    string? GeneratorPackageSource,
     string? Configuration,
     IReadOnlyList<string> Errors)
 {
@@ -21,7 +20,7 @@ internal sealed record ParsedCommand(
     {
         if (args.Length == 0)
         {
-            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, false, null, null, null, null, Array.Empty<string>());
+            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, false, null, null, null, Array.Empty<string>());
         }
 
         string command = args[0].StartsWith("-", StringComparison.Ordinal) ? "analyze" : args[0];
@@ -44,7 +43,6 @@ internal sealed record ParsedCommand(
         int buildTimeoutSeconds = 120;
         string? il2CppGamePath = null;
         string? monoGamePath = null;
-        string? generatorPackageSource = null;
         string? configuration = null;
 
         if (apply && dryRun)
@@ -116,12 +114,6 @@ internal sealed record ParsedCommand(
                 continue;
             }
 
-            if (arg.Equals("--generator-package-source", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                generatorPackageSource = args[++i];
-                continue;
-            }
-
             if ((arg.Equals("--configuration", StringComparison.OrdinalIgnoreCase) ||
                  arg.Equals("-c", StringComparison.OrdinalIgnoreCase)) &&
                 i + 1 < args.Length)
@@ -153,7 +145,7 @@ internal sealed record ParsedCommand(
             }
         }
 
-        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, backendNeutral, il2CppGamePath, monoGamePath, generatorPackageSource, configuration, errors);
+        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, backendNeutral, il2CppGamePath, monoGamePath, configuration, errors);
     }
 
     private static bool IsKnownFlag(string arg) =>
@@ -174,7 +166,6 @@ internal sealed record ParsedCommand(
         arg.Equals("--build-timeout-seconds", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--il2cpp-game-path", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--mono-game-path", StringComparison.OrdinalIgnoreCase) ||
-        arg.Equals("--generator-package-source", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--configuration", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("-c", StringComparison.OrdinalIgnoreCase);
 }
