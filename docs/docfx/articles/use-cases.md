@@ -1,47 +1,25 @@
-# Use cases
+# Ways to use S1Interop
 
-S1Interop is not one migration mode. You can use one part, combine a few parts, or grow into a backend-neutral mod over time.
+Most mods use only part of S1Interop. These combinations are normal.
 
-A common trap is treating S1Interop as "generate the SDK and rewrite everything." That is one path, but it is not the only useful one.
+## Guardrails without migration
 
-| What you want | Use | Skip |
-| --- | --- | --- |
-| Keep manual Mono/IL2CPP branches, but catch problems earlier. | `s1interop analyze`, `s1interop lint`, `s1interop build-hook`, and the `S1Interop.Generators` analyzer diagnostics. | `sdkgen`, generated facades, backend-neutral rewrites. |
-| Start from a Mono mod and add separate IL2CPP builds. | `s1interop migrate . --dual-runtime`, local path props, solution/configuration updates, sandbox verification. | A full generated SDK unless you also want facades for specific direct game calls. |
-| Experiment with one DLL that runs on both backends. | `s1interop init`, narrow `sdkgen`, generated `S1Interop.ScheduleOne.*` facades, both reference builds, and in-game smoke tests. | Removing the dual-runtime fallback before sustained validation. |
-| Patch game methods without writing backend-specific target resolution. | `S1InteropPatch`, `S1InteropPrefix`, `S1InteropPostfix`, patch target diagnostics, generated internal patch registration. | Manual `PatchAll` calls for those generated patch declarations. |
-| Use a small generated helper but keep the rest of the mod as-is. | The generator package plus the specific helper surface, such as object casts, delegate bridges, Unity lookups, Steam P2P helpers, or a few `S1InteropMember` bindings. | Full SDK generation and source rewrites. |
-| Explore the game API while prototyping. | `s1interop sdkgen . --full-sdk --apply` to seed broad type registration from local metadata. | Treating full SDK output as the final shape of a settled mod. |
+Keep manual Mono and IL2CPP code. Run `analyze` to inspect the project and `lint` to report known risks. Add `build-hook` only when you want those checks in the build. You do not need generated facades for this path.
 
-## Diagnostics-only use
+## Explicit dual-runtime builds
 
-If you already prefer manual runtime branches, S1Interop can still be useful as a build-time guardrail.
+Use `migrate --dual-runtime` when the mod needs separate Mono and IL2CPP assemblies. This is often the right final shape for a mod with runtime-specific dependencies or code. Generated facades can remain a small, optional addition.
 
-Use this when you want the project to keep its own `#if MONO`, `#if IL2CPP`, or configuration-specific references, but you want common IL2CPP mistakes to fail in CI or show up in the IDE. The useful pieces are:
+## Narrow backend-neutral helpers
 
-- `s1interop analyze .` for project shape, references, runtime defines, and source-risk reports;
-- `s1interop lint .` for command-line checks that can run before build or in CI;
-- `s1interop build-hook . --apply` when you want lint wired into MSBuild;
-- `S1Interop.Generators` when you want Roslyn diagnostics such as declaration errors, managed collection boundaries, IL2CPP object-cast risks, Steam P2P byte-buffer risks, and patch target review warnings.
+Reference `S1Interop.Generators` and declare only the type, member, patch target, or bridge you need. This works well for a direct Harmony target, a cached reflection binding, or one shared game type. Do not turn on broad facade generation unless it reduces real duplicated code.
 
-You do not need `sdkgen` for this path. You only add declarations when you want declaration diagnostics for a specific type/member, generated Harmony patch targets, event bridges, or a small helper facade.
+## Experimental one-DLL facades
 
-## Dual-runtime use
+Use usage-driven `sdkgen` when a narrow direct-game seam can move behind generated `S1Interop.ScheduleOne.*` facades. Keep explicit Mono and IL2CPP validation and a dual-runtime fallback until both branches have sustained in-game evidence.
 
-Use dual-runtime migration when the mod should keep separate Mono and IL2CPP outputs for now.
+## Local API exploration
 
-This fits mods with runtime-specific dependencies, IL2CPP injected components, native wrapper differences, or maintainers who want explicit backend branches. The first goal is honest project shape: two builds, local game paths, correct references, and source-risk reports. Generated facades can come later, one direct game access point at a time.
+`sdkgen --full-sdk` registers broad type coverage from local game metadata. It is useful while exploring, but it is not the default scaffold or a final production shape.
 
-## Backend-neutral use
-
-Use backend-neutral generation only as an experimental opt-in when the goal is one assembly.
-
-This path is still fragile. It works best when the mod needs a narrow set of direct game calls, simple member access, or patch targets covered by the current generated surface. Keep separate Mono and IL2CPP builds, and do not ship one DLL without testing it in both runtime branches.
-
-## Mixed use
-
-Most real mods are mixed.
-
-An S1API content mod might keep S1API for items and saveables, use S1Interop diagnostics in CI, and add one generated facade for a Harmony patch. A SteamNetworkLib mod might keep its message protocol and sync vars, but use S1Interop for backend-neutral Steam IDs, P2P packet buffers, and Schedule One lobby lookup. A mature Mono mod might start with dual-runtime migration, then move only the worst direct game seams to generated facades.
-
-Pick the part that removes the current pain. You can add more later.
+For commands and a decision table, return to [Choose an adoption path](adoption-guide.md).

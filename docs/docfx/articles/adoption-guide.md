@@ -1,86 +1,38 @@
 # Choose an adoption path
 
-Pick the smallest S1Interop path that solves the problem in front of you.
+Start with the smallest change that removes the problem you have. S1Interop can add diagnostics or a safe migration plan without converting the whole mod.
 
-- Existing mod: analyze first, then choose diagnostics, dual-runtime migration, generated helpers, or backend-neutral facades.
-- New mod: scaffold explicit Mono and IL2CPP builds first. Treat backend-neutral facades as a later experiment.
+## Choose a path
 
-S1Interop works from your local game install. It does not ship game assemblies, generated IL2CPP wrappers, decompiled source, prefabs, scenes, textures, or exported Unity projects.
-
-See [Use cases](use-cases.md) for the broader model. You can combine these paths.
-
-## Where S1Interop fits
-
-Keep your mod shape. Move the direct game access that causes Mono/IL2CPP friction.
-
-| Project shape | Common today | S1Interop role |
+| Your situation | Start with | Read next |
 | --- | --- | --- |
-| Direct MelonLoader patch mod | A `MelonMod`, Harmony patches, direct `ScheduleOne.*` or `Il2CppScheduleOne.*` references, and local game paths in `local.build.props`. | Use `analyze`, `sdkgen`, and generated facades to remove duplicated Mono/IL2CPP conditionals around game types and members. |
-| Native Mono/IL2CPP configured mod | One source tree with existing `Mono`, `Il2Cpp`, `Debug Il2Cpp`, or branch-specific build configurations and runtime-specific references. | Keep the runtime split only where the mod still needs it. Move portable game access toward generated facades, then collapse to one backend-neutral DLL when the runtime-specific references are gone. |
-| S1API content mod | Items, NPCs, shops, saveables, or UI built through S1API builders and lifecycle hooks. | Keep S1API for the gameplay workflow. Use S1Interop underneath or beside it when the mod still needs direct game-wrapper access that S1API does not cover. |
-| Hybrid S1API/direct mod | S1API handles content registration, but the mod also has Harmony patches, direct game reads, cached reflection bindings, or backend-specific helper code. | Leave S1API-owned workflows alone. Migrate direct game access. |
-| MAPI/building mod | Meshes, interiors, GLTF loading, or building helpers that try to avoid game assembly churn. | Use MAPI for content construction. Use S1Interop only for the direct Schedule One calls that remain. |
-| SteamNetworkLib or FishNet multiplayer mod | Runtime-specific networking references, host/client authority checks, and sometimes DTO libraries. | Start with analysis and dual-runtime verification. Move small direct game seams to facades before trying to make the whole project backend-neutral. |
-| Dedicated server addon | Headless safety, server/client splits, command permissions, and persistence hooks. | Treat server and client surfaces separately. S1Interop can reduce wrapper differences, but it does not replace server authority or lifecycle design. |
-| Performance or UI tuning mod | Direct patches against managers, UI screens, camera/player systems, graphics settings, or bGUI/uGUI surfaces. | Use type facades for stable direct game access. Keep Harmony patches thin and validate on the IL2CPP branch. |
+| A new Schedule I mod | `s1interop new .\MyMod --apply` | [Build your first mod](first-mod.md) |
+| An existing mod with manual Mono and IL2CPP branches | `s1interop analyze .`, then `s1interop lint .` | [Diagnostics](diagnostics.md) |
+| A Mono mod that needs separate IL2CPP output | `s1interop migrate . --dual-runtime --dry-run` | [Migrate to dual-runtime](migrate-to-dual-runtime.md) |
+| One direct game seam that you want to share | `s1interop init . --dry-run`, then `s1interop sdkgen . --dry-run` | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |
+| A migration you do not trust yet | `s1interop verify-migration . --dual-runtime --include-source-migrations` | [Migration overview](migrating-mono-mods.md) |
+| A local game API exploration project | `s1interop sdkgen . --full-sdk --dry-run` | [SDK generation](sdk-generation.md) |
 
-If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already owns the workflow, keep it. Use S1Interop for lower-level game-wrapper calls that still leak through.
+Review dry-run output before adding `--apply`. Applied migrations create backups and a manifest under `s1interop-runs/<run-id>/`.
 
-For Harmony targets that change between Mono and IL2CPP, use [backend-neutral Harmony patching](harmony-patching.md).
+## Keep the existing architecture
 
-## Which path should I use?
+Use S1Interop at direct game-wrapper seams. Leave higher-level systems in the library that owns them.
 
-| Situation | Start with | Why |
+| If the mod needs... | Keep using... | Use S1Interop for... |
 | --- | --- | --- |
-| You handle Mono/IL2CPP manually but want build-time warnings. | `s1interop analyze .`, `s1interop lint .`, optionally `s1interop build-hook . --apply` | Keeps your code shape while surfacing project, source-risk, and IL2CPP-boundary problems before runtime. |
-| You are new to Schedule One modding and want a blank mod project. | `s1interop new .\MyMod --apply`, then `doctor` and `setup` | Creates a MelonLoader mod with explicit Mono/IL2CPP builds, compile-time diagnostics, ignored local paths, and a runtime log marker. |
-| You have an existing Mono mod and want one backend-neutral assembly. | `s1interop analyze .`, then `s1interop init . --apply` and `s1interop sdkgen . --apply` | Keeps your project intact while adding the generator package and usage-driven SDK declarations. |
-| You have an existing Mono mod and want separate Mono/IL2CPP builds. | `s1interop analyze .`, then `s1interop migrate . --dual-runtime --dry-run` | Adds runtime-specific project configuration and reports the source patterns that still need review. You can skip the generated SDK until you actually want facades. |
-| You only need backend-neutral patch targets or helper bridges. | Add the generator package and the specific declarations. | Lets you use generated Harmony target resolution, event/delegate bridges, object casts, Steam P2P helpers, or member bindings without adopting a full SDK. |
-| You are exploring the game API surface. | `s1interop sdkgen . --full-sdk --apply` | Registers broad Schedule One type coverage from your local reference metadata. Add `S1InteropType` declarations for member facades you actually use. |
-| You are unsure whether a migration is safe. | `s1interop verify-migration . --dual-runtime --include-source-migrations` | Applies the plan in a temporary copy so your real mod tree is not mutated. |
+| Items, NPCs, shops, UI, saves, or gameplay lifecycle | S1API | A direct game call or patch outside the S1API surface. |
+| Buildings, models, or mesh workflows | MAPI | Remaining direct Schedule One access. |
+| Networking or dedicated-server behavior | Its networking or server framework | Runtime-specific game types, reflection bindings, and patch targets. |
+| A direct MelonLoader patch | Your existing mod structure | Analysis, diagnostics, and a narrow generated binding where it removes duplicated runtime code. |
 
-## First-time modder path
+Do not start by changing content registration, save data, deployment scripts, or packaging. Start with the direct `ScheduleOne.*` and `Il2CppScheduleOne.*` code that creates the compatibility problem.
 
-Follow [Build your first mod](first-mod.md). It covers installation checks, project creation, local game paths, a copyable `ModCore.cs`, the DLL output path, deployment, and the expected MelonLoader message.
+## Before you expand the scope
 
-The default scaffold starts with generated diagnostics and runtime reporting while keeping Mono and IL2CPP outputs explicit. Use `s1interop doctor .` and preview `s1interop setup .` before writing local configuration.
+- Keep `local.build.props` local. It contains machine-specific game paths.
+- Do not commit game assemblies, generated IL2CPP wrappers, decompiled output, or game assets.
+- Treat a Mono build as Mono evidence only. Build and test the IL2CPP branch separately.
+- Keep a dual-runtime fallback while backend-neutral facades are experimental.
 
-Do not start with `--backend-neutral` or `--full-sdk`. Backend-neutral facades are experimental and fragile. They require both reference builds, in-game validation on both runtime branches, and a dual-runtime fallback.
-
-## Existing mod developer path
-
-Start with analysis:
-
-```powershell
-s1interop analyze .
-```
-
-Then pick one step:
-
-- `s1interop lint .`: checks the current project without changing source.
-- `s1interop build-hook . --apply`: wires lint into MSBuild for projects that want guardrails but not generated facades.
-- `s1interop init . --apply`: installs the generator package and starter declarations without rewriting gameplay code.
-- `s1interop sdkgen . --apply`: generates declarations from the game types your source already references.
-- `s1interop migrate . --dual-runtime --dry-run`: previews project/configuration edits for separate Mono and IL2CPP builds.
-- `s1interop verify-migration . --dual-runtime --include-source-migrations`: tests the migration in a temporary copy.
-
-Existing mods often mix MelonLoader lifecycle wiring, Harmony patches, helper APIs, deployment scripts, and direct game references. Start with direct game references. Leave content builders, packaging, logging, and deployment scripts alone unless the analyzer reports a concrete issue.
-
-## What to avoid at first
-
-- Do not commit `local.build.props`; it contains machine-local game paths.
-- Do not copy game assemblies or generated IL2CPP wrappers into the repository.
-- Do not start with backend-neutral declarations. Get explicit Mono and IL2CPP builds passing first. If you later opt into the facade experiment, add narrow `S1InteropType` coverage before explicit per-member declarations.
-- Do not treat Mono build success as proof of IL2CPP runtime safety. Run an IL2CPP reference validation build or an in-game IL2CPP smoke test when local references are available.
-
-## First pass checklist
-
-- `s1interop doctor .` explains every missing prerequisite or reports the local setup ready;
-- `s1interop analyze .` runs without unexpected project discovery failures;
-- `local.build.props` exists locally and is ignored by git;
-- the project restores `S1Interop.Generators` from the intended package source;
-- `"Debug Mono"` and `"Debug Il2Cpp"` produce separate runtime-specific DLLs;
-- IL2CPP validation either passes or produces actionable diagnostics.
-
-Then move to [New projects](new-projects.md) or [Migrate to dual-runtime](migrate-to-dual-runtime.md). Evaluate [Migrate to backend-neutral](migrate-to-backend-neutral.md) only as an opt-in experiment after the explicit path works.
+For examples of small, mixed adoption, see [Ways to use S1Interop](use-cases.md). For the difference between S1API and low-level interop, see [S1API and S1Interop](s1api-and-s1interop.md).

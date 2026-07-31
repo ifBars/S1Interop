@@ -20,10 +20,10 @@
   items:
     - name: Core concepts
       href: core-concepts.md
-    - name: Architecture
-      href: architecture.md
     - name: Ways to use S1Interop
       href: use-cases.md
+    - name: Architecture
+      href: architecture.md
 - name: CLI reference
   items:
     - name: Commands

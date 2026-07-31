@@ -4,7 +4,7 @@ Use this path when an existing Mono mod should move toward one assembly that run
 
 Backend-neutral source moves away from direct `ScheduleOne.*` or `Il2CppScheduleOne.*` calls and uses generated facades under `S1Interop.ScheduleOne.*`. Mono and IL2CPP configurations remain useful as validation targets.
 
-This is not the only S1Interop path. If you want diagnostics while keeping manual runtime branches, use [Use cases](use-cases.md#diagnostics-only-use). If you want separate Mono and IL2CPP outputs first, use [Migrate to dual-runtime](migrate-to-dual-runtime.md).
+This is not the only S1Interop path. If you want diagnostics while keeping manual runtime branches, use [Ways to use S1Interop](use-cases.md). If you want separate Mono and IL2CPP outputs first, use [Migrate to dual-runtime](migrate-to-dual-runtime.md).
 
 ## 1. Analyze the mod
 
