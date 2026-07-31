@@ -22,7 +22,7 @@ Keep your mod shape. Move the direct game access that causes Mono/IL2CPP frictio
 | MAPI/building mod | Meshes, interiors, GLTF loading, or building helpers that try to avoid game assembly churn. | Use MAPI for content construction. Use S1Interop only for the direct Schedule One calls that remain. |
 | SteamNetworkLib or FishNet multiplayer mod | Runtime-specific networking references, host/client authority checks, and sometimes DTO libraries. | Start with analysis and dual-runtime verification. Move small direct game seams to facades before trying to make the whole project backend-neutral. |
 | Dedicated server addon | Headless safety, server/client splits, command permissions, and persistence hooks. | Treat server and client surfaces separately. S1Interop can reduce wrapper differences, but it does not replace server authority or lifecycle design. |
-| Performance or UI tuning mod | Direct patches against managers, UI screens, camera/player systems, graphics settings, or bGUI/uGUI surfaces. | Use type facades for stable direct game access. Keep Harmony patches thin and validate on the public IL2CPP branch. |
+| Performance or UI tuning mod | Direct patches against managers, UI screens, camera/player systems, graphics settings, or bGUI/uGUI surfaces. | Use type facades for stable direct game access. Keep Harmony patches thin and validate on the IL2CPP branch. |
 
 If S1API, MAPI, SteamNetworkLib, or DedicatedServerMod already owns the workflow, keep it. Use S1Interop for lower-level game-wrapper calls that still leak through.
 
@@ -46,7 +46,7 @@ Follow [Build your first mod](first-mod.md). It covers installation checks, proj
 
 The default scaffold starts with generated diagnostics and runtime reporting while keeping Mono and IL2CPP outputs explicit. Use `s1interop doctor .` and preview `s1interop setup .` before writing local configuration.
 
-Do not start with `--backend-neutral` or `--full-sdk`. Backend-neutral facades are experimental and fragile; they require both reference builds, in-game validation on both branches, and a safe dual-runtime fallback.
+Do not start with `--backend-neutral` or `--full-sdk`. Backend-neutral facades are experimental and fragile. They require both reference builds, in-game validation on both runtime branches, and a dual-runtime fallback.
 
 ## Existing mod developer path
 

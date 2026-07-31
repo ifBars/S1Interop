@@ -36,7 +36,7 @@ This fits mods with runtime-specific dependencies, IL2CPP injected components, n
 
 Use backend-neutral generation only as an experimental opt-in when the goal is one assembly.
 
-This path is still fragile. It is most plausible when the mod needs a narrow set of direct game calls, simple member access, or patch targets covered by the current generated surface. Keep explicit Mono and IL2CPP builds as the safe fallback, and do not ship a one-DLL result without exact in-game validation on both branches.
+This path is still fragile. It works best when the mod needs a narrow set of direct game calls, simple member access, or patch targets covered by the current generated surface. Keep separate Mono and IL2CPP builds, and do not ship one DLL without testing it in both runtime branches.
 
 ## Mixed use
 

@@ -47,6 +47,6 @@ Create it only with the explicit flag:
 s1interop new .\MyBackendNeutralExperiment --backend-neutral --apply
 ```
 
-Validate that project against both reference surfaces and in both game branches. Keep the default dual-runtime project shape as a fallback until the exact mod has sustained real-world validation.
+Validate that project against both reference surfaces and on both runtime branches. Keep the default dual-runtime project until the mod has sustained in-game validation.
 
 See [Use cases](use-cases.md), [Backend-neutral SDK](backend-neutral-sdk.md), and [Real-mod evidence](../contributors/real-mod-evidence.md).

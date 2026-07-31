@@ -12,7 +12,7 @@ Its dependable early value is:
 - rollbackable, narrow source and project transformations;
 - disposable sandbox verification and explicit Mono/IL2CPP build targets.
 
-Backend-neutral generated facades are available as an experimental opt-in. They are still fragile and are not the default scaffold or the primary product promise. Keep a dual-runtime fallback until a mod has sustained real-world validation on both game branches.
+Backend-neutral generated facades are an experimental opt-in. They are not the default scaffold or the primary product promise. Keep a dual-runtime fallback until a mod has sustained in-game validation on both runtime branches.
 
 ## Choose a path
 
@@ -38,7 +38,7 @@ s1interop setup . --apply
 
 `doctor` is read-only. `setup` is also a dry run unless `--apply` is present. It writes only an ignored `local.build.props`, never installs software, never edits the project, and never overwrites existing local configuration.
 
-Build the branch you have installed:
+Build for your installed runtime:
 
 ```powershell
 dotnet build .\MyFirstMod.sln -c "Debug Mono"
@@ -140,7 +140,7 @@ Use it only when:
 
 - the mod's direct game access is narrow enough for the current generated surface;
 - both Mono and IL2CPP reference builds pass;
-- the exact shipped assembly is smoke-tested in both game branches;
+- the exact shipped assembly is smoke-tested on both runtime branches;
 - a dual-runtime build remains available as the safe fallback.
 
 Create an experimental scaffold explicitly:

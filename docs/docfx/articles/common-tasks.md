@@ -77,7 +77,7 @@ s1interop init . --apply
 ## Experiment with one generated facade
 
 > [!WARNING]
-> Backend-neutral facades are opt-in, fragile, and not the default compatibility promise. Keep the explicit Mono/IL2CPP project or conditional implementation as a fallback until your exact mod has sustained in-game validation on both branches.
+> Backend-neutral facades are opt-in, fragile, and not the default compatibility promise. Keep the explicit Mono/IL2CPP project or conditional implementation until your mod has sustained in-game validation on both runtime branches.
 
 When the experiment is appropriate, add `S1InteropType` only for a type your mod uses. The generator can expose members only where both local reference surfaces provide a compatible shape. Start with [Backend-neutral SDK](backend-neutral-sdk.md) and [Declarations](backend-neutral-declarations.md), and review every skipped or ambiguous member.
 

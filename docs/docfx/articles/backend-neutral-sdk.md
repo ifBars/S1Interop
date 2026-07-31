@@ -1,7 +1,7 @@
 # Backend-neutral SDK
 
 > [!WARNING]
-> This facade path is experimental and fragile. It is not the default scaffold or the primary S1Interop promise. Keep an explicit Mono/IL2CPP build or conditional implementation as a fallback until your exact mod has sustained in-game validation on both branches.
+> This facade path is experimental and fragile. It is not the default scaffold or the primary S1Interop promise. Keep separate Mono and IL2CPP builds or a conditional implementation until your mod has sustained in-game validation on both runtime branches.
 
 For what the generator emits at build time and when those symbols appear, see [Generated output](generator-package.md). For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md).
 

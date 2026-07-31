@@ -6,9 +6,9 @@ uid: s1interop.first-mod
 
 # Build your first mod
 
-This walkthrough starts with an empty folder and ends with a mod that prints the active Schedule I runtime to the MelonLoader console.
+This walkthrough creates a mod that prints the active Schedule I runtime to the MelonLoader console.
 
-The default project keeps Mono and IL2CPP builds explicit. That is the safe beginner and production fallback while backend-neutral facades remain experimental.
+The default project creates separate Mono and IL2CPP builds. Use this path for your first mod. Backend-neutral facades remain experimental.
 
 ## Before you start
 
@@ -16,9 +16,8 @@ You need:
 
 - Windows and PowerShell;
 - .NET SDK 8 or newer;
-- the installed `s1interop` alpha tool;
-- at least one Schedule I install with MelonLoader;
-- the local folder containing `S1Interop.Generators.*.nupkg`.
+- the installed `s1interop` tool;
+- a Mono or IL2CPP Schedule I install with MelonLoader.
 
 Check the tools:
 
@@ -35,7 +34,7 @@ Follow [Install S1Interop](getting-started.md) if the command is not available.
 s1interop new ..\MyFirstMod
 ```
 
-The output lists every planned file and identifies the recommended dual-runtime mode. Nothing is written.
+The preview lists every planned file and identifies the recommended dual-runtime mode. It does not write files.
 
 ## 2. Create the project
 
@@ -79,27 +78,27 @@ s1interop doctor . `
   --il2cpp-game-path "D:\Games\Schedule I_public"
 ```
 
-Only Mono is required for the first Mono build. IL2CPP is optional until you want to build and test the public branch.
+You only need Mono for the first Mono build. Add an IL2CPP install when you are ready to build and test the IL2CPP branch.
 
 ## 4. Preview and write local configuration
 
-Use the same explicit flags when automatic detection needs help:
+Preview the generated `local.build.props`:
 
 ```powershell
 s1interop setup .
 ```
 
-When every required check is ready:
+If the preview is correct, write the file:
 
 ```powershell
 s1interop setup . --apply
 ```
 
-`setup` writes only `local.build.props`. It does not install software, edit the project, or overwrite an existing file. It refuses to write unless the target is covered by a recognized `.gitignore` rule.
+`setup` writes only `local.build.props`. It does not install software, edit the project, or overwrite an existing file. The target must be covered by a recognized `.gitignore` rule.
 
 ## 5. Build one runtime
 
-Build the branch you have installed:
+Build for your installed runtime:
 
 ```powershell
 dotnet build .\MyFirstMod.sln -c "Debug Mono"
@@ -111,7 +110,7 @@ or:
 dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
 ```
 
-The DLL is written to:
+The build writes the DLL to:
 
 ```text
 bin\Mono\Debug Mono\netstandard2.1\MyFirstMod.dll
@@ -125,7 +124,7 @@ bin\Il2Cpp\Debug Il2Cpp\net6.0\MyFirstMod.dll
 
 ## 6. Run it in Schedule I
 
-Copy the DLL matching the active branch into that install's `Mods` folder, then launch the game.
+Copy the DLL for your installed runtime into that install's `Mods` folder, then launch the game.
 
 Expected Mono log marker:
 
@@ -159,4 +158,4 @@ The backend-neutral one-DLL scaffold is an experimental opt-in:
 s1interop new ..\MyExperiment --backend-neutral --apply
 ```
 
-Do not use it as the production default. Keep explicit runtime builds until the exact mod has sustained real-world validation on both branches.
+Keep separate Mono and IL2CPP builds for production until the mod has sustained in-game validation on both runtime branches.
