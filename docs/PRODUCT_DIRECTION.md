@@ -152,7 +152,7 @@ The opt-in SDK experiment supports two generation entry points:
 
 For new mods:
 
-```powershell
+```batch
 s1interop new .\MyMod --apply
 s1interop doctor .\MyMod
 dotnet build .\MyMod\MyMod.sln -c "Debug Mono"
@@ -161,7 +161,7 @@ dotnet build .\MyMod\MyMod.sln -c "Debug Il2Cpp"
 
 For existing mods:
 
-```powershell
+```batch
 s1interop analyze .
 s1interop sdkgen . --apply
 s1interop migrate . --dual-runtime --dry-run
@@ -169,7 +169,7 @@ s1interop migrate . --dual-runtime --dry-run
 
 For an explicit backend-neutral experiment:
 
-```powershell
+```batch
 s1interop new .\MyExperiment --backend-neutral --apply
 s1interop sdkgen .\MyExperiment --full-sdk --apply
 ```

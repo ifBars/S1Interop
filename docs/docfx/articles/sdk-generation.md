@@ -9,7 +9,7 @@ Use `sdkgen` when you want generated facades or broad type registration. You do 
 
 For existing source, use the narrow mode:
 
-```powershell
+```batch
 s1interop sdkgen . --apply
 ```
 
@@ -17,7 +17,7 @@ This inspects source usage, aliases, namespace imports, string-held game type na
 
 For a blank or exploratory project that wants broad local type coverage, use the full SDK mode:
 
-```powershell
+```batch
 s1interop sdkgen . --full-sdk --apply
 ```
 

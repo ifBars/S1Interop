@@ -107,7 +107,7 @@ Yes. If your project already references `S1Interop.Generators`, you can author d
 
 Every applied migration writes backups of changed files and a rollback manifest under `s1interop-runs/<run-id>/`. To restore everything to its pre-migration state, run:
 
-```powershell
+```batch
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 

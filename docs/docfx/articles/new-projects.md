@@ -2,7 +2,7 @@
 
 Use `new` to create a normal MelonLoader project with explicit Mono and IL2CPP configurations:
 
-```powershell
+```batch
 s1interop new .\MyMod
 s1interop new .\MyMod --apply
 ```
@@ -19,8 +19,8 @@ The default scaffold includes:
 
 ## Configure local inputs
 
-```powershell
-Set-Location .\MyMod
+```batch
+cd .\MyMod
 s1interop doctor .
 s1interop setup .
 s1interop setup . --apply
@@ -30,7 +30,7 @@ s1interop setup . --apply
 
 ## Build
 
-```powershell
+```batch
 dotnet build .\MyMod.sln -c "Debug Mono"
 dotnet build .\MyMod.sln -c "Debug Il2Cpp"
 ```
@@ -43,7 +43,7 @@ The generated one-DLL facade model is experimental and fragile. It is not the de
 
 Create it only with the explicit flag:
 
-```powershell
+```batch
 s1interop new .\MyBackendNeutralExperiment --backend-neutral --apply
 ```
 

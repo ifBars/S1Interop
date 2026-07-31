@@ -8,11 +8,11 @@ Start with the exact error text. The first sections cover installation and scaff
 
 **Fix:** Check the installed tools:
 
-```powershell
+```batch
 dotnet tool list --global
 ```
 
-If `s1interop` is listed, close and reopen PowerShell. If it is not listed, repeat [Install the command](getting-started.md#2-install-the-command).
+If `s1interop` is listed, close and reopen Command Prompt. If it is not listed, repeat [Install the command](getting-started.md#2-install-the-command).
 
 ## "Missing MelonLoader at ..."
 
@@ -58,9 +58,8 @@ After adding the reference, run a full build so the generator emits the declarat
 
 **Fix:** Close the IDE, remove only the cached copy of this alpha package, then restore it from the local feed:
 
-```powershell
-$cachedPackage = Join-Path $env:USERPROFILE ".nuget\packages\s1interop.generators\0.1.0-alpha.1"
-Remove-Item -LiteralPath $cachedPackage -Recurse
+```batch
+rmdir /s /q "%USERPROFILE%\.nuget\packages\s1interop.generators\0.1.0-alpha.1"
 dotnet restore
 ```
 
@@ -112,13 +111,13 @@ On IL2CPP, do not assume a Mono member still exists or still gets called. If the
 
 1. Confirm NuGet.org is enabled:
 
-```powershell
+```batch
 dotnet nuget list source
 ```
 
 2. Clear stale caches and restore:
 
-```powershell
+```batch
 dotnet nuget locals all --clear
 dotnet restore
 ```
@@ -134,7 +133,7 @@ Contributors testing an unpublished build should pass their temporary package fo
 
 **Fix:** Every applied migration writes a rollback manifest and file backups under `s1interop-runs/<run-id>/`. Run the rollback command to restore all backed-up files:
 
-```powershell
+```batch
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 
@@ -155,10 +154,10 @@ Replace `<run-id>` with the specific run directory created by `--apply`.
 
 **Fix:** Pass the game paths directly as flags and increase the timeout as needed:
 
-```powershell
-s1interop verify-migration . --dual-runtime --build `
-  --mono-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" `
-  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I IL2CPP" `
+```batch
+s1interop verify-migration . --dual-runtime --build ^
+  --mono-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" ^
+  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I IL2CPP" ^
   --build-timeout-seconds 120
 ```
 

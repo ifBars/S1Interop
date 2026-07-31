@@ -14,7 +14,7 @@ Dual-runtime is also the safer first stop for Harmony transpilers, server/client
 
 ## 1. Analyze the mod
 
-```powershell
+```batch
 s1interop analyze .
 ```
 
@@ -22,7 +22,7 @@ Make sure the Mono project builds before migrating. Outdated mod dependencies sh
 
 ## 2. Review the migration plan
 
-```powershell
+```batch
 s1interop migrate . --dual-runtime --dry-run
 ```
 
@@ -37,7 +37,7 @@ A dual-runtime migration may:
 
 ## 3. Apply the migration
 
-```powershell
+```batch
 s1interop migrate . --dual-runtime --apply
 ```
 
@@ -62,15 +62,15 @@ Use your own install paths. The paths above are only examples.
 
 Before trusting the migrated tree, run verification in a temporary copy:
 
-```powershell
+```batch
 s1interop verify-migration . --dual-runtime --include-source-migrations
 ```
 
 When game paths are available, add build verification:
 
-```powershell
-s1interop verify-migration . --dual-runtime --build `
-  --mono-game-path "<your Mono Schedule I install>" `
+```batch
+s1interop verify-migration . --dual-runtime --build ^
+  --mono-game-path "<your Mono Schedule I install>" ^
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 
@@ -78,7 +78,7 @@ s1interop verify-migration . --dual-runtime --build `
 
 Applied migrations write backups and a manifest under `s1interop-runs/<run-id>/`.
 
-```powershell
+```batch
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 

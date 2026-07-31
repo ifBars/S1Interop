@@ -8,7 +8,7 @@ S1Interop uses an executable fixture harness instead of a framework-specific tes
 
 Fast analyzer, rewriter, migration-planning, and generator checks:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --quick
 ```
 
@@ -20,7 +20,7 @@ Generator diagnostics that validate `S1InteropType` declarations and `S1InteropM
 
 CI-safe coverage that does not require private local mod checkouts or local game installs:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --portable
 ```
 
@@ -30,7 +30,7 @@ Portable tests include slower MSBuild, packaging, sandbox verification, CLI, and
 
 Local real-mod and game-path coverage:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 
@@ -38,7 +38,7 @@ Integration tests may depend on the broader local Schedule One workspace, siblin
 
 Use focused lanes during normal local iteration:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
@@ -56,7 +56,7 @@ See Real-mod evidence (in the Contributors section) for the current real-mod cov
 
 Portable plus integration when the local workspace is available:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug
 ```
 
@@ -64,11 +64,11 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug
 
 Use the backend-neutral build validator for demo projects or new mods that should compile from one source tree against both reference surfaces:
 
-```powershell
-.\tests\Run-BackendNeutralBuildValidation.ps1 `
-  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
-  -MonoGamePath "C:\Path\To\Schedule I_alternate" `
-  -Il2CppGamePath "C:\Path\To\Schedule I_public" `
+```batch
+powershell -NoProfile -File .\tests\Run-BackendNeutralBuildValidation.ps1 ^
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln ^
+  -MonoGamePath "C:\Path\To\Schedule I_alternate" ^
+  -Il2CppGamePath "C:\Path\To\Schedule I_public" ^
   -GeneratorPackageSource .\artifacts\packages
 ```
 
@@ -80,17 +80,17 @@ The backend-neutral build validator above and runtime smoke runner below are spe
 
 Use the runtime smoke runner when a backend-neutral mod logs deterministic probe markers:
 
-```powershell
-.\tests\Run-BackendNeutralRuntimeSmoke.ps1 `
-  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
-  -Runtime Mono `
-  -GamePath "C:\Path\To\Schedule I_alternate" `
+```batch
+powershell -NoProfile -File .\tests\Run-BackendNeutralRuntimeSmoke.ps1 ^
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln ^
+  -Runtime Mono ^
+  -GamePath "C:\Path\To\Schedule I_alternate" ^
   -GeneratorPackageSource .\artifacts\packages
 
-.\tests\Run-BackendNeutralRuntimeSmoke.ps1 `
-  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln `
-  -Runtime Il2Cpp `
-  -GamePath "C:\Path\To\Schedule I_public" `
+powershell -NoProfile -File .\tests\Run-BackendNeutralRuntimeSmoke.ps1 ^
+  -ProjectPath C:\Path\To\YourBackendNeutralMod\YourBackendNeutralMod.sln ^
+  -Runtime Il2Cpp ^
+  -GamePath "C:\Path\To\Schedule I_public" ^
   -GeneratorPackageSource .\artifacts\packages
 ```
 
@@ -102,7 +102,7 @@ For build-only/audit-only checks, add `-NoLaunch`. Runtime logs are copied under
 
 GitHub Actions runs on Windows with .NET 8 and executes:
 
-```powershell
+```batch
 dotnet restore .\S1Interop.sln
 dotnet build .\S1Interop.sln --no-restore --configuration Release
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable

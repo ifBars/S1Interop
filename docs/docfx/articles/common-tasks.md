@@ -12,7 +12,7 @@ Start here after the [first mod walkthrough](first-mod.md). The supported path k
 
 Run the read-only doctor whenever the game or MelonLoader changes:
 
-```powershell
+```batch
 s1interop doctor .
 ```
 
@@ -20,10 +20,10 @@ It checks the project, ignored local configuration, game executables, managed ga
 
 If a valid input moved, preview and then apply only the ignored local file:
 
-```powershell
-s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
+```batch
+s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" ^
   --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I"
-s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
+s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" ^
   --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" --apply
 ```
 
@@ -31,7 +31,7 @@ s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I"
 
 ## Build both reference surfaces
 
-```powershell
+```batch
 dotnet build .\MyFirstMod.sln -c "Debug Mono"
 dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
 ```
@@ -49,7 +49,7 @@ Deploy the DLL matching the game branch. The starter logs `[MyFirstMod] loaded o
 
 Run `analyze` from the mod folder or pass its path:
 
-```powershell
+```batch
 s1interop analyze .
 ```
 
@@ -57,7 +57,7 @@ This reads project files and source without changing them. It reports the build 
 
 If the report is too noisy, analyze one configuration:
 
-```powershell
+```batch
 s1interop analyze . --configuration Mono
 ```
 
@@ -67,7 +67,7 @@ Use [Choose an adoption path](adoption-guide.md) before applying migration comma
 
 Commands that can edit a project preview by default. Keep preview and apply as separate steps:
 
-```powershell
+```batch
 s1interop init .
 s1interop init . --apply
 ```

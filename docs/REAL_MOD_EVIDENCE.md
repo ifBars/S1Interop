@@ -6,7 +6,7 @@ The real-mod lanes run against sibling checkouts in the broader local ScheduleOn
 
 ## Evidence Lanes
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
@@ -18,7 +18,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Run the full integration lane before release-facing validation:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 
@@ -26,7 +26,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 On July 5, 2026, the focused backend-neutral real-mod lane passed locally against the current checkout:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
 ```
 
@@ -34,7 +34,7 @@ Result: `S1Interop fixture tests passed (9 executed).`
 
 The focused Hoverboard lane also passed locally:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-hoverboard
 ```
 
@@ -42,7 +42,7 @@ Result: `S1Interop fixture tests passed (3 executed).`
 
 The focused build-gate lane also passed locally:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-build-gates
 ```
 

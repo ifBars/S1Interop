@@ -10,7 +10,7 @@ S1Interop is an alpha .NET tool. Install the command from NuGet.org; generated m
 
 ## 1. Check the .NET SDK
 
-```powershell
+```batch
 dotnet --version
 ```
 
@@ -18,13 +18,13 @@ Use .NET SDK 8.0 or newer. The SDK is required, not only the .NET runtime.
 
 ## 2. Install the command
 
-```powershell
+```batch
 dotnet tool install --global S1Interop --version 0.1.0-alpha.1
 ```
 
 If S1Interop is already installed, update it:
 
-```powershell
+```batch
 dotnet tool update --global S1Interop --version 0.1.0-alpha.1
 ```
 
@@ -32,16 +32,16 @@ No custom NuGet source is required. The CLI package and `S1Interop.Generators` a
 
 ## 3. Check the installation
 
-```powershell
+```batch
 s1interop --version
 s1interop --help
 ```
 
 The version output should start with `S1Interop 0.1.0-alpha.1`. The help output should list `doctor`, `setup`, `new`, `analyze`, `sdkgen`, and `verify-migration`.
 
-If PowerShell cannot find `s1interop`, close and reopen the terminal so the .NET global-tools path refreshes. Inspect installed tools with:
+If Command Prompt cannot find `s1interop`, close and reopen the terminal so the .NET global-tools path refreshes. Inspect installed tools with:
 
-```powershell
+```batch
 dotnet tool list --global
 ```
 
@@ -49,7 +49,7 @@ dotnet tool list --global
 
 To keep the command inside one working directory:
 
-```powershell
+```batch
 dotnet tool install S1Interop --tool-path .\.tools --version 0.1.0-alpha.1
 .\.tools\s1interop --version
 ```
@@ -60,7 +60,7 @@ The rest of these docs use the global `s1interop` command. Substitute the full `
 
 Contributors can still create local packages for validation:
 
-```powershell
+```batch
 dotnet restore .\S1Interop.sln
 dotnet build .\S1Interop.sln -c Release
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages

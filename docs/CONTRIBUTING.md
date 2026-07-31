@@ -11,7 +11,7 @@ S1Interop is alpha software. Keep changes small, verifiable, and honest about cu
 
 ## First-Time Setup
 
-```powershell
+```batch
 dotnet restore .\S1Interop.sln
 dotnet build .\S1Interop.sln -c Debug
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --quick
@@ -21,26 +21,26 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Use the fastest test lane that proves the change:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --quick
 ```
 
 Run portable tests before opening or pushing a general change:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --portable
 ```
 
 Run the Release CI-equivalent path before pushing changes that affect packaging, CLI behavior, build verification, or generators:
 
-```powershell
+```batch
 dotnet build .\S1Interop.sln --no-restore --configuration Release
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
 ```
 
 Run integration tests when changing real-mod migration behavior:
 
-```powershell
+```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 

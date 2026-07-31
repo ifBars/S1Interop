@@ -18,7 +18,7 @@ You can also choose a smaller path: diagnostics only, build hooks only, generate
 
 Start with analysis:
 
-```powershell
+```batch
 s1interop analyze .
 ```
 
@@ -42,7 +42,7 @@ Commands that write files have a dry-run mode. Review that plan before applying.
 
 Applied migrations write backups and a manifest under `s1interop-runs/<run-id>/`.
 
-```powershell
+```batch
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 
@@ -50,15 +50,15 @@ s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 
 Use sandbox verification before touching a real mod tree when possible. `verify-migration` applies the migration plan in a temporary copy:
 
-```powershell
+```batch
 s1interop verify-migration . --dual-runtime --include-source-migrations
 ```
 
 When local game paths are available, build-gated verification can compile both runtime configurations:
 
-```powershell
-s1interop verify-migration . --dual-runtime --build `
-  --mono-game-path "<your Mono Schedule I install>" `
+```batch
+s1interop verify-migration . --dual-runtime --build ^
+  --mono-game-path "<your Mono Schedule I install>" ^
   --il2cpp-game-path "<your IL2CPP Schedule I install>"
 ```
 

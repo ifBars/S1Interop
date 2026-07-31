@@ -25,8 +25,8 @@ Steam normally keeps one branch in its install folder. If you develop against bo
 
 Copy the committed example:
 
-```powershell
-Copy-Item .\local.build.props.example .\local.build.props
+```batch
+copy .\local.build.props.example .\local.build.props
 ```
 
 Then edit the copy:
@@ -64,9 +64,9 @@ It resolves MelonLoader from `MelonLoader\net35` for Mono and `MelonLoader\net6`
 
 You can provide paths for one verification run without editing a props file:
 
-```powershell
-s1interop verify-migration . --dual-runtime --build `
-  --mono-game-path "D:\Games\Schedule I_alternate" `
+```batch
+s1interop verify-migration . --dual-runtime --build ^
+  --mono-game-path "D:\Games\Schedule I_alternate" ^
   --il2cpp-game-path "D:\Games\Schedule I_public"
 ```
 

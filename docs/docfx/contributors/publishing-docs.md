@@ -4,7 +4,7 @@ The DocFX project lives in `docs/docfx`.
 
 Build it locally:
 
-```powershell
+```batch
 dotnet build .\S1Interop.sln -c Release
 docfx .\docs\docfx\docfx.json
 ```
@@ -21,7 +21,7 @@ The GitHub Actions workflow at `.github/workflows/docs.yml` builds the solution,
 
 Use DocFX's built-in preview server:
 
-```powershell
+```batch
 docfx .\docs\docfx\docfx.json --serve
 ```
 

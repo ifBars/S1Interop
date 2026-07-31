@@ -8,7 +8,7 @@ This is not the only S1Interop path. If you want diagnostics while keeping manua
 
 ## 1. Analyze the mod
 
-```powershell
+```batch
 s1interop analyze .
 ```
 
@@ -20,13 +20,13 @@ If the mod already uses native Mono/IL2CPP configurations, S1API, MAPI, SteamNet
 
 Run a dry-run first:
 
-```powershell
+```batch
 s1interop init . --dry-run
 ```
 
 Apply when the plan looks right:
 
-```powershell
+```batch
 s1interop init . --apply
 ```
 
@@ -36,7 +36,7 @@ s1interop init . --apply
 
 Start with usage-driven generation:
 
-```powershell
+```batch
 s1interop sdkgen . --dry-run
 s1interop sdkgen . --apply
 ```
@@ -47,7 +47,7 @@ Usage-driven generation also picks up simple reflection bindings that point at S
 
 For exploratory projects, seed broad type coverage from local game references:
 
-```powershell
+```batch
 s1interop sdkgen . --full-sdk --dry-run
 s1interop sdkgen . --full-sdk --apply
 ```
@@ -90,7 +90,7 @@ For a mod that already uses S1API, keep the S1API calls where they are. For a mo
 
 Build the project from the IDE or command line:
 
-```powershell
+```batch
 dotnet build
 ```
 

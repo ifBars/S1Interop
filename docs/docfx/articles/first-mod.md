@@ -14,14 +14,14 @@ The default project creates separate Mono and IL2CPP builds. Use this path for y
 
 You need:
 
-- Windows and PowerShell;
+- Windows and Command Prompt;
 - .NET SDK 8 or newer;
 - the installed `s1interop` tool;
 - a Mono or IL2CPP Schedule I install with MelonLoader.
 
 Check the tools:
 
-```powershell
+```batch
 dotnet --version
 s1interop --version
 ```
@@ -30,7 +30,7 @@ Follow [Install S1Interop](getting-started.md) if the command is not available.
 
 ## 1. Preview the project
 
-```powershell
+```batch
 s1interop new ..\MyFirstMod
 ```
 
@@ -38,9 +38,9 @@ The preview lists every planned file and identifies the recommended dual-runtime
 
 ## 2. Create the project
 
-```powershell
+```batch
 s1interop new ..\MyFirstMod --apply
-Set-Location ..\MyFirstMod
+cd ..\MyFirstMod
 ```
 
 S1Interop refuses to write into a non-empty target directory.
@@ -57,7 +57,7 @@ You do not need to edit code before the first build.
 
 Try automatic detection:
 
-```powershell
+```batch
 s1interop doctor .
 ```
 
@@ -72,9 +72,9 @@ It is always read-only.
 
 If a path is not detected, pass it explicitly:
 
-```powershell
-s1interop doctor . `
-  --mono-game-path "D:\Games\Schedule I_alternate" `
+```batch
+s1interop doctor . ^
+  --mono-game-path "D:\Games\Schedule I_alternate" ^
   --il2cpp-game-path "D:\Games\Schedule I_public"
 ```
 
@@ -84,13 +84,13 @@ You only need Mono for the first Mono build. Add an IL2CPP install when you are 
 
 Preview the generated `local.build.props`:
 
-```powershell
+```batch
 s1interop setup .
 ```
 
 If the preview is correct, write the file:
 
-```powershell
+```batch
 s1interop setup . --apply
 ```
 
@@ -100,13 +100,13 @@ s1interop setup . --apply
 
 Build for your installed runtime:
 
-```powershell
+```batch
 dotnet build .\MyFirstMod.sln -c "Debug Mono"
 ```
 
 or:
 
-```powershell
+```batch
 dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
 ```
 
@@ -154,7 +154,7 @@ Continue with [Common tasks](common-tasks.md) to analyze code, add a safe migrat
 
 The backend-neutral one-DLL scaffold is an experimental opt-in:
 
-```powershell
+```batch
 s1interop new ..\MyExperiment --backend-neutral --apply
 ```
 
