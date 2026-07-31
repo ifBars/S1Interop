@@ -74,7 +74,9 @@ Use the backend-neutral build validator for demo projects or new mods that shoul
 
 The script checks expected MelonLoader and Unity reference files before building. It does not launch the game or copy files into `Mods/`.
 
-For manual IDE validation of a project created with `s1interop new`, copy `local.build.props.example` to `local.build.props`, set `MonoGamePath`, `Il2CppGamePath`, and, when using local unpublished packages, `S1InteropGeneratorPackageSource`. The generated project maps that source into `RestoreAdditionalProjectSources` so Visual Studio and Rider can restore `S1Interop.Generators`.
+For manual IDE validation of a project created with `s1interop new`, run `s1interop doctor` and preview `s1interop setup`. The default generated project builds with `"Debug Mono"` and `"Debug Il2Cpp"` configurations. `setup --apply` may create only an ignored `local.build.props`; it sets `MonoGamePath`, `Il2CppGamePath`, and, when using local unpublished packages, `S1InteropGeneratorPackageSource`.
+
+The backend-neutral build validator above and runtime smoke runner below are specifically for projects created with `s1interop new --backend-neutral`. That one-DLL facade path is experimental and should retain the default dual-runtime shape as its fallback.
 
 Use the runtime smoke runner when a backend-neutral mod logs deterministic probe markers:
 

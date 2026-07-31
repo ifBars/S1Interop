@@ -9,7 +9,7 @@ If this is your first mod, follow these pages in order:
 3. [Build your first mod](first-mod.md)
 4. [Common tasks](common-tasks.md)
 
-The first mod is intentionally tiny: it builds one DLL and prints the active backend when Schedule I loads it. The common tasks page then adds one generated game type and an IL2CPP reference check.
+The first mod is intentionally tiny: it validates your local setup, builds explicit Mono and IL2CPP DLLs, and prints the compiled runtime when Schedule I loads it. The common tasks page then covers diagnostics, analysis, and the optional facade experiment.
 
 ## Coming from an existing mod
 
@@ -29,7 +29,7 @@ The `s1interop` command handles project analysis, scaffolding, migration plans, 
 
 ## Generated code
 
-The `S1Interop.Generators` package runs during compilation and emits the backend-neutral surface your mod uses.
+The `S1Interop.Generators` package runs during compilation and provides interop diagnostics. It can also emit an experimental backend-neutral surface when a project opts into facade declarations.
 
 | Page | Use it when |
 | --- | --- |
@@ -44,7 +44,7 @@ End-to-end paths that combine CLI commands and generated code.
 
 | Page | Use it when |
 | --- | --- |
-| [New projects](new-projects.md) | Start a backend-neutral MelonLoader mod. |
+| [New projects](new-projects.md) | Start an explicit Mono/IL2CPP MelonLoader mod. |
 | [Migration overview](migrating-mono-mods.md) | Choose backend-neutral or dual-runtime migration. |
 | [Migrate to backend-neutral](migrate-to-backend-neutral.md) | Move shared direct game access behind generated facades. |
 | [Migrate to dual-runtime](migrate-to-dual-runtime.md) | Keep separate Mono and IL2CPP outputs from one source tree. |

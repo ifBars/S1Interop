@@ -1470,7 +1470,7 @@ internal sealed partial class S1InteropFixtureTests
                 .ToArray();
 
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshS1FuelFacadeMod");
-            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--backend-neutral", "--apply");
             Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for real facade alias validation. Output: {create.Output}");
 
             string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshS1FuelFacadeMod.csproj");
@@ -1653,7 +1653,7 @@ internal sealed partial class S1InteropFixtureTests
         try
         {
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshBarsGraphicsFacadeMod");
-            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--backend-neutral", "--apply");
             Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for BarsGraphics alias validation. Output: {create.Output}");
 
             string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshBarsGraphicsFacadeMod.csproj");
@@ -2096,7 +2096,7 @@ internal sealed partial class S1InteropFixtureTests
             Assert(aliases.Length >= 4, "Hoverboard should expose several namespace-scoped backend-neutral aliases for scaffold validation.");
 
             string scaffoldDirectory = Path.Combine(tempRoot, "FreshHoverboardFacadeMod");
-            ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+            ProcessResult create = RunCli("new", scaffoldDirectory, "--backend-neutral", "--apply");
             Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for Hoverboard alias validation. Output: {create.Output}");
 
             string scaffoldProject = Path.Combine(scaffoldDirectory, "FreshHoverboardFacadeMod.csproj");
@@ -2253,7 +2253,7 @@ internal sealed partial class S1InteropFixtureTests
         string il2CppGamePath)
     {
         string scaffoldDirectory = Path.Combine(tempRoot, scaffoldName);
-        ProcessResult create = RunCli("new", scaffoldDirectory, "--apply");
+        ProcessResult create = RunCli("new", scaffoldDirectory, "--backend-neutral", "--apply");
         Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold for generated SDK validation. Output: {create.Output}");
 
         string scaffoldProject = Path.Combine(scaffoldDirectory, $"{scaffoldName}.csproj");

@@ -1,6 +1,9 @@
 # Architecture
 
-This page shows the moving parts behind SDK generation and the backend-neutral single-assembly workflow.
+This page shows the moving parts behind compile-time diagnostics, migration automation, and the experimental backend-neutral single-assembly workflow.
+
+> [!WARNING]
+> The single-assembly facade flow below is opt-in and fragile. The supported default is explicit Mono and IL2CPP builds; keep that shape as the fallback until a mod has sustained real-world validation.
 
 S1Interop has two halves:
 

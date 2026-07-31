@@ -45,7 +45,7 @@ S1Interop.0.1.0-alpha.1.nupkg
 S1Interop.Generators.0.1.0-alpha.1.nupkg
 ```
 
-The CLI creates and edits projects. The generator runs inside each mod build and creates the backend-neutral helpers. A scaffolded mod needs the generator package feed even after the CLI is installed.
+The CLI diagnoses, analyzes, scaffolds, and safely migrates projects. The generator runs inside each mod build to provide compile-time diagnostics; it also creates backend-neutral helpers only when a project opts into the experimental facade path. A scaffolded mod needs the generator package feed even after the CLI is installed.
 
 ## 3. Install the command
 
@@ -74,7 +74,7 @@ s1interop --version
 s1interop --help
 ```
 
-The version output should start with `S1Interop 0.1.0-alpha.1`. A source build may add a `+` suffix containing the Git commit. The help output should list commands such as `new`, `analyze`, `sdkgen`, and `verify-migration`.
+The version output should start with `S1Interop 0.1.0-alpha.1`. A source build may add a `+` suffix containing the Git commit. The help output should list commands such as `doctor`, `setup`, `new`, `analyze`, `sdkgen`, and `verify-migration`.
 
 If PowerShell cannot find `s1interop`, close and reopen the terminal so the .NET global tools path is refreshed. You can inspect installed tools with:
 

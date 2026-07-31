@@ -66,7 +66,7 @@ IL2CPP boundary diagnostics fire only when the compilation targets IL2CPP, detec
 These diagnostics catch source shapes that compile successfully but fail at runtime inside an IL2CPP game. They are intentionally narrow: normal managed collections and arrays inside ordinary mod logic are fine. The checks only trigger at the specific boundary crossing patterns described below.
 
 > [!TIP]
-> To trigger S1I004-S1I007 locally, run an explicit IL2CPP reference validation build, for example `dotnet build -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp`. Mono-reference single-assembly builds will not report these diagnostics.
+> To trigger S1I004-S1I007 locally, build the explicit `"Debug Il2Cpp"` configuration. In the experimental single-assembly scaffold, use `dotnet build -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp`; its normal Mono-reference build will not report these diagnostics.
 
 | Diagnostic | Severity | Meaning |
 | --- | --- | --- |

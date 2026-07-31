@@ -1,52 +1,51 @@
 ---
 title: Common tasks
-description: Add a game type, check IL2CPP references, analyze an existing mod, and choose the right Schedule I library.
+description: Diagnose local inputs, validate both runtimes, analyze an existing mod, and preview safe changes.
 uid: s1interop.common-tasks
 ---
 
 # Common tasks
 
-Start here after the [first mod walkthrough](first-mod.md). Each task adds one idea without changing the basic one-DLL project shape.
+Start here after the [first mod walkthrough](first-mod.md). The supported path keeps Mono and IL2CPP outputs explicit so failures are easy to diagnose.
 
-## Add one Schedule I game type
+## Recheck local prerequisites
 
-A facade is the generated C# type your mod uses instead of choosing between a Mono class and its IL2CPP wrapper. A declaration tells the generator which facade to create.
-
-Open `S1Interop.Generated\S1Interop.BackendNeutral.cs` and add this above the namespace:
-
-```csharp
-[assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera")]
-```
-
-Build once. The generator creates `S1Interop.ScheduleOne.PlayerScripts.PlayerCamera` inside your mod assembly.
-
-You can now resolve the runtime type without writing separate Mono and IL2CPP names:
-
-```csharp
-using S1Interop.ScheduleOne.PlayerScripts;
-
-LoggerInstance.Msg($"PlayerCamera resolves to {PlayerCamera.TypeName}.");
-```
-
-On Mono, the message uses `ScheduleOne.PlayerScripts.PlayerCamera`. On IL2CPP, it uses `Il2CppScheduleOne.PlayerScripts.PlayerCamera`.
-
-Add `S1InteropType` only for types your mod uses. The generator will also expose compatible public members when both reference surfaces provide a safe shape. Use [Declarations](backend-neutral-declarations.md) when you need the full rules.
-
-## Check the IL2CPP reference surface
-
-The shipping build uses Mono references and detects the backend at runtime. An IL2CPP reference build checks the same source against the generated IL2CPP assemblies on your machine:
+Run the read-only doctor whenever the game, MelonLoader, or local generator package changes:
 
 ```powershell
-dotnet build .\MyFirstMod.sln -c Debug `
-  -p:S1InteropReferenceRuntime=Il2Cpp `
-  -p:S1InteropTargetRuntime=Il2Cpp
+s1interop doctor .
 ```
 
-This requires `Il2CppGamePath` in `local.build.props`. Launch the IL2CPP game with MelonLoader once if `MelonLoader\Il2CppAssemblies` has not been generated.
+It checks the project, ignored local configuration, game executables, managed game references, MelonLoader references, and the exact local generator package. It does not install software or edit the project.
 
-Treat this as a compile-time check. Keep shipping the normal DLL from `bin\Single`, not the validation output under `bin\Il2Cpp`.
+If a valid input moved, preview and then apply only the ignored local file:
 
-The check can finish successfully while printing `MSB3277` warnings about different .NET assembly versions. Those warnings come from comparing a `netstandard2.1` mod with MelonLoader's .NET 6 IL2CPP reference set. For this check, use the final `Build succeeded` or `Build FAILED` line to decide whether the source compiled.
+```powershell
+s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
+  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" `
+  --generator-package-source "C:\src\S1Interop\artifacts\packages"
+s1interop setup . --mono-game-path "D:\SteamLibrary\steamapps\common\Schedule I" `
+  --il2cpp-game-path "C:\Program Files (x86)\Steam\steamapps\common\Schedule I" `
+  --generator-package-source "C:\src\S1Interop\artifacts\packages" --apply
+```
+
+`setup` refuses to write unless `local.build.props` is ignored. It never overwrites an existing local file.
+
+## Build both reference surfaces
+
+```powershell
+dotnet build .\MyFirstMod.sln -c "Debug Mono"
+dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
+```
+
+The builds produce separate DLLs:
+
+```text
+bin\Mono\Debug Mono\netstandard2.1\MyFirstMod.dll
+bin\Il2Cpp\Debug Il2Cpp\net6.0\MyFirstMod.dll
+```
+
+Deploy the DLL matching the game branch. The starter logs `[MyFirstMod] loaded on Mono.` or `[MyFirstMod] loaded on Il2Cpp.` so the selected runtime is visible.
 
 ## Analyze an existing mod
 
@@ -68,24 +67,31 @@ Use [Choose an adoption path](adoption-guide.md) before applying migration comma
 
 ## Preview every file-changing command
 
-Commands that can edit a project support a dry run. Keep the dry run and apply steps separate:
+Commands that can edit a project preview by default. Keep preview and apply as separate steps:
 
 ```powershell
-s1interop init . --dry-run
+s1interop init .
 s1interop init . --apply
 ```
 
-Applied migrations write backups and a manifest under `s1interop-runs\<run-id>`. See [Migration overview](migrating-mono-mods.md) before changing an established mod.
+`--dry-run` and `--apply` are mutually exclusive. Applied migrations write backups and a manifest under `s1interop-runs\<run-id>`. See [Migration overview](migrating-mono-mods.md) before changing an established mod.
+
+## Experiment with one generated facade
+
+> [!WARNING]
+> Backend-neutral facades are opt-in, fragile, and not the default compatibility promise. Keep the explicit Mono/IL2CPP project or conditional implementation as a fallback until your exact mod has sustained in-game validation on both branches.
+
+When the experiment is appropriate, add `S1InteropType` only for a type your mod uses. The generator can expose members only where both local reference surfaces provide a compatible shape. Start with [Backend-neutral SDK](backend-neutral-sdk.md) and [Declarations](backend-neutral-declarations.md), and review every skipped or ambiguous member.
 
 ## Use S1API for gameplay systems
 
-S1Interop is for low-level access to game types, member bindings, patches, and runtime differences. It does not provide item builders, NPC creation, quests, phone apps, or save data APIs.
+S1Interop is for low-level access to game types, member bindings, patches, diagnostics, migrations, and runtime validation. It does not provide item builders, NPC creation, quests, phone apps, or save data APIs.
 
 Use [S1API and S1Interop](s1api-and-s1interop.md) when you need one of those systems. A mod can use S1API for the gameplay feature and S1Interop for one direct game call that S1API does not cover.
 
 ## Read the right page next
 
-- [Generated output](generator-package.md) explains where facades come from and why IntelliSense can lag behind a declaration change.
-- [Backend-neutral SDK](backend-neutral-sdk.md) explains `Handle`, `As`, member access, and fallback helpers.
-- [Backend-neutral Harmony patching](harmony-patching.md) is the next step for direct game patches.
+- [Diagnostics](diagnostics.md) covers compile-time findings for declarations and IL2CPP boundaries.
+- [Migration overview](migrating-mono-mods.md) covers plans, backups, and verification.
+- [Generated output](generator-package.md) explains what the opt-in facade generator emits.
 - [Troubleshooting](troubleshooting.md) maps common build and generator errors to fixes.

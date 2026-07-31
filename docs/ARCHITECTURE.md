@@ -154,14 +154,14 @@ These are not Roslyn source generators. They are part of the CLI migration pipel
 
 Path: `src/S1Interop.Core/Scaffolding/`
 
-Scaffolding owns the generated shape for new backend-neutral projects. The CLI `new` command should only create a plan, reject unsafe targets, apply the plan when requested, and print text or JSON results.
+Scaffolding owns both the default explicit Mono/IL2CPP starter and the opt-in experimental backend-neutral starter. The CLI `new` command should only create a plan, reject unsafe targets, apply the selected shape when requested, and print text or JSON results.
 
 Current scaffolding types:
 
-- `BackendNeutralProjectScaffolder`: creates and applies the backend-neutral project plan.
+- `BackendNeutralProjectScaffolder`: creates and applies the default dual-runtime or experimental backend-neutral project plan.
 - `NewProjectPlan`: names the generated project and every planned file path.
 
-Keep file templates here rather than in `S1Interop.Cli`. A generated backend-neutral project is part of the product surface, not merely console output.
+Keep file templates here rather than in `S1Interop.Cli`. Both generated shapes are product surfaces, not merely console output. The explicit-runtime starter is the supported default; the backend-neutral shape must remain visibly experimental and preserve a fallback path.
 
 ## Roslyn Generator Layer
 

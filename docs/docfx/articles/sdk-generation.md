@@ -1,5 +1,8 @@
 # SDK generation
 
+> [!WARNING]
+> `sdkgen` enables the experimental backend-neutral facade path. Preview first, generate narrowly, review skipped or ambiguous members, and keep an explicit Mono/IL2CPP fallback.
+
 `sdkgen` is the CLI command that writes the generated declarations powering the backend-neutral SDK. It produces declaration files on disk; the `S1Interop.Generators` Roslyn package then consumes those declarations at build time. See [Generated output](generator-package.md) for the compile-time side.
 
 Use `sdkgen` when you want generated facades or broad type registration. You do not need it for diagnostics-only adoption, manual Mono/IL2CPP branches, or `migrate --dual-runtime` unless you also want generated helpers for specific game access.

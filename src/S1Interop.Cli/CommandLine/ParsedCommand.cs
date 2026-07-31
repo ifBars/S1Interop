@@ -10,8 +10,10 @@ internal sealed record ParsedCommand(
     int BuildTimeoutSeconds,
     bool IncludeSourceMigrations,
     bool FullSdk,
+    bool BackendNeutral,
     string? Il2CppGamePath,
     string? MonoGamePath,
+    string? GeneratorPackageSource,
     string? Configuration,
     IReadOnlyList<string> Errors)
 {
@@ -19,7 +21,7 @@ internal sealed record ParsedCommand(
     {
         if (args.Length == 0)
         {
-            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, null, null, null, Array.Empty<string>());
+            return new ParsedCommand("analyze", null, ".", OutputFormat.Text, false, false, false, false, 120, false, false, false, null, null, null, null, Array.Empty<string>());
         }
 
         string command = args[0].StartsWith("-", StringComparison.Ordinal) ? "analyze" : args[0];
@@ -34,13 +36,21 @@ internal sealed record ParsedCommand(
         bool dualRuntime = args.Any(arg => arg.Equals("--dual-runtime", StringComparison.OrdinalIgnoreCase));
         bool build = args.Any(arg => arg.Equals("--build", StringComparison.OrdinalIgnoreCase));
         bool fullSdk = args.Any(arg => arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase));
+        bool backendNeutral = args.Any(arg => arg.Equals("--backend-neutral", StringComparison.OrdinalIgnoreCase));
+        bool dryRun = args.Any(arg => arg.Equals("--dry-run", StringComparison.OrdinalIgnoreCase));
         bool includeSourceMigrations = args.Any(arg =>
             arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
             arg.Equals("--source-migrations", StringComparison.OrdinalIgnoreCase));
         int buildTimeoutSeconds = 120;
         string? il2CppGamePath = null;
         string? monoGamePath = null;
+        string? generatorPackageSource = null;
         string? configuration = null;
+
+        if (apply && dryRun)
+        {
+            errors.Add("--dry-run and --apply are mutually exclusive. Remove one; dry-run is the safe default.");
+        }
 
         int startIndex = command == "analyze" && args[0].StartsWith("-", StringComparison.Ordinal) ? 0 : 1;
         if (command.Equals("migrate", StringComparison.OrdinalIgnoreCase) &&
@@ -106,6 +116,12 @@ internal sealed record ParsedCommand(
                 continue;
             }
 
+            if (arg.Equals("--generator-package-source", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                generatorPackageSource = args[++i];
+                continue;
+            }
+
             if ((arg.Equals("--configuration", StringComparison.OrdinalIgnoreCase) ||
                  arg.Equals("-c", StringComparison.OrdinalIgnoreCase)) &&
                 i + 1 < args.Length)
@@ -137,7 +153,7 @@ internal sealed record ParsedCommand(
             }
         }
 
-        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, il2CppGamePath, monoGamePath, configuration, errors);
+        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, backendNeutral, il2CppGamePath, monoGamePath, generatorPackageSource, configuration, errors);
     }
 
     private static bool IsKnownFlag(string arg) =>
@@ -148,6 +164,7 @@ internal sealed record ParsedCommand(
         arg.Equals("--dual-runtime", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--build", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--backend-neutral", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--source-migrations", StringComparison.OrdinalIgnoreCase);
 
@@ -157,6 +174,7 @@ internal sealed record ParsedCommand(
         arg.Equals("--build-timeout-seconds", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--il2cpp-game-path", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--mono-game-path", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--generator-package-source", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--configuration", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("-c", StringComparison.OrdinalIgnoreCase);
 }

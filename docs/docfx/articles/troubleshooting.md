@@ -26,7 +26,7 @@ The same path mistake can produce `Missing Unity assemblies`, `Missing Schedule 
 
 **Cause:** A backend-neutral build could not find the well-known Schedule I type or assembly names used by the generated runtime probe.
 
-**Fix:** Confirm the DLL is running under MelonLoader inside Schedule I, not in a standalone test process. Check `MelonLoader\Latest.log` for assembly-load failures and make sure the DLL came from the normal `bin\Single` build. If the game or generated IL2CPP assembly names changed, keep the log because the probe list may need a S1Interop update.
+**Fix:** Confirm the DLL is running under MelonLoader inside Schedule I, not in a standalone test process. For the default scaffold, deploy the DLL from the output matching the active runtime (`bin\Mono\...` or `bin\Il2Cpp\...`). The `bin\Single` output exists only in the experimental backend-neutral scaffold. Check `MelonLoader\Latest.log` for assembly-load failures. If the game or generated IL2CPP assembly names changed, keep the log because the probe list may need a S1Interop update.
 
 ## "type or namespace 'S1InteropType' could not be found"
 

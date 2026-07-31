@@ -1,65 +1,52 @@
-# New backend-neutral projects
+# New projects
 
-Use `new` when you want a MelonLoader mod that builds one backend-neutral DLL. If this is your first Schedule I mod, use the complete [first mod walkthrough](first-mod.md) instead of starting from this reference page.
-
-If you want diagnostics for an existing mod, separate Mono/IL2CPP builds, or only a few generated helpers, start with [Use cases](use-cases.md) instead.
+Use `new` to create a normal MelonLoader project with explicit Mono and IL2CPP configurations:
 
 ```powershell
-s1interop new .\MyBackendNeutralMod --apply
+s1interop new .\MyMod
+s1interop new .\MyMod --apply
 ```
 
-The scaffold includes:
+The first command is a dry run. The second writes only to an empty target directory.
 
-- a C# project and solution;
-- `Debug` and `Release` builds that produce one `bin/Single/...` assembly;
-- `local.build.props.example` for machine-specific game paths;
-- an empty `S1Interop.Generated/S1Interop.BackendNeutral.cs` declaration file with commented examples;
-- package references needed by the generated helpers;
-- a normal MelonLoader entry point with `[MelonInfo]`, `[MelonGame]`, and a `MelonMod` class.
+The default scaffold includes:
 
-After creating the project:
+- `Debug Mono`, `Release Mono`, `Debug Il2Cpp`, and `Release Il2Cpp` configurations;
+- `S1Interop.Generators` for compile-time diagnostics and runtime reporting;
+- a `ModCore.cs` entry point that logs the selected runtime;
+- `local.build.props.example` and an explicit `.gitignore` rule;
+- an opt-in declaration file for later generated-helper experiments.
 
-1. Copy `local.build.props.example` to `local.build.props`.
-2. Set `MonoGamePath` to an `alternate` or `alternate-beta` branch install. This is required for the normal one-DLL build.
-3. Set `Il2CppGamePath` to a public `none` or `beta` branch install when you are ready to run the optional IL2CPP reference check.
-4. If you are using unpublished local S1Interop packages, set `S1InteropGeneratorPackageSource` to the folder containing `S1Interop.Generators.*.nupkg`.
-5. Open the `.sln` in Visual Studio or Rider.
-6. Build `Debug`.
-
-The normal build uses Mono reference assemblies, emits `S1InteropTargetRuntime=Unknown`, and detects Mono or IL2CPP at runtime. That DLL is the one you ship to both game installs.
-
-If you intentionally want an IL2CPP reference compile while developing declarations, run it explicitly and treat the output as a check:
+## Configure local inputs
 
 ```powershell
-dotnet build .\MyBackendNeutralMod.sln -c Debug -p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp
+Set-Location .\MyMod
+s1interop doctor .
+s1interop setup .
+s1interop setup . --apply
 ```
 
-Do not publish separate Mono and IL2CPP DLLs for a backend-neutral project unless your mod still has runtime-specific code that S1Interop cannot cover yet.
+`doctor` is read-only. `setup` writes only ignored local configuration, never installs software, and never overwrites an existing `local.build.props`.
 
-For broad API exploration, you can seed the SDK from your local game references:
+## Build
 
 ```powershell
-s1interop sdkgen . --full-sdk --apply
+dotnet build .\MyMod.sln -c "Debug Mono"
+dotnet build .\MyMod.sln -c "Debug Il2Cpp"
 ```
 
-That adds broad type registration from local metadata. It does not create named members for every game type. For a normal mod, add one `S1InteropType` declaration at a time for the types where you need member facades.
+Build and test the runtime matching the active game branch. When both installs are available, keep both builds as the compatibility proof.
 
-Use [Backend-neutral declarations](backend-neutral-declarations.md) to review or hand-edit the declaration file. See [Generated output](generator-package.md) for what appears after a build.
+## Experimental backend-neutral project
 
-## Working with other S1 modding libraries
+The generated one-DLL facade model is experimental and fragile. It is not the default.
 
-S1Interop does not replace S1API, MAPI, SteamNetworkLib, bGUI, or dedicated server APIs. Add those dependencies the same way you would in a normal MelonLoader project.
+Create it only with the explicit flag:
 
-Use S1Interop for direct game access:
+```powershell
+s1interop new .\MyBackendNeutralExperiment --backend-neutral --apply
+```
 
-- generated facades for `ScheduleOne.*` / `Il2CppScheduleOne.*` types;
-- type/member lookup that should survive backend differences;
-- Unity component lookup helpers such as `S1Interop.Generated.S1InteropUnity`;
-- simple public fields, properties, constructors, enum mirrors, and methods when metadata is safe;
-- explicit `S1InteropMember` declarations for private, ambiguous, or migration-specific seams.
+Validate that project against both reference surfaces and in both game branches. Keep the default dual-runtime project shape as a fallback until the exact mod has sustained real-world validation.
 
-Keep S1API for item, NPC, shop, saveable, and UI workflows. Keep MAPI for building and model construction. Keep SteamNetworkLib for higher-level networking clients, sync vars, DTOs, chunking, and message protocols.
-
-Use S1Interop underneath those libraries when you still need direct backend-neutral game or Steamworks access. That includes Steam P2P byte buffers, relay/session calls, callback pumping, reliable send-mode lookup, Steam ID values, and Schedule One lobby member lookup.
-
-It does not commit game assemblies, wrapper dumps, decompiled source, prefabs, scenes, textures, or exported Unity projects.
+See [Use cases](use-cases.md), [Backend-neutral SDK](backend-neutral-sdk.md), and [Real-mod evidence](../contributors/real-mod-evidence.md).

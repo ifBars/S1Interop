@@ -36,6 +36,123 @@ internal sealed partial class S1InteropFixtureTests
             dryRun.ExitCode == 0 &&
             dryRun.Output.Contains("S1Interop migration dry-run", StringComparison.Ordinal),
             $"The documented --dry-run flag should be accepted as the default non-apply mode. Output: {dryRun.Output}");
+
+        ProcessResult contradictoryMutationFlags = RunCli("init", "--dry-run", "--apply", "--path", RepositoryRoot);
+        Assert(
+            contradictoryMutationFlags.ExitCode == 2 &&
+            contradictoryMutationFlags.Output.Contains("--dry-run and --apply are mutually exclusive", StringComparison.Ordinal),
+            $"Contradictory mutation flags should fail before dispatch. Output: {contradictoryMutationFlags.Output}");
+    }
+
+    private void DoctorAndSetupConfigureOnlyIgnoredLocalInputs()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
+        string projectDirectory = Path.Combine(tempRoot, "GuidedMod");
+        string monoGamePath = Path.Combine(tempRoot, "Schedule I_alternate");
+        string il2CppGamePath = Path.Combine(tempRoot, "Schedule I_public");
+        string packageSource = Path.Combine(tempRoot, "packages");
+        string localPropsPath = Path.Combine(projectDirectory, "local.build.props");
+        Directory.CreateDirectory(projectDirectory);
+        Directory.CreateDirectory(packageSource);
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(projectDirectory, "GuidedMod.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>netstandard2.1</TargetFramework></PropertyGroup></Project>");
+            File.WriteAllText(Path.Combine(projectDirectory, ".gitignore"), "local.build.props\n");
+            CreateFiles(
+                monoGamePath,
+                "Schedule I.exe",
+                Path.Combine("Schedule I_Data", "Managed", "Assembly-CSharp.dll"),
+                Path.Combine("Schedule I_Data", "Managed", "ScheduleOne.Core.dll"),
+                Path.Combine("MelonLoader", "net35", "MelonLoader.dll"));
+            CreateFiles(
+                il2CppGamePath,
+                "Schedule I.exe",
+                Path.Combine("MelonLoader", "Il2CppAssemblies", "Assembly-CSharp.dll"),
+                Path.Combine("MelonLoader", "Il2CppAssemblies", "Il2CppScheduleOne.Core.dll"),
+                Path.Combine("MelonLoader", "net6", "MelonLoader.dll"));
+            File.WriteAllText(
+                Path.Combine(packageSource, $"{S1InteropPackageInfo.GeneratorsPackageId}.{S1InteropPackageInfo.GeneratorsPackageVersion}.nupkg"),
+                string.Empty);
+
+            string[] inputs =
+            [
+                projectDirectory,
+                "--mono-game-path",
+                monoGamePath,
+                "--il2cpp-game-path",
+                il2CppGamePath,
+                "--generator-package-source",
+                packageSource
+            ];
+            ProcessResult doctor = RunCli(["doctor", .. inputs]);
+            Assert(
+                doctor.ExitCode == 0 &&
+                doctor.Output.Contains("[ready] mono", StringComparison.Ordinal) &&
+                doctor.Output.Contains("[ready] il2cpp", StringComparison.Ordinal) &&
+                doctor.Output.Contains("doctor is read-only", StringComparison.Ordinal),
+                $"doctor should validate explicit inputs without mutating the project. Output: {doctor.Output}");
+            Assert(!File.Exists(localPropsPath), "doctor must not write local configuration.");
+
+            ProcessResult missingIl2Cpp = RunCli(
+                "doctor",
+                projectDirectory,
+                "--mono-game-path",
+                monoGamePath,
+                "--il2cpp-game-path",
+                Path.Combine(tempRoot, "missing-il2cpp"),
+                "--generator-package-source",
+                packageSource);
+            Assert(
+                missingIl2Cpp.ExitCode == 0 &&
+                missingIl2Cpp.Output.Contains("[optional] il2cpp", StringComparison.Ordinal) &&
+                missingIl2Cpp.Output.Contains("--il2cpp-game-path", StringComparison.Ordinal),
+                $"doctor should allow a first Mono build while making the missing IL2CPP validation surface actionable. Output: {missingIl2Cpp.Output}");
+
+            ProcessResult preview = RunCli(["setup", .. inputs]);
+            Assert(
+                preview.ExitCode == 0 &&
+                preview.Output.Contains("setup dry-run", StringComparison.Ordinal) &&
+                preview.Output.Contains("Run again with --apply", StringComparison.Ordinal),
+                $"setup should preview the ignored local configuration by default. Output: {preview.Output}");
+            Assert(!File.Exists(localPropsPath), "setup dry-run must not write local configuration.");
+
+            ProcessResult apply = RunCli(["setup", .. inputs, "--apply"]);
+            Assert(apply.ExitCode == 0, $"setup --apply should write the validated local configuration. Output: {apply.Output}");
+            string localProps = File.ReadAllText(localPropsPath);
+            Assert(
+                localProps.Contains($"<MonoGamePath>{monoGamePath}</MonoGamePath>", StringComparison.Ordinal) &&
+                localProps.Contains($"<Il2CppGamePath>{il2CppGamePath}</Il2CppGamePath>", StringComparison.Ordinal) &&
+                localProps.Contains($"<{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>{packageSource}</{S1InteropPackageInfo.GeneratorsPackageSourceProperty}>", StringComparison.Ordinal),
+                "setup should write only the validated local game and package inputs.");
+
+            ProcessResult overwrite = RunCli(["setup", .. inputs, "--apply"]);
+            Assert(
+                overwrite.ExitCode == 2 &&
+                overwrite.Output.Contains("existing local.build.props files are never overwritten", StringComparison.Ordinal),
+                $"setup should refuse to overwrite local configuration. Output: {overwrite.Output}");
+
+            ProcessResult existingPreview = RunCli(["setup", .. inputs]);
+            Assert(
+                existingPreview.ExitCode == 0 &&
+                existingPreview.Output.Contains("will not be overwritten", StringComparison.Ordinal),
+                $"setup preview should recognize an already valid local configuration without treating it as a failed setup. Output: {existingPreview.Output}");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(tempRoot);
+        }
+    }
+
+    private static void CreateFiles(string root, params string[] relativePaths)
+    {
+        foreach (string relativePath in relativePaths)
+        {
+            string path = Path.Combine(root, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, string.Empty);
+        }
     }
 
     private void CliHelpUsageLinesAreDocumented()
@@ -2033,7 +2150,7 @@ internal sealed partial class S1InteropFixtureTests
         }
     }
 
-    private void NewCommandCreatesBackendNeutralProjectScaffold()
+    private void NewCommandCreatesDualRuntimeProjectScaffold()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "S1Interop.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempRoot);
@@ -2061,6 +2178,16 @@ internal sealed partial class S1InteropFixtureTests
 
             ProcessResult apply = RunCli("new", targetDirectory, "--apply");
             Assert(apply.ExitCode == 0, $"s1interop new --apply should succeed. Output: {apply.Output}");
+            Assert(
+                apply.Output.Contains("Mode: dual-runtime (recommended)", StringComparison.Ordinal) &&
+                apply.Output.Contains($"dotnet build .\\{projectName}.sln -c \"Debug Mono\"", StringComparison.Ordinal) &&
+                apply.Output.Contains($"dotnet build .\\{projectName}.sln -c \"Debug Il2Cpp\"", StringComparison.Ordinal) &&
+                apply.Output.Contains($"bin\\Mono\\Debug Mono\\netstandard2.1\\{projectName}.dll", StringComparison.Ordinal) &&
+                apply.Output.Contains($"bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{projectName}.dll", StringComparison.Ordinal) &&
+                apply.Output.Contains("Mono deploy: Copy-Item", StringComparison.Ordinal) &&
+                apply.Output.Contains("IL2CPP run:", StringComparison.Ordinal) &&
+                apply.Output.Contains($"Expected log: {projectName} loaded on Mono. (or Il2Cpp)", StringComparison.Ordinal),
+                $"s1interop new should print exact build, output, deploy, run, and log guidance. Output: {apply.Output}");
             Assert(File.Exists(solutionPath), "s1interop new should create a solution file for IDE builds.");
             Assert(File.Exists(projectPath), "s1interop new should create the project file.");
             Assert(File.Exists(corePath), "s1interop new should create the core source file.");
@@ -2077,38 +2204,43 @@ internal sealed partial class S1InteropFixtureTests
             string gitignoreSource = File.ReadAllText(gitignorePath);
             string readmeSource = File.ReadAllText(readmePath);
             Assert(
-                solutionSource.Contains("Debug|Any CPU = Debug|Any CPU", StringComparison.Ordinal) &&
-                solutionSource.Contains("Release|Any CPU = Release|Any CPU", StringComparison.Ordinal) &&
-                !solutionSource.Contains("Debug Il2Cpp|Any CPU", StringComparison.Ordinal) &&
-                !solutionSource.Contains("Release Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Debug Mono|Any CPU = Debug Mono|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Release Mono|Any CPU = Release Mono|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Debug Il2Cpp|Any CPU = Debug Il2Cpp|Any CPU", StringComparison.Ordinal) &&
+                solutionSource.Contains("Release Il2Cpp|Any CPU = Release Il2Cpp|Any CPU", StringComparison.Ordinal) &&
                 solutionSource.Contains($"{projectName}.csproj", StringComparison.Ordinal),
-                "Generated solution should expose one normal Debug/Release build for the backend-neutral shipping assembly.");
+                "Generated solution should expose explicit Mono and IL2CPP validation and release builds.");
             Assert(
                 projectSource.Contains("<TargetFramework>netstandard2.1</TargetFramework>", StringComparison.Ordinal) &&
                 projectSource.Contains("<LangVersion>10.0</LangVersion>", StringComparison.Ordinal) &&
                 projectSource.Contains(S1InteropPackageInfo.GeneratorsPackageId, StringComparison.Ordinal) &&
                 projectSource.Contains($"PrivateAssets=\"{S1InteropPackageInfo.PrivateAssets}\"", StringComparison.Ordinal) &&
                 projectSource.Contains("<Import Project=\"local.build.props\" Condition=\"Exists('local.build.props')\" />", StringComparison.Ordinal) &&
-                projectSource.Contains("<Configurations>Debug;Release</Configurations>", StringComparison.Ordinal) &&
-                projectSource.Contains("<S1InteropTargetRuntime Condition=\"'$(S1InteropTargetRuntime)'==''\">Unknown</S1InteropTargetRuntime>", StringComparison.Ordinal) &&
-                projectSource.Contains("<S1InteropReferenceRuntime Condition=\"'$(S1InteropReferenceRuntime)'==''\">Mono</S1InteropReferenceRuntime>", StringComparison.Ordinal) &&
-                projectSource.Contains("<BaseOutputPath Condition=\"'$(BaseOutputPath)'=='' and '$(S1InteropTargetRuntime)'=='Unknown'\">bin\\Single\\</BaseOutputPath>", StringComparison.Ordinal) &&
-                projectSource.Contains("<GamePath Condition=\"'$(GamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'\">$(Il2CppGamePath)</GamePath>", StringComparison.Ordinal) &&
-                projectSource.Contains("<ManagedPath Condition=\"'$(ManagedPath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(GamePath)'!=''\">$(GamePath)\\MelonLoader\\Il2CppAssemblies</ManagedPath>", StringComparison.Ordinal) &&
+                projectSource.Contains("<Configurations>Debug Mono;Release Mono;Debug Il2Cpp;Release Il2Cpp</Configurations>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>", StringComparison.Ordinal) &&
+                projectSource.Contains("<TargetFramework>net6.0</TargetFramework>", StringComparison.Ordinal) &&
+                projectSource.Contains("<DefineConstants>$(DefineConstants);MONO</DefineConstants>", StringComparison.Ordinal) &&
+                projectSource.Contains("<DefineConstants>$(DefineConstants);IL2CPP</DefineConstants>", StringComparison.Ordinal) &&
+                projectSource.Contains("<BaseOutputPath>bin\\Mono\\</BaseOutputPath>", StringComparison.Ordinal) &&
+                projectSource.Contains("<BaseOutputPath>bin\\Il2Cpp\\</BaseOutputPath>", StringComparison.Ordinal) &&
+                projectSource.Contains("<IntermediateOutputPath>obj\\Mono\\$(Configuration)\\</IntermediateOutputPath>", StringComparison.Ordinal) &&
+                projectSource.Contains("<IntermediateOutputPath>obj\\Il2Cpp\\$(Configuration)\\</IntermediateOutputPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"0Harmony\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"Assembly-CSharp\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"ScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'!='Il2Cpp'\">", StringComparison.Ordinal) &&
                 projectSource.Contains("<Reference Include=\"Il2CppScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'=='Il2Cpp'\">", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, enable C# 10, install S1Interop.Generators privately, and default to a Mono-reference backend-neutral single output.");
+                "Generated project should target netstandard2.1, install diagnostics privately, and keep Mono/IL2CPP outputs explicit.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
                 coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
                 coreSource.Contains("public sealed class ModCore : MelonMod", StringComparison.Ordinal) &&
                 coreSource.Contains("public override void OnInitializeMelon()", StringComparison.Ordinal) &&
-                coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal),
-                "Generated core source should be a real MelonLoader mod entry point with a sanitized project namespace/name.");
+                coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal) &&
+                coreSource.Contains("loaded on {S1Interop.Generated.S1InteropRuntime.Backend}", StringComparison.Ordinal),
+                "Generated core source should be a real MelonLoader entry point that reports the selected runtime.");
             Assert(
                 starterSource.Contains("// [assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
                 !starterSource.Contains($"{Environment.NewLine}[assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
@@ -2124,11 +2256,12 @@ internal sealed partial class S1InteropFixtureTests
                 "Generated local path scaffolding should show both runtime game paths and the optional local generator package feed while keeping local.build.props ignored.");
             Assert(
                 readmeSource.Contains("## First local setup", StringComparison.Ordinal) &&
-                readmeSource.Contains("Do not copy game assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or exported Unity projects into this repository.", StringComparison.Ordinal) &&
-                readmeSource.Contains("one backend-neutral assembly built against Mono references with runtime backend detection", StringComparison.Ordinal) &&
-                readmeSource.Contains("-p:S1InteropReferenceRuntime=Il2Cpp -p:S1InteropTargetRuntime=Il2Cpp", StringComparison.Ordinal) &&
-                readmeSource.Contains("s1interop sdkgen . --apply", StringComparison.Ordinal),
-                "Generated README should guide first-time modders through local setup, safety boundaries, single-assembly builds, validation targets, and SDK generation.");
+                readmeSource.Contains("s1interop doctor .", StringComparison.Ordinal) &&
+                readmeSource.Contains("## Build and success check", StringComparison.Ordinal) &&
+                readmeSource.Contains("Debug Mono", StringComparison.Ordinal) &&
+                readmeSource.Contains("Debug Il2Cpp", StringComparison.Ordinal) &&
+                readmeSource.Contains("backend-neutral facades are opt-in and still fragile", StringComparison.OrdinalIgnoreCase),
+                "Generated README should guide first-time modders through safe setup, explicit runtime builds, and the experimental facade boundary.");
 
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
             File.WriteAllText(
@@ -2153,6 +2286,8 @@ internal sealed partial class S1InteropFixtureTests
                     ProcessResult monoScaffoldBuild = RunDotNet(
                         "build",
                         projectPath,
+                        "-c",
+                        "Debug Mono",
                         "--nologo",
                         "-v:minimal",
                         $"-p:MonoGamePath={monoGamePath}",
@@ -2165,10 +2300,10 @@ internal sealed partial class S1InteropFixtureTests
                     ProcessResult il2CppScaffoldBuild = RunDotNet(
                         "build",
                         projectPath,
+                        "-c",
+                        "Debug Il2Cpp",
                         "--nologo",
                         "-v:minimal",
-                        "-p:S1InteropReferenceRuntime=Il2Cpp",
-                        "-p:S1InteropTargetRuntime=Il2Cpp",
                         $"-p:Il2CppGamePath={il2CppGamePath}",
                         $"-p:RestoreAdditionalProjectSources={packageSource}");
                     Assert(il2CppScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local IL2CPP game path without changing source. Output: {il2CppScaffoldBuild.Output}");
@@ -2231,7 +2366,7 @@ internal sealed partial class S1InteropFixtureTests
                 }
                 """);
 
-            ProcessResult create = RunCli("new", targetDirectory, "--apply");
+            ProcessResult create = RunCli("new", targetDirectory, "--backend-neutral", "--apply");
             Assert(create.ExitCode == 0, $"s1interop new should create the backend-neutral scaffold before SDK seeding. Output: {create.Output}");
             File.WriteAllText(
                 Path.Combine(targetDirectory, "local.build.props"),

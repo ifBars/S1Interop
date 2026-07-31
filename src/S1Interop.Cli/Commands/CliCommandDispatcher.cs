@@ -21,6 +21,12 @@ internal static class CliCommandDispatcher
             return NewProjectCommand.Run(command);
         }
 
+        if (command.Name.Equals("doctor", StringComparison.OrdinalIgnoreCase) ||
+            command.Name.Equals("setup", StringComparison.OrdinalIgnoreCase))
+        {
+            return DeveloperSetupCommand.Run(command);
+        }
+
         WorkspaceAnalysis analysis;
         try
         {

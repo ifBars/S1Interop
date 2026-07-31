@@ -4,4 +4,5 @@ global using S1Interop.Core.Contracts;
 global using S1Interop.Core.Migration;
 global using S1Interop.Core.Packaging;
 global using S1Interop.Core.Rewriting;
+global using S1Interop.Core.Setup;
 global using S1Interop.Core.Utilities;

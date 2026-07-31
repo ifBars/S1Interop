@@ -214,7 +214,8 @@ See [Local game paths](local-paths.md) for the property reference.
 | You want to... | Use this |
 | --- | --- |
 | Understand which S1Interop pieces fit your mod | [Use cases](use-cases.md). |
-| Start a new backend-neutral mod | `s1interop new` then `s1interop sdkgen --full-sdk --apply`. See [New projects](new-projects.md). |
+| Start a new explicit Mono/IL2CPP mod | `s1interop new`, review the preview, then add `--apply`. See [New projects](new-projects.md). |
+| Experiment with a backend-neutral facade mod | `s1interop new --backend-neutral --apply`, while retaining an explicit-runtime fallback. See [Backend-neutral SDK](backend-neutral-sdk.md). |
 | Inspect a mod's runtime assumptions and risks | `s1interop analyze`. See [Commands](commands.md). |
 | Add compile-time guardrails without generated facades | `s1interop lint`, `s1interop build-hook`, or `S1Interop.Generators` diagnostics. See [Diagnostics](diagnostics.md). |
 | Generate SDK declarations from existing source | `s1interop sdkgen --apply`. See [SDK generation](sdk-generation.md). |

@@ -45,6 +45,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         CliRejectsInvalidOptionsBeforeDispatch();
         count++;
+        DoctorAndSetupConfigureOnlyIgnoredLocalInputs();
+        count++;
         CliHelpUsageLinesAreDocumented();
         count++;
         PackageInfoMatchesPackageProjects();
@@ -207,6 +209,8 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         CliRejectsInvalidOptionsBeforeDispatch();
         count++;
+        DoctorAndSetupConfigureOnlyIgnoredLocalInputs();
+        count++;
         CliHelpUsageLinesAreDocumented();
         count++;
         PackageInfoMatchesPackageProjects();
@@ -245,7 +249,7 @@ internal sealed partial class S1InteropFixtureTests
         count++;
         InitCommandApplyAndRollbackCreatesBackendNeutralStarter();
         count++;
-        NewCommandCreatesBackendNeutralProjectScaffold();
+        NewCommandCreatesDualRuntimeProjectScaffold();
         count++;
         NewCommandProjectCanSeedFullBackendNeutralSdkFromReferenceMetadata();
         count++;

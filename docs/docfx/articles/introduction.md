@@ -13,16 +13,18 @@ Schedule I has two game backends that matter to modders:
 
 The same game class has a different C# shape on each backend. A Mono mod might use `ScheduleOne.PlayerScripts.PlayerCamera`; an IL2CPP mod sees an Il2CppInterop wrapper such as `Il2CppScheduleOne.PlayerScripts.PlayerCamera`. Casts, delegates, reflection, and Harmony targets can differ too.
 
-S1Interop puts that low-level difference behind generated code. Your mod can use a facade such as `S1Interop.ScheduleOne.PlayerScripts.PlayerCamera`, while the generated code resolves the real Mono or IL2CPP type when the mod runs.
+S1Interop's stable early job is to help you see and validate that difference: project analysis, compile-time diagnostics, safe migration plans, rollbackable transformations, and explicit builds for both runtimes.
+
+Generated backend-neutral facades can put selected differences behind generated code, but that path is experimental and fragile. It is opt-in, not the default scaffold or the primary promise.
 
 ## When to use it
 
 S1Interop is useful when you want to:
 
-- start a MelonLoader mod that ships one DLL for Mono and IL2CPP;
+- start a MelonLoader mod with explicit Mono and IL2CPP builds;
 - inspect an existing mod before adding IL2CPP support;
 - keep separate Mono and IL2CPP builds but catch unsafe code earlier;
-- generate type and member bindings instead of maintaining two reflection paths;
+- experiment with generated type and member bindings after both explicit runtime builds are stable;
 - resolve a Harmony target on either backend;
 - try a migration in a temporary copy before touching the real project.
 
@@ -70,4 +72,4 @@ string runtimeTypeName = PlayerCamera.TypeName;
 
 The facade keeps the mod source the same. Its runtime type name changes to match Mono or IL2CPP.
 
-New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go to [Choose an adoption path](adoption-guide.md).
+New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go directly to [Choose an adoption path](adoption-guide.md). Use the backend-neutral pages only after reading their experimental limitations.

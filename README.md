@@ -1,160 +1,205 @@
 # S1Interop
 
-S1Interop is an alpha toolchain for Schedule One mod developers who need help with Mono, IL2CPP, or both. You can use it for diagnostics, dual-runtime builds, small generated helpers, or a backend-neutral single-assembly shape.
+S1Interop helps Schedule I mod developers catch Mono/IL2CPP problems earlier and change projects more safely.
 
-The intended role is an interop surface, not a hand-maintained high-level modding API. S1Interop should make direct game-wrapper work safer and easier by generating backend-neutral facades from local reference metadata. Higher-level APIs such as S1API can still provide domain workflows for items, NPCs, shops, saveables, and UI; S1Interop is for the direct game access that remains in a mod, whether that mod is standalone, S1API-based, or a mix of both.
+Its dependable early value is:
 
-That matters for real Schedule One projects because most mods are not blank SDK samples. A small Harmony patch mod, an S1API content mod, a MAPI building mod, a SteamNetworkLib multiplayer mod, and a dedicated server addon all have different owners for gameplay, networking, assets, and packaging. S1Interop should only take over the direct `ScheduleOne.*` / `Il2CppScheduleOne.*` interop seams that make those projects hard to keep portable.
+- compile-time diagnostics for known IL2CPP boundary problems;
+- read-only project and source analysis;
+- explainable migration plans with dry-run defaults;
+- rollbackable, narrow source and project transformations;
+- disposable sandbox verification and explicit Mono/IL2CPP build targets.
 
-The pieces are meant to be composable:
+Backend-neutral generated facades are available as an experimental opt-in. They are still fragile and are not the default scaffold or the primary product promise. Keep a dual-runtime fallback until a mod has sustained real-world validation on both game branches.
 
-- `s1interop new` starts a backend-neutral mod project.
-- `s1interop sdkgen` generates facades when you want backend-neutral game access.
-- `s1interop migrate --dual-runtime` helps existing Mono mods move toward two-assembly dual-runtime support.
-- `s1interop analyze`, `lint`, and `verify-migration` report unsafe IL2CPP boundary cases before they become runtime failures.
-- `S1Interop.Generators` can be used for diagnostics and selected generated helpers without running the full SDK path.
+## Choose a path
 
-It is not a finished "convert every mod with one command" tool yet. The current alpha already handles real project analysis, SDK facade generation, rollbackable migrations, and sandbox verification, but unsupported or ambiguous cases are reported instead of guessed.
+### New to modding — build your first mod
 
-Backend-neutral authoring means one source model and generated `S1Interop.ScheduleOne.*` facades. It does not mean developers should never build against Mono and IL2CPP references. Per-runtime build configurations remain useful validation targets so generator diagnostics can catch missing types, wrapper drift, and IL2CPP boundary failures before runtime.
-
-## Architecture at a glance
-
-```mermaid
-flowchart LR
-    Source["Mod source"] --> SdkGen["s1interop sdkgen"]
-    Refs["Local Mono and IL2CPP references"] --> SdkGen
-    SdkGen --> Declarations["S1Interop declarations"]
-    Declarations --> Generator["S1Interop.Generators"]
-    Generator --> Generated["Runtime registry, facades,<br/>handles, diagnostics, helpers"]
-    Generated --> Build["Build"]
-    Source --> Build
-    Build --> Dll["One mod DLL"]
-    Dll --> Runtime["Runtime backend detection"]
-    Runtime --> Mono["Mono ScheduleOne.*"]
-    Runtime --> Il2Cpp["IL2CPP Il2CppScheduleOne.*"]
-```
-
-See [Architecture](docs/docfx/articles/architecture.md) for the full SDK generation and single-assembly flow.
-
-## Documentation
-
-The full docs site lives under [`docs/docfx`](docs/docfx):
-
-- [Introduction](docs/docfx/articles/introduction.md)
-- [Build your first mod](docs/docfx/articles/first-mod.md)
-- [Common tasks](docs/docfx/articles/common-tasks.md)
-- [Architecture](docs/docfx/articles/architecture.md)
-- [Use cases](docs/docfx/articles/use-cases.md)
-- [Core concepts](docs/docfx/articles/core-concepts.md)
-- [Adoption guide](docs/docfx/articles/adoption-guide.md)
-- [S1API and S1Interop](docs/docfx/articles/s1api-and-s1interop.md)
-- [Getting started](docs/docfx/articles/getting-started.md)
-- [Commands](docs/docfx/articles/commands.md)
-- [Generated output](docs/docfx/articles/generator-package.md)
-- [Backend-neutral SDK](docs/docfx/articles/backend-neutral-sdk.md)
-- [Declarations](docs/docfx/articles/backend-neutral-declarations.md)
-- [SDK generation](docs/docfx/articles/sdk-generation.md)
-- [Migration overview](docs/docfx/articles/migrating-mono-mods.md)
-- [Migrate to backend-neutral](docs/docfx/articles/migrate-to-backend-neutral.md)
-- [Migrate to dual-runtime](docs/docfx/articles/migrate-to-dual-runtime.md)
-- [Diagnostics](docs/docfx/articles/diagnostics.md)
-- [Troubleshooting](docs/docfx/articles/troubleshooting.md)
-- [FAQ](docs/docfx/articles/faq.md)
-- [API reference scope](docs/docfx/articles/api-reference.md)
-- [Testing](docs/docfx/contributors/testing.md)
-
-Build the DocFX site locally:
+Create the recommended dual-runtime starter:
 
 ```powershell
-dotnet build .\S1Interop.sln -c Release
-docfx .\docs\docfx\docfx.json
+s1interop new .\MyFirstMod
+s1interop new .\MyFirstMod --apply
+Set-Location .\MyFirstMod
 ```
 
-The generated site is written to `docs/docfx/_site`. The GitHub Pages workflow in [`.github/workflows/docs.yml`](.github/workflows/docs.yml) builds and publishes the same site from `main`.
+The first command previews every file. The second creates the project only when the target directory is empty.
 
-## Quick start
+Detect and validate local prerequisites:
 
-Choose the workflow first:
+```powershell
+s1interop doctor .
+s1interop setup .
+s1interop setup . --apply
+```
 
-| You are... | First command after install |
+`doctor` is read-only. `setup` is also a dry run unless `--apply` is present. It writes only an ignored `local.build.props`, never installs software, never edits the project, and never overwrites existing local configuration.
+
+Build the branch you have installed:
+
+```powershell
+dotnet build .\MyFirstMod.sln -c "Debug Mono"
+dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
+```
+
+The matching DLL is written under:
+
+```text
+bin\Mono\Debug Mono\netstandard2.1\MyFirstMod.dll
+bin\Il2Cpp\Debug Il2Cpp\net6.0\MyFirstMod.dll
+```
+
+Copy the matching DLL to that game install's `Mods` folder. A successful launch logs:
+
+```text
+MyFirstMod loaded on Mono.
+```
+
+or:
+
+```text
+MyFirstMod loaded on Il2Cpp.
+```
+
+Continue with [Build your first mod](docs/docfx/articles/first-mod.md) and [Common tasks](docs/docfx/articles/common-tasks.md).
+
+### Existing or advanced mod — analyze safely
+
+Start without changing files:
+
+```powershell
+s1interop analyze .
+s1interop lint .
+s1interop migrate . --dual-runtime --dry-run
+s1interop verify-migration . --dual-runtime --include-source-migrations --build
+```
+
+Use the smallest feature that solves the current problem:
+
+| Goal | Start with |
 | --- | --- |
-| New to Schedule I modding | Follow [Build your first mod](docs/docfx/articles/first-mod.md) |
-| Bringing an existing Mono, dual-config, S1API, or hybrid mod | `s1interop analyze .` |
-| Keeping manual backend code but wanting guardrails | `s1interop lint .` |
-| Exploring local game API coverage | `s1interop sdkgen . --full-sdk --apply` |
-| Unsure whether migration is safe | `s1interop verify-migration . --dual-runtime --include-source-migrations` |
+| Understand configurations, references, and source risks | `s1interop analyze .` |
+| Fail CI on supported high-confidence diagnostics | `s1interop lint .` or `build-hook` |
+| Preview separate Mono/IL2CPP project support | `s1interop migrate . --dual-runtime --dry-run` |
+| Test changes without touching the project | `s1interop verify-migration . --dual-runtime` |
+| Add selected generated diagnostics or helpers | `s1interop init . --dry-run` |
+| Experiment with backend-neutral facades | Read the warning below, then use `sdkgen` narrowly |
 
-See the [adoption guide](docs/docfx/articles/adoption-guide.md) for the beginner path, existing-mod path, and safety model.
+See [Choose an adoption path](docs/docfx/articles/adoption-guide.md), [Use cases](docs/docfx/articles/use-cases.md), and [Commands](docs/docfx/articles/commands.md).
 
-Build from source:
+## Install the current alpha
+
+The current alpha is built from this repository. You need .NET SDK 8 or newer:
 
 ```powershell
 dotnet restore .\S1Interop.sln
-dotnet build .\S1Interop.sln
-```
-
-Run the CLI from source:
-
-```powershell
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- analyze .
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- new .\MyBackendNeutralMod --apply
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- init . --dry-run
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- sdkgen . --full-sdk --apply
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- migrate . --dual-runtime --dry-run
-dotnet run --project .\src\S1Interop.Cli\S1Interop.Cli.csproj -- verify-migration . --dual-runtime
-```
-
-Pack and install the local alpha packages:
-
-```powershell
+dotnet build .\S1Interop.sln -c Release
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj -c Release -o .\artifacts\packages
 dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release -o .\artifacts\packages
-dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
-.\.tools\s1interop --help
-.\.tools\s1interop --version
+dotnet tool install --global S1Interop --add-source .\artifacts\packages --version 0.1.0-alpha.1
+s1interop --version
+s1interop --help
 ```
 
-The CLI tool and Roslyn generator package are separate packages. During local alpha testing, keep both packages in the same local feed and set `S1InteropGeneratorPackageSource` in generated or migrated projects when they need to restore unpublished `S1Interop.Generators` builds.
+Use `dotnet tool update` instead of `install` when that version is already installed. `doctor` and `setup` can accept the package folder explicitly:
 
-## Local game paths
-
-Every developer has different Schedule One install paths. Keep those paths out of source control.
-
-If S1Interop creates `local.build.props`, copy or edit the generated file and set:
-
-```xml
-<MonoGamePath>...</MonoGamePath>
-<Il2CppGamePath>...</Il2CppGamePath>
+```powershell
+s1interop doctor . --generator-package-source C:\Code\S1Interop\artifacts\packages
 ```
 
-For projects created with `s1interop new`, copy `local.build.props.example` to `local.build.props`. The normal one-DLL build needs `MonoGamePath`; add `Il2CppGamePath` when you are ready for the optional IL2CPP reference build. Then open the generated `.sln` in Visual Studio or Rider.
+Full installation details are in [Install S1Interop](docs/docfx/articles/getting-started.md).
 
-When using local unpublished packages, also set:
+## Common tasks
 
-```xml
-<S1InteropGeneratorPackageSource>...\S1Interop\artifacts\packages</S1InteropGeneratorPackageSource>
+```powershell
+# Read-only reports
+s1interop doctor .
+s1interop analyze .
+s1interop lint .
+
+# Preview or write ignored local configuration
+s1interop setup .
+s1interop setup . --apply
+
+# Preview safe project changes
+s1interop init . --dry-run
+s1interop migrate . --dual-runtime --dry-run
+
+# Verify in a disposable copy
+s1interop verify-migration . --dual-runtime --include-source-migrations --build
 ```
 
-## Repository layout
+`--dry-run` and `--apply` are mutually exclusive. File-changing commands keep dry-run behavior as the default.
 
-```text
-src/S1Interop.Cli/          CLI commands and reporting
-src/S1Interop.Core/         analysis, migration, generation, rewriting, verification
-src/S1Interop.Generators/   Roslyn source generator and diagnostics package
-tests/S1Interop.Tests/      portable and local integration coverage
-docs/docfx/                 public documentation site
-docs/                       maintainer notes and project direction
-```
-
-## Safety model
-
-S1Interop works on your mod source and project files. It should not commit, package, or redistribute Schedule One assemblies, generated IL2CPP wrappers, decompiled dumps, prefabs, scenes, textures, or AssetRipper exports.
-
-Applied migrations write a manifest and backups under `s1interop-runs/<run-id>/`, so generated changes can be rolled back:
+Applied migrations write backups and a manifest under `s1interop-runs/<run-id>/`:
 
 ```powershell
 s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
 ```
 
-Machine-local files such as `local.build.props`, `Directory.Build.user.props`, `s1interop-runs/`, and `s1interop-cache/` are ignored by default.
+## Experimental backend-neutral facades
+
+The one-DLL generated-facade path is experimental and fragile.
+
+Use it only when:
+
+- the mod's direct game access is narrow enough for the current generated surface;
+- both Mono and IL2CPP reference builds pass;
+- the exact shipped assembly is smoke-tested in both game branches;
+- a dual-runtime build remains available as the safe fallback.
+
+Create an experimental scaffold explicitly:
+
+```powershell
+s1interop new .\MyExperiment --backend-neutral --apply
+```
+
+For existing projects, prefer narrow usage-driven generation:
+
+```powershell
+s1interop init . --dry-run
+s1interop sdkgen . --dry-run
+```
+
+`sdkgen --full-sdk` is for local exploration, not the default beginner or production workflow. Unsupported, ambiguous, overloaded, generic, collection, cast, and runtime-wrapper shapes can still require manual code or separate runtime builds.
+
+Read [Backend-neutral SDK](docs/docfx/articles/backend-neutral-sdk.md), [SDK generation](docs/docfx/articles/sdk-generation.md), and [Real mod evidence](docs/REAL_MOD_EVIDENCE.md) before adopting it.
+
+## Scope and safety
+
+S1Interop is low-level tooling. It does not replace gameplay libraries:
+
+- use S1API for items, NPCs, shops, saveables, UI, and other domain workflows;
+- use MAPI for building and model workflows;
+- use SteamNetworkLib for higher-level networking;
+- use DedicatedServerMod APIs for server/client addon lifecycles.
+
+S1Interop must not commit or redistribute game assemblies, generated IL2CPP wrappers, decompiled output, AssetRipper exports, prefabs, scenes, textures, or local game paths.
+
+## Architecture
+
+```text
+CLI
+  -> read-only analysis and diagnosis
+  -> migration planning
+  -> optional rollbackable apply
+  -> optional disposable verification/build
+
+S1Interop.Generators
+  -> compile-time diagnostics
+  -> selected generated helpers
+  -> experimental facades when explicitly declared
+```
+
+Repository layout:
+
+```text
+src/S1Interop.Cli/          commands and user-facing reporting
+src/S1Interop.Core/         analysis, setup, migration, generation, rollback, verification
+src/S1Interop.Generators/   Roslyn generator and diagnostics package
+tests/S1Interop.Tests/      portable and local integration coverage
+docs/docfx/                 public documentation site
+```
+
+See [Architecture](docs/docfx/articles/architecture.md), [Testing](docs/TESTING.md), and [Contributing](docs/CONTRIBUTING.md).

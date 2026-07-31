@@ -8,7 +8,7 @@ A common trap is treating S1Interop as "generate the SDK and rewrite everything.
 | --- | --- | --- |
 | Keep manual Mono/IL2CPP branches, but catch problems earlier. | `s1interop analyze`, `s1interop lint`, `s1interop build-hook`, and the `S1Interop.Generators` analyzer diagnostics. | `sdkgen`, generated facades, backend-neutral rewrites. |
 | Start from a Mono mod and add separate IL2CPP builds. | `s1interop migrate . --dual-runtime`, local path props, solution/configuration updates, sandbox verification. | A full generated SDK unless you also want facades for specific direct game calls. |
-| Ship one DLL that runs on both backends. | `s1interop init`, `s1interop sdkgen`, generated `S1Interop.ScheduleOne.*` facades, IL2CPP reference validation, in-game smoke tests. | Runtime-specific public release DLLs once the mod no longer needs them. |
+| Experiment with one DLL that runs on both backends. | `s1interop init`, narrow `sdkgen`, generated `S1Interop.ScheduleOne.*` facades, both reference builds, and in-game smoke tests. | Removing the dual-runtime fallback before sustained validation. |
 | Patch game methods without writing backend-specific target resolution. | `S1InteropPatch`, `S1InteropPrefix`, `S1InteropPostfix`, patch target diagnostics, generated internal patch registration. | Manual `PatchAll` calls for those generated patch declarations. |
 | Use a small generated helper but keep the rest of the mod as-is. | The generator package plus the specific helper surface, such as object casts, delegate bridges, Unity lookups, Steam P2P helpers, or a few `S1InteropMember` bindings. | Full SDK generation and source rewrites. |
 | Explore the game API while prototyping. | `s1interop sdkgen . --full-sdk --apply` to seed broad type registration from local metadata. | Treating full SDK output as the final shape of a settled mod. |
@@ -34,9 +34,9 @@ This fits mods with runtime-specific dependencies, IL2CPP injected components, n
 
 ## Backend-neutral use
 
-Use backend-neutral generation when the goal is one assembly.
+Use backend-neutral generation only as an experimental opt-in when the goal is one assembly.
 
-This path works best when the mod mostly needs direct game access, Harmony patch targets, simple member reads/writes, Unity object casts, delegate/event conversion, or Steamworks seams that S1Interop can hide. Keep Mono and IL2CPP validation builds even after the shipping output is one DLL.
+This path is still fragile. It is most plausible when the mod needs a narrow set of direct game calls, simple member access, or patch targets covered by the current generated surface. Keep explicit Mono and IL2CPP builds as the safe fallback, and do not ship a one-DLL result without exact in-game validation on both branches.
 
 ## Mixed use
 

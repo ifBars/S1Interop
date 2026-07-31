@@ -30,26 +30,30 @@ internal static class NewProjectCommand
             return 0;
         }
 
-        scaffolder.Apply(plan);
+        scaffolder.Apply(plan, command.BackendNeutral);
 
         if (command.Format == OutputFormat.Json)
         {
             var result = new
             {
+                mode = command.BackendNeutral ? "experimental-backend-neutral" : "dual-runtime",
                 projectName = plan.ProjectName,
                 targetDirectory = plan.TargetDirectory,
-                files = plan.PlannedFiles
+                files = plan.PlannedFiles,
+                next = GetNextSteps(plan, command.BackendNeutral)
             };
             Console.WriteLine(JsonSerializer.Serialize(result));
             return 0;
         }
 
-        Console.WriteLine($"S1Interop backend-neutral project created: {plan.ProjectName}");
+        Console.WriteLine($"S1Interop project created: {plan.ProjectName}");
+        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "dual-runtime (recommended)")}");
         Console.WriteLine($"Directory: {plan.TargetDirectory}");
         foreach (string file in plan.PlannedFiles)
         {
             Console.WriteLine($"  created {file}");
         }
+        PrintNextSteps(plan, command.BackendNeutral);
 
         return 0;
     }
@@ -60,6 +64,7 @@ internal static class NewProjectCommand
         {
             var result = new
             {
+                mode = command.BackendNeutral ? "experimental-backend-neutral" : "dual-runtime",
                 projectName = plan.ProjectName,
                 targetDirectory = plan.TargetDirectory,
                 apply = false,
@@ -70,6 +75,7 @@ internal static class NewProjectCommand
         }
 
         Console.WriteLine($"S1Interop new project dry-run: {plan.ProjectName}");
+        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "dual-runtime (recommended)")}");
         Console.WriteLine($"Directory: {plan.TargetDirectory}");
         foreach (string file in plan.PlannedFiles)
         {
@@ -77,4 +83,48 @@ internal static class NewProjectCommand
         }
         Console.WriteLine("Run again with --apply to write files.");
     }
+
+    private static void PrintNextSteps(NewProjectPlan plan, bool backendNeutral)
+    {
+        Console.WriteLine();
+        if (backendNeutral)
+        {
+            Console.WriteLine("Experimental mode: backend-neutral facades are fragile; keep a dual-runtime fallback and validate both game branches.");
+        }
+
+        Console.WriteLine("Next:");
+        foreach (string step in GetNextSteps(plan, backendNeutral))
+        {
+            Console.WriteLine($"  {step}");
+        }
+    }
+
+    private static string[] GetNextSteps(NewProjectPlan plan, bool backendNeutral) =>
+        backendNeutral
+            ?
+            [
+                $"Set-Location \"{plan.TargetDirectory}\"",
+                "s1interop doctor .",
+                "s1interop setup . --apply",
+                $"dotnet build .\\{plan.ProjectName}.sln -c Debug",
+                $"DLL: bin\\Single\\Debug\\netstandard2.1\\{plan.ProjectName}.dll",
+                $"Deploy: Copy-Item \".\\bin\\Single\\Debug\\netstandard2.1\\{plan.ProjectName}.dll\" \"<MonoGamePath>\\Mods\\{plan.ProjectName}.dll\" -Force",
+                "Run: & \"<MonoGamePath>\\Schedule I.exe\"",
+                $"Expected log: {plan.ProjectName} loaded on Mono. (or Il2Cpp)"
+            ]
+            :
+            [
+                $"Set-Location \"{plan.TargetDirectory}\"",
+                "s1interop doctor .",
+                "s1interop setup . --apply",
+                $"dotnet build .\\{plan.ProjectName}.sln -c \"Debug Mono\"",
+                $"dotnet build .\\{plan.ProjectName}.sln -c \"Debug Il2Cpp\"",
+                $"Mono DLL: bin\\Mono\\Debug Mono\\netstandard2.1\\{plan.ProjectName}.dll",
+                $"IL2CPP DLL: bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{plan.ProjectName}.dll",
+                $"Mono deploy: Copy-Item \".\\bin\\Mono\\Debug Mono\\netstandard2.1\\{plan.ProjectName}.dll\" \"<MonoGamePath>\\Mods\\{plan.ProjectName}.dll\" -Force",
+                "Mono run: & \"<MonoGamePath>\\Schedule I.exe\"",
+                $"IL2CPP deploy: Copy-Item \".\\bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{plan.ProjectName}.dll\" \"<Il2CppGamePath>\\Mods\\{plan.ProjectName}.dll\" -Force",
+                "IL2CPP run: & \"<Il2CppGamePath>\\Schedule I.exe\"",
+                $"Expected log: {plan.ProjectName} loaded on Mono. (or Il2Cpp)"
+            ];
 }

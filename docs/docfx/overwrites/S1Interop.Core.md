@@ -21,7 +21,7 @@ The namespaces follow the same broad shape as S1API's feature folders: analysis 
 | <xref:S1Interop.Core.Migration.MigrationPlanner> | You need a dry-run migration plan from an analysis result. |
 | <xref:S1Interop.Core.Migration.MigrationApplier> | You need to apply a migration plan and get rollback metadata. |
 | <xref:S1Interop.Core.Migration.MigrationVerifier> | You need sandbox verification for a project or workspace. |
-| <xref:S1Interop.Core.Scaffolding.BackendNeutralProjectScaffolder> | You need to create the same backend-neutral project shape as `s1interop new`. |
+| <xref:S1Interop.Core.Scaffolding.BackendNeutralProjectScaffolder> | You need to create the default dual-runtime or opt-in experimental backend-neutral shape used by `s1interop new`. |
 
 ## Result models
 

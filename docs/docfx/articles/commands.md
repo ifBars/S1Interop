@@ -8,8 +8,10 @@ Unknown options, missing option values, and invalid option values fail before co
 Use only the commands that fit your project. `analyze`, `lint`, and `build-hook` are useful even when you keep manual Mono/IL2CPP code. `migrate --dual-runtime` can add separate runtime builds without requiring a generated SDK. `sdkgen` is for projects that want generated facade declarations.
 
 ```text
+s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--format text|json]
+s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--generator-package-source path] [--dry-run|--apply] [--format text|json]
 s1interop analyze [path=.] [--configuration name] [--format text|json]
-s1interop new <path> [--dry-run|--apply] [--format text|json]
+s1interop new <path> [--backend-neutral] [--dry-run|--apply] [--format text|json]
 s1interop init [path=.] [--dry-run|--apply] [--format text|json]
 s1interop lint [path=.] [--configuration name] [--format text|json]
 s1interop sdkgen [path=.] [--full-sdk] [--dry-run|--apply] [--format text|json]
@@ -24,8 +26,10 @@ s1interop --version
 
 | Command | Use it for |
 | --- | --- |
+| `doctor` | Detect and validate a project, local game references, MelonLoader surfaces, ignored local configuration, and the local alpha generator package. It is always read-only. |
+| `setup` | Preview or write only `local.build.props`. It refuses missing prerequisites, unignored targets, and existing local configuration. It never installs software or edits committed project files. |
 | `analyze` | Inspect projects, runtime references, configurations, packages, and source risks without changing files. |
-| `new` | Create a backend-neutral project scaffold. |
+| `new` | Create the recommended explicit Mono/IL2CPP project scaffold. `--backend-neutral` selects the experimental one-DLL facade scaffold. |
 | `init` | Add a declaration file and generator support to an existing project. |
 | `lint` | Report issues using inferred project/runtime context. Useful for diagnostics-only adoption. |
 | `sdkgen` | Generate SDK declarations and facades when you want generated game access. |
@@ -37,6 +41,10 @@ s1interop --version
 
 Commands that change files default to dry-run mode unless `--apply` is provided. Use the dry-run output to inspect planned operations before writing source, project, solution, props, or target files.
 
-`sdkgen` is usage-driven by default. Add `--full-sdk` when seeding a blank backend-neutral project from local game reference metadata.
+`--dry-run` and `--apply` are mutually exclusive. Passing both is an error.
+
+`setup --apply` is intentionally narrower than migration commands: it writes only an ignored `local.build.props` and never overwrites an existing one.
+
+`sdkgen` is an experimental facade workflow and is usage-driven by default. Add `--full-sdk` only for broad local exploration from local game reference metadata.
 
 `verify-migration` always works in a temporary sandbox. It does not mutate the source project, and `--include-source-migrations` only changes what gets applied inside that sandbox.

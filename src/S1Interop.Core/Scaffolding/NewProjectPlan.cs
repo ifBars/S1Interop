@@ -1,7 +1,7 @@
 namespace S1Interop.Core.Scaffolding;
 
 /// <summary>
-/// Describes the files that will be written for a new backend-neutral project.
+/// Describes the files that will be written for a new S1Interop project.
 /// </summary>
 /// <param name="ProjectName">The generated project and root namespace name.</param>
 /// <param name="TargetDirectory">The target directory for the scaffolded project.</param>

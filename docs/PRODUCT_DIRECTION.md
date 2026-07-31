@@ -1,13 +1,17 @@
 # Product Direction
 
-S1Interop should become a generated backend-neutral SDK for Schedule One mod development.
-
-The ideal authoring experience is not a hand-written registry of every member a developer might need. A developer should be able to opt into, infer, or bulk-generate a game type once and then work through a generated facade that exposes the type's normal public surface as much as the Mono and IL2CPP reference metadata allows.
+S1Interop should make direct Schedule One interop safer and more repeatable across Mono and IL2CPP.
 
 The core product promise is:
 
-- New backend-neutral mods should start from an SDK-shaped project, not from raw reflection helpers.
-- Migrated mods should move toward the same SDK shape instead of accumulating more conditional code.
+- New developers get a guided first build, actionable environment diagnostics, and explicit Mono and IL2CPP outputs.
+- Existing mods get compile-time IL2CPP warnings, read-only analysis, reviewable migration plans, safe transformations, and dual-runtime validation.
+- Commands preview changes by default and preserve an explicit fallback whenever automation cannot prove a transformation.
+- Backend-neutral facades remain an opt-in experiment until sustained real-world validation shows that they are reliable enough to promote.
+
+The experimental facade direction is:
+
+- Developers opt into or infer a game type once, then work through a generated facade where Mono and IL2CPP metadata agree.
 - `S1InteropNamespace` is the broad type-registration path, not an instruction to generate every public member for every type.
 - `S1InteropType` is a declaration of type coverage, not a requirement to manually list the type's public members.
 - `S1InteropMember` is an override and escape hatch for surfaces that cannot be safely discovered yet.
@@ -15,24 +19,25 @@ The core product promise is:
 
 ## Positioning
 
-S1Interop is the low-level interop layer for direct Schedule One game-wrapper work. It should make IL2CPP and backend-neutral development approachable without becoming a hand-written replacement for every higher-level modding API.
+S1Interop is the low-level tooling and interop layer for direct Schedule One game-wrapper work. Its stable early value is compile-time help, diagnostics, migration planning, safe transformations, and validation against both runtime reference surfaces. It should make IL2CPP development approachable without becoming a hand-written replacement for every higher-level modding API.
 
 That means:
 
-- S1Interop should hide repetitive Mono/IL2CPP wrapper differences, type lookup, member binding, casts, delegate conversion, and build-validation mechanics.
+- S1Interop should automate repetitive Mono/IL2CPP project setup, risk detection, migration planning, and build-validation mechanics.
+- Backend-neutral type lookup, member binding, casts, and delegate conversion are useful experiments, not a default compatibility promise.
 - S1Interop should not grow into a manually maintained S1API-style catalog of gameplay concepts, item builders, NPC builders, shops, saveables, or UI workflows.
 - Higher-level APIs can build on top of S1Interop when they need backend-neutral internals, while still owning their own domain abstractions.
 - Generated metadata-backed coverage is preferred over a committed static wrapper catalog because Schedule One and MelonLoader wrapper output can drift.
 
-## Backend-neutral authoring vs validation
+## Explicit runtimes first; backend-neutral only by opt-in
 
-Backend-neutral is an authoring model first: mod code should move toward one source surface under `S1Interop.ScheduleOne.*`. The project may still expose Mono and IL2CPP build configurations so developers can validate the same source against both local reference surfaces.
+The supported default is one project with explicit Mono and IL2CPP build configurations. The starter reports which runtime it was compiled for, produces separate DLLs, and makes both reference checks visible. This keeps failures attributable and gives developers a dependable fallback.
 
-Those configurations should be presented as validation targets, not as a requirement to maintain two conditional codepaths. A new developer should be able to start with the generated facade model, fill in local paths, and build both reference surfaces without needing to understand every wrapper naming rule up front.
+Backend-neutral is an experimental authoring model: an opted-in mod moves selected direct game access toward one generated source surface under `S1Interop.ScheduleOne.*`. It must retain a dual-runtime build or branch-based fallback until its exact gameplay paths have sustained validation on both game branches.
 
 ## Current alpha bar
 
-The current generated facade is intentionally conservative. `Handle`, `As`, `TryAs`, `Is`, `Create`, named member accessors, and low-level `Get`/`TrySet`/`Invoke` helpers are useful now, but the public authoring goal is still more native-feeling than the current object/reflection-shaped fallback layer.
+The current generated facade is intentionally conservative and fragile. `Handle`, `As`, `TryAs`, `Is`, `Create`, named member accessors, and low-level `Get`/`TrySet`/`Invoke` helpers are useful experiments, but they are not yet the primary onboarding path or a general runtime-compatibility guarantee.
 
 Near-term SDK quality should prioritize:
 
@@ -134,23 +139,24 @@ Use explicit member declarations when:
 
 Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. Explicit declarations remain the safer alpha path for aliases, private members, pinned bindings, and ambiguous overloads, but they should still be enriched from metadata whenever one compatible member can be identified. The escape hatch should not permanently downgrade a mod back to object-only helpers.
 
-## SDK Generation Modes
+## Experimental SDK Generation Modes
 
-The SDK should support three entry points:
+The opt-in SDK experiment supports two generation entry points:
 
-- `new`: create a backend-neutral project that already references the generator package, local path props, and SDK generation workflow.
 - `sdkgen --apply`: infer the narrow SDK a mod needs from source usage, aliases, string-held type names, and local reference metadata.
 - `sdkgen --full-sdk --apply`: seed a blank or exploratory project with all discoverable Schedule One type facades from local reference metadata.
 
-All three paths should produce the same style of facade. Starting backend-neutral should not require a developer to first write a Mono-only mod and then migrate it.
+`new --backend-neutral` creates the experimental single-assembly project shape. Plain `new` creates the supported explicit Mono/IL2CPP starter. All facade-generation paths should produce the same style of facade, but developers must be able to return to the explicit dual-runtime shape when metadata or runtime behavior diverges.
 
 ## CLI Shape
 
-For new backend-neutral mods:
+For new mods:
 
 ```powershell
 s1interop new .\MyMod --apply
-s1interop sdkgen . --full-sdk --apply
+s1interop doctor .\MyMod
+dotnet build .\MyMod\MyMod.sln -c "Debug Mono"
+dotnet build .\MyMod\MyMod.sln -c "Debug Il2Cpp"
 ```
 
 For existing mods:
@@ -161,9 +167,16 @@ s1interop sdkgen . --apply
 s1interop migrate . --dual-runtime --dry-run
 ```
 
+For an explicit backend-neutral experiment:
+
+```powershell
+s1interop new .\MyExperiment --backend-neutral --apply
+s1interop sdkgen .\MyExperiment --full-sdk --apply
+```
+
 `sdkgen --full-sdk` is the blank-project seeding path. It should generate facades for all discoverable Schedule One types from local reference metadata. Usage-driven `sdkgen` should generate only the types and members a project appears to use.
 
-`migrate` should converge existing mods toward the same generated SDK surface. When it cannot safely rewrite a runtime-specific call, it should leave a focused report or explicit override declaration instead of guessing.
+`migrate` should first produce reviewable plans and safe transformations. Generated SDK convergence is an optional migration outcome. When S1Interop cannot safely rewrite a runtime-specific call, it should leave a focused report or explicit conditional fallback instead of guessing.
 
 ## Non-Goals
 
