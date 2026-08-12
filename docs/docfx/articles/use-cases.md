@@ -22,4 +22,4 @@ Use usage-driven `sdkgen` when a narrow direct-game seam can move behind generat
 
 `sdkgen --full-sdk` registers broad type coverage from local game metadata. It is useful while exploring, but it is not the default scaffold or a final production shape.
 
-For commands and a decision table, return to [Choose an adoption path](adoption-guide.md).
+For commands and a decision table, return to [Start here](adoption-guide.md).

@@ -7,76 +7,68 @@ _layout: landing
   <h1>Build and validate Schedule I mods across Mono and IL2CPP.</h1>
   <p class="s1interop-lead">S1Interop guides local setup, adds compile-time diagnostics, analyzes existing mods, previews safe migrations, and validates both runtime reference surfaces. Backend-neutral facades are an opt-in experiment.</p>
   <div class="s1interop-actions">
-    <a class="s1interop-action s1interop-action-primary" href="articles/first-mod.md">Build your first mod</a>
+    <a class="s1interop-action s1interop-action-primary" href="articles/adoption-guide.md">Start here</a>
     <a class="s1interop-action" href="articles/introduction.md">What S1Interop does</a>
-    <a class="s1interop-action" href="articles/getting-started.md">Install S1Interop</a>
-    <a class="s1interop-action" href="articles/adoption-guide.md">I already have a mod</a>
+    <a class="s1interop-action" href="articles/commands.md">Command reference</a>
+    <a class="s1interop-action" href="articles/troubleshooting.md">Troubleshooting</a>
   </div>
 </section>
 
 <section class="s1interop-section">
   <div class="s1interop-section-heading">
-    <p class="s1interop-eyebrow">Start small</p>
-    <h2>Get one result, then add the next piece.</h2>
+    <p class="s1interop-eyebrow">Choose your route</p>
+    <h2>Begin with the experience you already have.</h2>
   </div>
 
   <div class="s1interop-card-grid">
-    <a class="s1interop-card" href="articles/first-mod.md">
-      <h3>Build both runtime targets</h3>
-      <p>Diagnose local paths, build explicit Mono and IL2CPP DLLs, deploy one, and check the exact log message.</p>
+    <a class="s1interop-card" href="articles/adoption-guide.md#new-to-schedule-i-modding">
+      <h3>New to Schedule I modding</h3>
+      <p>Install the tool, build a small mod, load it in-game, and stop at a clear success marker.</p>
     </a>
-    <a class="s1interop-card" href="articles/common-tasks.md">
-      <h3>Run the common checks</h3>
-      <p>Validate setup, check both reference surfaces, analyze an existing mod, or preview a migration.</p>
+    <a class="s1interop-card" href="articles/adoption-guide.md#already-maintaining-a-mod">
+      <h3>Already maintaining a mod</h3>
+      <p>Analyze the project without changing it, then add only the compatibility path you need.</p>
     </a>
-    <a class="s1interop-card" href="articles/s1api-and-s1interop.md">
-      <h3>Know when to use S1API</h3>
-      <p>Keep items, NPCs, quests, UI, and save workflows in S1API. Use S1Interop for the direct game access left over.</p>
-    </a>
-    <a class="s1interop-card" href="articles/adoption-guide.md">
-      <h3>Work with an existing mod</h3>
-      <p>Start with read-only analysis, then choose diagnostics, separate runtime builds, or an opt-in facade experiment.</p>
-    </a>
-    <a class="s1interop-card" href="articles/troubleshooting.md">
-      <h3>Fix the first error</h3>
-      <p>Match missing paths, package restores, generated symbols, runtime detection, and migration failures to concrete checks.</p>
+    <a class="s1interop-card" href="articles/adoption-guide.md#already-know-what-you-need">
+      <h3>Looking for one feature</h3>
+      <p>Jump to commands, generated interop, local paths, migration, the Core API, or help.</p>
     </a>
   </div>
 </section>
 
 <section class="s1interop-section">
   <div class="s1interop-section-heading">
-    <p class="s1interop-eyebrow">Go deeper</p>
-    <h2>Read these when the basic project works.</h2>
+    <p class="s1interop-eyebrow">Browse the documentation</p>
+    <h2>Learn, complete a task, look up details, or fix a problem.</h2>
   </div>
 
   <div class="s1interop-card-grid s1interop-card-grid-wide">
-    <a class="s1interop-card" href="articles/backend-neutral-sdk.md">
-      <h3>Experimental generated facades</h3>
-      <p>Evaluate the fragile `S1Interop.ScheduleOne.*` facade path while retaining an explicit dual-runtime fallback.</p>
+    <a class="s1interop-card" href="articles/first-mod.md">
+      <h3>Tutorials</h3>
+      <p>Follow an end-to-end path that creates a project and produces an in-game result.</p>
     </a>
-    <a class="s1interop-card" href="articles/generator-package.md">
-      <h3>Generated at build time</h3>
-      <p>The Roslyn generator emits facades, registries, and diagnostics during compilation. See what is generated and when symbols appear.</p>
+    <a class="s1interop-card" href="articles/common-tasks.md">
+      <h3>Guides</h3>
+      <p>Configure paths, analyze a mod, build both runtimes, or preview a safe migration.</p>
     </a>
-    <a class="s1interop-card" href="articles/local-paths.md">
-      <h3>Local paths stay local</h3>
-      <p>Use ignored `local.build.props` files for each developer's Mono and IL2CPP game installs.</p>
+    <a class="s1interop-card" href="articles/core-concepts.md">
+      <h3>Concepts</h3>
+      <p>Understand runtime targets, packages, declarations, safety, and the boundary with other modding APIs.</p>
     </a>
-    <a class="s1interop-card" href="contributors/testing.md">
-      <h3>Verification paths</h3>
-      <p>Run quick, portable, and real-mod integration tests without mutating a developer's real mod checkout.</p>
+    <a class="s1interop-card" href="articles/commands.md">
+      <h3>Reference</h3>
+      <p>Look up exact CLI options, SDK generation behavior, generated symbols, and Core API contracts.</p>
     </a>
-    <a class="s1interop-card" href="contributors/real-mod-evidence.md">
-      <h3>Real-mod evidence</h3>
-      <p>Track which real Schedule One mods have exercised the migration and backend-neutral paths so claims stay grounded.</p>
+    <a class="s1interop-card" href="articles/troubleshooting.md">
+      <h3>Help</h3>
+      <p>Match setup, build, package, generator, runtime, and migration failures to concrete checks.</p>
     </a>
   </div>
 </section>
 
 <section class="s1interop-section s1interop-bottom-links">
   <a href="articles/commands.md">Commands</a>
-  <a href="articles/generator-package.md">Generated output</a>
+  <a href="articles/adoption-guide.md">Start here</a>
   <a href="api/S1Interop.Core.yml">API reference</a>
   <a href="contributors/index.md">Contributors</a>
   <a href="https://github.com/ifBars/S1Interop">GitHub repository</a>

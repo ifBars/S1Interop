@@ -72,4 +72,4 @@ string runtimeTypeName = PlayerCamera.TypeName;
 
 The facade keeps the mod source the same. Its runtime type name changes to match Mono or IL2CPP.
 
-New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go directly to [Choose an adoption path](adoption-guide.md). Use the backend-neutral pages only after reading their experimental limitations.
+New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go directly to [Start here](adoption-guide.md). Use the backend-neutral pages only after reading their experimental limitations.

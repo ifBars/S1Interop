@@ -8,13 +8,13 @@ Licensed under [GPL-3.0-only](LICENSE).
 
 ## Start here
 
-| If you want to... | Start with |
+Use the [Start here guide](docs/docfx/articles/adoption-guide.md). It gives new modders a complete first-mod route, lets experienced mod authors begin with read-only analysis, and sends tool authors directly to the relevant reference.
+
+| Your situation | First route |
 | --- | --- |
-| Build a new mod | [`s1interop new`](docs/docfx/articles/first-mod.md) |
-| Inspect an existing project | [`s1interop analyze .`](docs/docfx/articles/adoption-guide.md) |
-| Add separate Mono and IL2CPP outputs | [`s1interop migrate . --dual-runtime --dry-run`](docs/docfx/articles/migrate-to-dual-runtime.md) |
-| Add compiler guardrails without migration | [`s1interop lint .`](docs/docfx/articles/diagnostics.md) |
-| Experiment with one backend-neutral assembly | [Backend-neutral migration](docs/docfx/articles/migrate-to-backend-neutral.md) |
+| New to Schedule I modding | [Install, build, and load a small mod](docs/docfx/articles/adoption-guide.md#new-to-schedule-i-modding) |
+| Already maintaining a mod | [Inspect it without changing files](docs/docfx/articles/adoption-guide.md#already-maintaining-a-mod) |
+| Already know the S1Interop feature you need | [Jump to a task or reference](docs/docfx/articles/adoption-guide.md#already-know-what-you-need) |
 
 The default new-project path produces explicit Mono and IL2CPP builds. Generated backend-neutral facades are experimental. Keep a dual-runtime fallback until the shipped assembly has in-game evidence on both runtime branches.
 
@@ -39,10 +39,10 @@ Use `dotnet tool update --global S1Interop --version 0.1.0-alpha.1` when the too
 
 ## Documentation
 
-The documentation starts with a route by task: [S1Interop docs](docs/docfx/articles/index.md).
+The documentation starts with one route by experience and outcome: [Start here](docs/docfx/articles/adoption-guide.md).
 
 - [Core concepts](docs/docfx/articles/core-concepts.md)
-- [Choose an adoption path](docs/docfx/articles/adoption-guide.md)
+- [Common tasks](docs/docfx/articles/common-tasks.md)
 - [Commands](docs/docfx/articles/commands.md)
 - [Troubleshooting](docs/docfx/articles/troubleshooting.md)
 - [Contributing](docs/CONTRIBUTING.md)

@@ -1,38 +1,63 @@
-# Choose an adoption path
+---
+title: Start here
+description: Choose the shortest S1Interop route for a first mod, an existing mod, or a tooling integration.
+uid: s1interop.start
+---
 
-Start with the smallest change that removes the problem you have. S1Interop can add diagnostics or a safe migration plan without converting the whole mod.
+# Start here
 
-## Choose a path
+Choose the section that matches your experience. You do not need to read the documentation in order, and you do not need to migrate an entire mod to use S1Interop.
 
-| Your situation | Start with | Read next |
-| --- | --- | --- |
-| A new Schedule I mod | `s1interop new .\MyMod --apply` | [Build your first mod](first-mod.md) |
-| An existing mod with manual Mono and IL2CPP branches | `s1interop analyze .`, then `s1interop lint .` | [Diagnostics](diagnostics.md) |
-| A Mono mod that needs separate IL2CPP output | `s1interop migrate . --dual-runtime --dry-run` | [Migrate to dual-runtime](migrate-to-dual-runtime.md) |
-| One direct game seam that you want to share | `s1interop init . --dry-run`, then `s1interop sdkgen . --dry-run` | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |
-| A migration you do not trust yet | `s1interop verify-migration . --dual-runtime --include-source-migrations` | [Migration overview](migrating-mono-mods.md) |
-| A local game API exploration project | `s1interop sdkgen . --full-sdk --dry-run` | [SDK generation](sdk-generation.md) |
+> [!TIP]
+> If you are unsure, keep Mono and IL2CPP as explicit build targets. This is the recommended starting point for new and existing mods. The one-assembly backend-neutral path is an experimental opt-in.
 
-Review dry-run output before adding `--apply`. Applied migrations create backups and a manifest under `s1interop-runs/<run-id>/`.
+## New to Schedule I modding
 
-## Keep the existing architecture
+Complete one small result before learning the migration and generator features:
 
-Use S1Interop at direct game-wrapper seams. Leave higher-level systems in the library that owns them.
+1. [Install S1Interop](getting-started.md).
+2. [Build your first mod](first-mod.md).
+3. Stop when the mod loads in-game and reports the expected runtime.
 
-| If the mod needs... | Keep using... | Use S1Interop for... |
-| --- | --- | --- |
-| Items, NPCs, shops, UI, saves, or gameplay lifecycle | S1API | A direct game call or patch outside the S1API surface. |
-| Buildings, models, or mesh workflows | MAPI | Remaining direct Schedule One access. |
-| Networking or dedicated-server behavior | Its networking or server framework | Runtime-specific game types, reflection bindings, and patch targets. |
-| A direct MelonLoader patch | Your existing mod structure | Analysis, diagnostics, and a narrow generated binding where it removes duplicated runtime code. |
+The walkthrough explains each prerequisite, command, output path, and success log. After it works, use [Common tasks](common-tasks.md) to build the other runtime or inspect a real project.
 
-Do not start by changing content registration, save data, deployment scripts, or packaging. Start with the direct `ScheduleOne.*` and `Il2CppScheduleOne.*` code that creates the compatibility problem.
+If your mod is mainly about items, NPCs, shops, UI, saves, or other gameplay systems, read [S1API and S1Interop](s1api-and-s1interop.md) first. S1API may own most of the feature; S1Interop can remain limited to direct game calls that need runtime compatibility.
 
-## Before you expand the scope
+## Already maintaining a mod
 
-- Keep `local.build.props` local. It contains machine-specific game paths.
-- Do not commit game assemblies, generated IL2CPP wrappers, decompiled output, or game assets.
-- Treat a Mono build as Mono evidence only. Build and test the IL2CPP branch separately.
-- Keep a dual-runtime fallback while backend-neutral facades are experimental.
+Install the tool, open a terminal in the mod directory, and start with one read-only command:
 
-For examples of small, mixed adoption, see [Ways to use S1Interop](use-cases.md). For the difference between S1API and low-level interop, see [S1API and S1Interop](s1api-and-s1interop.md).
+```batch
+s1interop analyze .
+```
+
+`analyze` reports the project shape, runtime evidence, and known IL2CPP risks without changing files. Choose the next step from the result you want:
+
+| Outcome | Next step |
+| --- | --- |
+| Keep the current architecture and add compiler guardrails | Run `s1interop lint .`, then read [Diagnostics](diagnostics.md). |
+| Produce separate Mono and IL2CPP assemblies | Preview [dual-runtime migration](migrate-to-dual-runtime.md). |
+| Verify a migration without touching the original project | Use the sandbox flow in [Migration overview](migrating-mono-mods.md). |
+| Share one direct game seam across runtimes | Evaluate a narrow [backend-neutral migration](migrate-to-backend-neutral.md). |
+
+Start at the direct `ScheduleOne.*` or `Il2CppScheduleOne.*` seam causing the compatibility problem. Keep content registration, saves, networking, deployment, and packaging in their existing libraries and workflows.
+
+## Already know what you need
+
+| I need to... | Go to... |
+| --- | --- |
+| Look up a CLI option | [Command reference](commands.md) |
+| Configure local game installs | [Local game paths](local-paths.md) |
+| Generate declarations from source or metadata | [SDK generation](sdk-generation.md) |
+| Understand generated symbols and diagnostics | [Generated output](generator-package.md) |
+| Call S1Interop from another tool | [Core API reference](api-reference.md) |
+| Compare small, mixed adoption patterns | [Ways to use S1Interop](use-cases.md) |
+| Resolve a failure | [Troubleshooting](troubleshooting.md) |
+
+## Safety rules that apply to every route
+
+- Commands that can write files preview their plan until you add `--apply`.
+- Applied migrations create backups and a rollback manifest under `s1interop-runs/<run-id>/`.
+- `verify-migration` works in a temporary copy instead of the source project.
+- A Mono build is evidence for Mono only; build and test IL2CPP separately.
+- Keep `local.build.props`, game assemblies, generated wrappers, decompiled output, and game assets out of source control.

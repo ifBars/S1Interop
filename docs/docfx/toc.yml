@@ -1,6 +1,6 @@
 - name: Docs
   href: articles/
-  topicHref: articles/index.md
+  topicHref: articles/adoption-guide.md
 - name: API
   href: api/
   topicHref: api/S1Interop.Core.yml

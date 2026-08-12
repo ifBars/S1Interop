@@ -1,34 +1,17 @@
-# S1Interop docs
+# S1Interop documentation
 
-S1Interop helps Schedule I mods work across Mono and IL2CPP. You can use it for a new project, an existing mod, or one troublesome direct game call. It does not require a full migration.
+S1Interop helps Schedule I mods work across Mono and IL2CPP. It supports gradual adoption: use one read-only check, add explicit dual-runtime builds, or experiment with a narrow generated facade.
 
-## Start with your situation
+## Begin with one route
 
-| I want to... | Read this next |
-| --- | --- |
-| Build a first mod | [Build your first mod](first-mod.md) |
-| Understand what S1Interop owns | [What S1Interop does](introduction.md) |
-| Add IL2CPP support to an existing mod | [Choose an adoption path](adoption-guide.md) |
-| Keep manual runtime branches but add guardrails | [Diagnostics](diagnostics.md) |
-| Use one experimental assembly on both backends | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |
-| Look up a command or option | [Commands](commands.md) |
-| Resolve an error or unexpected result | [Troubleshooting](troubleshooting.md) |
+[Start here](adoption-guide.md) and choose your situation: new to Schedule I modding, already maintaining a mod, or already looking for a specific feature. That page is the single entry point for setup and adoption decisions.
 
-## The recommended learning path
+## Browse by documentation type
 
-If this is your first Schedule I mod, use the pages in this order:
+- **Tutorials:** [Install S1Interop](getting-started.md) and [build your first mod](first-mod.md).
+- **Guides:** [Common tasks](common-tasks.md), [local game paths](local-paths.md), and [migration](migrating-mono-mods.md).
+- **Concepts:** [What S1Interop does](introduction.md), [core concepts](core-concepts.md), and [architecture](architecture.md).
+- **Reference:** [Commands](commands.md), [SDK generation](sdk-generation.md), and the [Core API](api-reference.md).
+- **Help:** [Troubleshooting](troubleshooting.md) and [FAQ](faq.md).
 
-1. [Install S1Interop](getting-started.md)
-2. [Build your first mod](first-mod.md)
-3. [Common tasks](common-tasks.md)
-
-The starter keeps Mono and IL2CPP outputs explicit. This is the supported starting point. Generated backend-neutral facades are an experimental opt-in after both reference builds and in-game tests are reliable.
-
-## Learn only the part you need
-
-- [Core concepts](core-concepts.md) explains the runtime model and the boundary between the CLI and generator.
-- [Migration overview](migrating-mono-mods.md) explains planning, sandbox verification, and rollback.
-- [Generated output](generator-package.md), [Declarations](backend-neutral-declarations.md), and [Diagnostics](diagnostics.md) cover the generator package.
-- [S1API and S1Interop](s1api-and-s1interop.md) explains where low-level interop fits beside gameplay APIs.
-
-The [API reference](api-reference.md) is for tools that call `S1Interop.Core` directly. It is not required to create or migrate a mod.
+The API reference is for tools that call `S1Interop.Core` directly. Mod authors can ignore it unless they are building their own automation or integration.

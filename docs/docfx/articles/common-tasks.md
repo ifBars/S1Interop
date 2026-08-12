@@ -61,7 +61,7 @@ If the report is too noisy, analyze one configuration:
 s1interop analyze . --configuration Mono
 ```
 
-Use [Choose an adoption path](adoption-guide.md) before applying migration commands.
+Return to [Start here](adoption-guide.md) before applying migration commands.
 
 ## Preview every file-changing command
 

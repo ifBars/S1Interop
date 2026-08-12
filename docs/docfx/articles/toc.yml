@@ -1,36 +1,38 @@
 - name: Start here
   items:
-    - name: Documentation home
-      href: index.md
-    - name: What S1Interop does
-      href: introduction.md
+    - name: Start here
+      href: adoption-guide.md
     - name: Install S1Interop
       href: getting-started.md
     - name: Build your first mod
       href: first-mod.md
-    - name: Common tasks
-      href: common-tasks.md
-    - name: Choose an adoption path
-      href: adoption-guide.md
     - name: S1API and S1Interop
       href: s1api-and-s1interop.md
+- name: Guides
+  items:
+    - name: Common tasks
+      href: common-tasks.md
+    - name: New projects
+      href: new-projects.md
     - name: Local game paths
       href: local-paths.md
-- name: Learn the model
+    - name: Migration overview
+      href: migrating-mono-mods.md
+    - name: Migrate to dual-runtime
+      href: migrate-to-dual-runtime.md
+    - name: Migrate to backend-neutral
+      href: migrate-to-backend-neutral.md
+- name: Understand S1Interop
   items:
+    - name: What S1Interop does
+      href: introduction.md
     - name: Core concepts
       href: core-concepts.md
     - name: Ways to use S1Interop
       href: use-cases.md
     - name: Architecture
       href: architecture.md
-- name: CLI reference
-  items:
-    - name: Commands
-      href: commands.md
-    - name: SDK generation
-      href: sdk-generation.md
-- name: Generator package
+- name: Generated interop
   items:
     - name: Generated output
       href: generator-package.md
@@ -42,21 +44,17 @@
       href: harmony-patching.md
     - name: Diagnostics
       href: diagnostics.md
-- name: Project workflows
+- name: Reference
   items:
-    - name: New projects
-      href: new-projects.md
-    - name: Migration overview
-      href: migrating-mono-mods.md
-    - name: Migrate to backend-neutral
-      href: migrate-to-backend-neutral.md
-    - name: Migrate to dual-runtime
-      href: migrate-to-dual-runtime.md
-- name: API reference
-  href: api-reference.md
-- name: Troubleshooting
+    - name: Commands
+      href: commands.md
+    - name: SDK generation
+      href: sdk-generation.md
+    - name: Core API
+      href: api-reference.md
+- name: Help
   items:
-    - name: Common issues
+    - name: Troubleshooting
       href: troubleshooting.md
     - name: FAQ
       href: faq.md
