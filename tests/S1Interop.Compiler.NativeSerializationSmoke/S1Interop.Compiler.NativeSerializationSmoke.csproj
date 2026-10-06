@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="local.build.props" Condition="Exists('local.build.props')" />
+  <!--
+    Native-only serialization diagnostic. It binds directly to the installed IL2CPP interop assemblies and to the already built
+    IL2CPP RuntimeLibrary/S1Interop.Runtime outputs; it is deliberately not lowered by the compiler and has no ProjectReference.
+    Build: dotnet build -c Release -p:Il2CppGamePath="C:\Path\To\Schedule I_il2cpp_test_copy"
+    Optional: -p:RuntimeLibraryPath="<dir holding S1Interop.Runtime.dll and S1Interop.Compiler.RuntimeLibrary.dll>"
+  -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>S1Interop.Compiler.NativeSerializationSmoke</AssemblyName>
+    <RootNamespace>S1Interop.CompilerSmoke.NativeSerialization</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <Il2CppGamePath Condition="'$(Il2CppGamePath)'==''">$(S1_IL2CPP_GAME_PATH)</Il2CppGamePath>
+    <RuntimeLibraryPath Condition="'$(RuntimeLibraryPath)'==''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\S1Interop.Compiler.RuntimeLibrary\bin\Il2Cpp\Il2Cpp\net6.0'))</RuntimeLibraryPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\Il2CppAssemblies\*.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\MelonLoader.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\0Harmony.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="$(RuntimeLibraryPath)\S1Interop.Runtime.dll" Private="false" />
+    <Reference Include="$(RuntimeLibraryPath)\S1Interop.Compiler.RuntimeLibrary.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Run-CompilerRuntimeSmoke.ps1 installs both DLLs from the mod's output directory into UserLibs. -->
+  <ItemGroup>
+    <None Include="$(RuntimeLibraryPath)\S1Interop.Runtime.dll" Link="S1Interop.Runtime.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(RuntimeLibraryPath)\S1Interop.Compiler.RuntimeLibrary.dll" Link="S1Interop.Compiler.RuntimeLibrary.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="S1NativeSerializationValidateInputs" BeforeTargets="ResolveAssemblyReferences">
+    <Error Code="S1NL001" Condition="'$(Il2CppGamePath)'==''"
+      Text="Set Il2CppGamePath (-p:Il2CppGamePath=... or local.build.props) to an IL2CPP install whose MelonLoader interop assemblies were generated." />
+    <Error Code="S1NL002" Condition="!Exists('$(Il2CppGamePath)\MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll')"
+      Text="Missing $(Il2CppGamePath)\MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll. Launch that install once so MelonLoader generates its interop assemblies." />
+    <Error Code="S1NL003" Condition="!Exists('$(Il2CppGamePath)\MelonLoader\net6\MelonLoader.dll') or !Exists('$(Il2CppGamePath)\MelonLoader\net6\Il2CppInterop.Runtime.dll')"
+      Text="Missing MelonLoader net6 assemblies under $(Il2CppGamePath)\MelonLoader\net6." />
+    <Error Code="S1NL004" Condition="!Exists('$(RuntimeLibraryPath)\S1Interop.Runtime.dll') or !Exists('$(RuntimeLibraryPath)\S1Interop.Compiler.RuntimeLibrary.dll')"
+      Text="Missing S1Interop.Runtime.dll or S1Interop.Compiler.RuntimeLibrary.dll in $(RuntimeLibraryPath). Build tests/S1Interop.Compiler.RuntimeLibrary with the Il2Cpp configuration first, or pass -p:RuntimeLibraryPath=." />
+  </Target>
+</Project>

@@ -6,6 +6,8 @@ It is low-level tooling. Use S1API, MAPI, networking libraries, and dedicated-se
 
 Licensed under [GPL-3.0-only](LICENSE).
 
+For ordinary `ScheduleOne.*` source with build-time adaptation, see the separate [source compiler experiment](docs/SOURCE_COMPILER.md). Its unchanged-source probe has live Mono and IL2CPP 0.4.7f9 evidence. It is an opt-in source-checkout prototype with documented limits, separate from the published packages and the workflow below.
+
 ## Start here
 
 Use the [Start here guide](docs/docfx/articles/adoption-guide.md). It gives new modders a complete first-mod route, lets experienced mod authors begin with read-only analysis, and sends tool authors directly to the relevant reference.

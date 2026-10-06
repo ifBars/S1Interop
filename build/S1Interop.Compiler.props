@@ -1,0 +1,16 @@
+<Project>
+  <!-- Import before assigning framework/output properties; the matching targets import also supplies a fallback. -->
+  <PropertyGroup Condition="'$(_S1CompilerPropsImported)'!='true'">
+    <_S1CompilerPropsImported>true</_S1CompilerPropsImported>
+    <_S1CompilerConfigurationRuntime Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(Configuration)', '(?i)(^|[ _-])il2cpp($|[ _-])'))">Il2Cpp</_S1CompilerConfigurationRuntime>
+    <_S1CompilerConfigurationRuntime Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(Configuration)', '(?i)(^|[ _-])mono($|[ _-])'))">Mono</_S1CompilerConfigurationRuntime>
+    <S1InteropCompilerRuntime Condition="'$(S1InteropCompilerRuntime)'=='' and '$(_S1CompilerConfigurationRuntime)'!=''">$(_S1CompilerConfigurationRuntime)</S1InteropCompilerRuntime>
+    <S1InteropCompilerRuntime Condition="'$(S1InteropCompilerRuntime)'==''">Mono</S1InteropCompilerRuntime>
+    <TargetFramework Condition="'$(TargetFramework)'=='' and '$(S1InteropCompilerRuntime)'=='Mono'">netstandard2.1</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)'=='' and '$(S1InteropCompilerRuntime)'=='Il2Cpp'">net6.0</TargetFramework>
+    <OutputPath Condition="'$(OutputPath)'==''">bin\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath Condition="'$(IntermediateOutputPath)'==''">obj\$(Configuration)\</IntermediateOutputPath>
+    <OutputPath>$([System.IO.Path]::Combine('$(OutputPath)', '$(S1InteropCompilerRuntime)'))\</OutputPath>
+    <IntermediateOutputPath>$([System.IO.Path]::Combine('$(IntermediateOutputPath)', '$(S1InteropCompilerRuntime)'))\</IntermediateOutputPath>
+  </PropertyGroup>
+</Project>

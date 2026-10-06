@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../build/S1Interop.Compiler.props" />
+  <PropertyGroup>
+    <AssemblyName>S1Interop.Compiler.RuntimeLibrary</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Import Project="../../build/S1Interop.Compiler.targets" />
+</Project>

@@ -1,0 +1,20 @@
+name: Source compiler contracts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compiler:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build compiler contracts
+        run: dotnet build tests/S1Interop.Compiler.Tests -c Release
+      - name: Run compiler contracts without game installations
+        run: dotnet run --project tests/S1Interop.Compiler.Tests -c Release --no-build
