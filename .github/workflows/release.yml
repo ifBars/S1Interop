@@ -90,9 +90,14 @@ jobs:
             "artifacts\packages\S1Interop.$env:PACKAGE_VERSION.nupkg",
             "artifacts\packages\S1Interop.Generators.$env:PACKAGE_VERSION.nupkg",
             "--verify-tag",
-            "--title", "S1Interop $env:PACKAGE_VERSION",
-            "--generate-notes"
+            "--title", "S1Interop $env:PACKAGE_VERSION"
           )
+          $notesPath = "docs/releases/$env:PACKAGE_VERSION.md"
+          if (Test-Path -LiteralPath $notesPath) {
+            $releaseArgs += @("--notes-file", $notesPath)
+          } else {
+            $releaseArgs += "--generate-notes"
+          }
           if ($env:PACKAGE_VERSION.Contains("-")) {
             $releaseArgs += "--prerelease"
           }

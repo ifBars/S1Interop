@@ -69,7 +69,7 @@ Portable tests and compilation do not complete gameplay gates. Retain alpha stat
 
 ## Publication sequence
 
-1. Keep both package versions and `S1InteropPackageInfo` aligned. Update installation examples and release notes for the chosen version.
+1. Keep both package versions and `S1InteropPackageInfo` aligned. Update installation examples and `docs/releases/<version>.md` for the chosen version. The workflow uses that file as the GitHub release body when present.
 2. Review the candidate changes and land the release commit after CI and documentation checks pass.
 3. When publication is authorized, push the matching `v<version>` tag. The release workflow runs compiler contracts, both package lanes and documentation validation before publishing.
 4. Confirm both packages are downloadable, compare published artifacts with the validated packages, repeat fresh installation against NuGet.org and check hosted docs.
