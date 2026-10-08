@@ -66,4 +66,4 @@ Launch each installation separately and check MelonLoader for `MyMod loaded.`. A
 
 Change the log message in `Mod.cs`, rebuild the selected runtime, replace its deployed DLL with the game closed, and confirm the new message after launch. There is no Unity Editor project or generated wrapper catalog to edit.
 
-Continue with [Everyday development](common-tasks.md). Before sharing your mod, follow [Test and distribute a mod](distributing-mods.md).
+Next, [Write game code](writing-code.md): read the player and NPCs, then add a light that follows your player. Before sharing your mod, follow [Test and distribute a mod](distributing-mods.md).

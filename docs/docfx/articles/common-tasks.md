@@ -8,6 +8,8 @@ uid: s1interop.common-tasks
 
 Run these commands from the compiler project created in [Build your first mod](first-mod.md).
 
+For a complete example of accessing game objects, start with [Write game code](writing-code.md).
+
 ## Edit and rebuild
 
 Write C# in your mod's source files using ordinary game and Unity namespaces. Keep compiler-generated files under `obj` unchanged.
