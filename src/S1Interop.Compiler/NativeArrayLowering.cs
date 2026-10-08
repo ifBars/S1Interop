@@ -8,7 +8,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 namespace S1Interop.Compiler;
 
 /// <summary>
-/// Lowers rank-1 primitive arrays whose storage is connected to a native slot onto <c>Il2CppStructArray&lt;T&gt;</c>, and rank-1
+/// Lowers rank-1 primitive and mapped enum arrays connected to a native slot onto <c>Il2CppStructArray&lt;T&gt;</c>, and rank-1
 /// arrays of mapped native reference classes onto <c>Il2CppReferenceArray&lt;T&gt;</c>.
 /// Every decision is made on the original node through <see cref="CollectionStorageAnalysis"/>, so arrays outside the
 /// connected flow stay CLR arrays and an existing array is never copied into native storage.
@@ -26,13 +26,13 @@ internal sealed class NativeArrayLowering(SemanticModel model, MetadataSymbolMap
     ];
 
     public static string Display(MetadataSymbolMap map, IArrayTypeSymbol array) =>
-        (IsReference(array) ? NativeReferenceArraySource.ReferenceArrayName : NativeArraySource.StructArrayName) +
+        (!NativeArraySource.IsSupportedArray(map, array) ? NativeReferenceArraySource.ReferenceArrayName : NativeArraySource.StructArrayName) +
         "<" + map.TargetDisplay(array.ElementType) + ">";
 
-    // Eligible arrays are either scalar or mapped native reference arrays, so anything not scalar is a reference array.
-    private static bool IsReference(IArrayTypeSymbol array) => !NativeArraySource.IsSupportedArray(array);
+    // Eligibility has already checked the enum mapping and layout before helper selection.
+    private bool IsReference(IArrayTypeSymbol array) => !NativeArraySource.IsSupportedArray(map, array);
 
-    private static string Helper(IArrayTypeSymbol array) =>
+    private string Helper(IArrayTypeSymbol array) =>
         IsReference(array) ? NativeReferenceArraySource.TypeName : NativeArraySource.TypeName;
 
     public TypeSyntax? Type(ArrayTypeSyntax original)
@@ -184,6 +184,22 @@ internal sealed class NativeArrayLowering(SemanticModel model, MetadataSymbolMap
         if (identityHelper is null ||
             model.GetSymbolInfo(original).Symbol is not IMethodSymbol method)
             return null;
+
+        if (map.SupportsNativeArrays && !map.IsAuthorType(method.ContainingType) && method.IsStatic &&
+            method.ContainingType.ToDisplayString() == "System.BitConverter")
+        {
+            if (method.Name == "GetBytes" && method.Parameters.Length == 1 &&
+                method.ReturnType is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte } &&
+                storage.IsNativeArray(original, model, out _))
+                // Framework GetBytes allocates its result; transfer it before exposing an alias.
+                return Call(NativeArraySource.TypeName, "Of", "byte", Argument(visited.WithoutTrivia())).WithTriviaFrom(original);
+            if (NativeArraySource.BitConverterReads.ContainsKey(method.Name) &&
+                method.Parameters is [{ Type: IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte } },
+                    { Type.SpecialType: SpecialType.System_Int32 }] &&
+                original.ArgumentList.Arguments.Any(argument => model.GetOperation(argument) is IArgumentOperation { Parameter.Ordinal: 0 } &&
+                    storage.IsNativeArray(argument.Expression, model, out _)))
+                return Call(NativeArraySource.TypeName, method.Name, null, visited.ArgumentList).WithTriviaFrom(original);
+        }
 
         if (map.SupportsNativeArrays && !map.IsAuthorType(method.ContainingType) && method.IsStatic &&
             method.ContainingType.ToDisplayString() == "System.Convert" && method.Name == "ToBase64String" &&
@@ -353,10 +369,10 @@ internal sealed class NativeArrayLowering(SemanticModel model, MetadataSymbolMap
                 arguments = arguments.Replace(arguments[i], arguments[i].WithExpression(none.WithTriviaFrom(arguments[i].Expression)));
             }
             else if (model.GetTypeInfo(source.Expression).Type is not IArrayTypeSymbol { IsSZArray: true } type ||
-                     type.ElementType.SpecialType != element.ElementType.SpecialType)
+                     !SymbolEqualityComparer.Default.Equals(type.ElementType, element.ElementType))
             {
                 Report(original, ((IMethodSymbol)model.GetSymbolInfo(original).Symbol!).Name,
-                    "array operands must be one-dimensional arrays with the same scalar element type");
+                    "array operands must be one-dimensional arrays with the same primitive or mapped enum element type");
                 return null;
             }
         }

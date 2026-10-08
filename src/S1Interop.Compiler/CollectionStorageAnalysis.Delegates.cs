@@ -31,7 +31,7 @@ internal sealed partial class CollectionStorageAnalysis
                 if (expression is InvocationExpressionSyntax invocation &&
                     model.GetOperation(invocation) is IInvocationOperation { TargetMethod.MethodKind: MethodKind.DelegateInvoke } call &&
                     DelegateReceiver(invocation, model) is { } receiver &&
-                    BuiltInDelegate(call.TargetMethod.ContainingType))
+                    TrackedDelegate(call.TargetMethod.ContainingType))
                 {
                     int owner = Root(Expression(receiver, model));
                     foreach (var argument in call.Arguments)
@@ -42,11 +42,11 @@ internal sealed partial class CollectionStorageAnalysis
                 }
 
                 if (model.GetTypeInfo(expression).ConvertedType is not INamedTypeSymbol { DelegateInvokeMethod: { } invoke } type ||
-                    !BuiltInDelegate(type)) continue;
+                    !TrackedDelegate(type)) continue;
                 int valueOwner = Root(Expression(expression, model));
                 foreach (var target in new[] { targetSlots.ExpectedTargetType(expression), targetSlots.InferredTargetType(expression) })
                 {
-                    if (target?.DelegateInvokeMethod is not { } targetInvoke || targetInvoke.Parameters.Length != invoke.Parameters.Length) continue;
+                    if (target is null || DelegateConversions.InvokeSignature(target) is not { } targetInvoke || targetInvoke.Parameters.Length != invoke.Parameters.Length) continue;
                     for (int index = 0; index < invoke.Parameters.Length; index++)
                         if (Eligible(invoke.Parameters[index].Type) &&
                             NativeSlot(targetInvoke.Parameters[index].Type as INamedTypeSymbol, invoke.Parameters[index].Type))
@@ -88,6 +88,9 @@ internal sealed partial class CollectionStorageAnalysis
 
     private bool BuiltInDelegate(INamedTypeSymbol type) => !map.IsAuthorType(type) && type.TypeKind == TypeKind.Delegate &&
         type.ContainingNamespace.ToDisplayString() == "System" && type.Name is "Func" or "Action";
+
+    private bool TrackedDelegate(INamedTypeSymbol type) => BuiltInDelegate(type) ||
+        type.TypeKind == TypeKind.Delegate && map.Resolve(type).Target is { } target && DelegateConversions.IsNativeDelegate(target);
 
     private static ExpressionSyntax? DelegateReceiver(InvocationExpressionSyntax invocation, SemanticModel model) => invocation.Expression switch
     {

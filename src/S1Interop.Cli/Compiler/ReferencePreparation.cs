@@ -40,6 +40,9 @@ internal static class ReferencePreparation
                 File.WriteAllBytes(destination, reference);
                 generated++;
             }
+            // Keep original IL discoverable for reconstruction without copying game bodies into compile references.
+            WriteChanged(destination + ".s1interop-origin.json", System.Text.Json.JsonSerializer.Serialize(
+                new ReferenceOrigin(path, key, Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(destination))))));
             prepared.Add(destination);
         }
         Directory.CreateDirectory(directory);
@@ -65,4 +68,6 @@ internal static class ReferencePreparation
     {
         if (!File.Exists(path) || File.ReadAllText(path) != content) File.WriteAllText(path, content, new UTF8Encoding(false));
     }
+
+    internal sealed record ReferenceOrigin(string Path, string OriginalSha256, string ReferenceSha256);
 }

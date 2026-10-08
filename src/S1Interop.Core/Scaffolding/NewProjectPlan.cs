@@ -4,21 +4,23 @@ namespace S1Interop.Core.Scaffolding;
 /// Describes the files that will be written for a new S1Interop project.
 /// </summary>
 /// <param name="ProjectName">The generated project and root namespace name.</param>
+/// <param name="ExperimentalBackendNeutral">Whether the plan creates the experimental one-DLL facade project instead of the default dual-runtime project.</param>
 /// <param name="TargetDirectory">The target directory for the scaffolded project.</param>
 /// <param name="SolutionPath">The solution file path.</param>
 /// <param name="ProjectPath">The project file path.</param>
 /// <param name="CorePath">The starter mod source file path.</param>
-/// <param name="StarterPath">The generated S1Interop starter declaration file path.</param>
+/// <param name="StarterPath">The S1Interop declaration file path, written only for the experimental backend-neutral project.</param>
 /// <param name="LocalPropsExamplePath">The local path configuration example file path.</param>
 /// <param name="GitignorePath">The generated <c>.gitignore</c> file path.</param>
 /// <param name="ReadmePath">The generated project README path.</param>
 public sealed record NewProjectPlan(
     string ProjectName,
+    bool ExperimentalBackendNeutral,
     string TargetDirectory,
     string SolutionPath,
     string ProjectPath,
     string CorePath,
-    string StarterPath,
+    string? StarterPath,
     string LocalPropsExamplePath,
     string GitignorePath,
     string ReadmePath)
@@ -27,13 +29,16 @@ public sealed record NewProjectPlan(
     /// Gets all files that the scaffold apply step writes for this plan.
     /// </summary>
     public IReadOnlyList<string> PlannedFiles =>
-    [
-        SolutionPath,
-        ProjectPath,
-        CorePath,
-        StarterPath,
-        LocalPropsExamplePath,
-        GitignorePath,
-        ReadmePath
-    ];
+        new[]
+        {
+            SolutionPath,
+            ProjectPath,
+            CorePath,
+            StarterPath,
+            LocalPropsExamplePath,
+            GitignorePath,
+            ReadmePath
+        }
+        .OfType<string>()
+        .ToArray();
 }

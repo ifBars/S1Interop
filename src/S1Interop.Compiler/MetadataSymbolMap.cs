@@ -41,11 +41,13 @@ internal sealed class MetadataSymbolMap
     {
         this.author = author;
         this.target = target;
+        ReferenceFields = new ReferenceFieldCatalog(author);
         NativeObjectBase = FindUnique(NativeObjectBaseName);
     }
 
     /// <summary>Gets the target's IL2CPP proxy base, or null when the target is not an IL2CPP surface.</summary>
     public INamedTypeSymbol? NativeObjectBase { get; }
+    internal ReferenceFieldCatalog ReferenceFields { get; }
     public bool UsesNativeLists { get; private set; }
 
     /// <summary>Gets whether the target exposes the native scalar array surface the array helpers need.</summary>

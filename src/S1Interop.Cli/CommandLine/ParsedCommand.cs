@@ -16,6 +16,8 @@ internal sealed record ParsedCommand(
     string? Configuration,
     IReadOnlyList<string> Errors)
 {
+    public bool LegacyGenerator { get; init; }
+
     public static ParsedCommand Parse(string[] args)
     {
         if (args.Length == 0)
@@ -36,6 +38,9 @@ internal sealed record ParsedCommand(
         bool build = args.Any(arg => arg.Equals("--build", StringComparison.OrdinalIgnoreCase));
         bool fullSdk = args.Any(arg => arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase));
         bool backendNeutral = args.Any(arg => arg.Equals("--backend-neutral", StringComparison.OrdinalIgnoreCase));
+        bool legacyGenerator = args.Any(arg => arg.Equals("--legacy-generator", StringComparison.OrdinalIgnoreCase));
+        if (legacyGenerator && (backendNeutral || !command.Equals("new", StringComparison.OrdinalIgnoreCase)))
+            errors.Add("--legacy-generator is only valid for new and cannot be combined with --backend-neutral.");
         bool dryRun = args.Any(arg => arg.Equals("--dry-run", StringComparison.OrdinalIgnoreCase));
         bool includeSourceMigrations = args.Any(arg =>
             arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
@@ -145,7 +150,12 @@ internal sealed record ParsedCommand(
             }
         }
 
-        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, backendNeutral, il2CppGamePath, monoGamePath, configuration, errors);
+        if (command.Equals("new", StringComparison.OrdinalIgnoreCase) &&
+            (dualRuntime || build || fullSdk || includeSourceMigrations || il2CppGamePath is not null || monoGamePath is not null ||
+             configuration is not null || args.Any(arg => arg.Equals("--build-timeout-seconds", StringComparison.OrdinalIgnoreCase))))
+            errors.Add("new does not accept analysis, setup, or migration options. Configure local.build.props after creating the project.");
+
+        return new ParsedCommand(command, subcommand, path, format, showHelp, apply, dualRuntime, build, buildTimeoutSeconds, includeSourceMigrations, fullSdk, backendNeutral, il2CppGamePath, monoGamePath, configuration, errors) { LegacyGenerator = legacyGenerator };
     }
 
     private static bool IsKnownFlag(string arg) =>
@@ -157,6 +167,7 @@ internal sealed record ParsedCommand(
         arg.Equals("--build", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--full-sdk", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--backend-neutral", StringComparison.OrdinalIgnoreCase) ||
+        arg.Equals("--legacy-generator", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--include-source-migrations", StringComparison.OrdinalIgnoreCase) ||
         arg.Equals("--source-migrations", StringComparison.OrdinalIgnoreCase);
 

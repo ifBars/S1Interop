@@ -14,7 +14,7 @@ internal static class DeveloperSetupCommand
                 command.MonoGamePath,
                 command.Il2CppGamePath);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Xml.XmlException)
         {
             Console.Error.WriteLine($"s1interop: setup inspection failed: {ex.Message}");
             return 2;

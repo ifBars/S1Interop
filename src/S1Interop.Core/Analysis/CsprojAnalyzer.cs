@@ -129,7 +129,14 @@ public sealed class CsprojAnalyzer
 
         IReadOnlyList<ReferenceInfo> references = GetReferences(projectElements, configurationName, properties);
         IReadOnlyList<PackageReferenceInfo> packageReferences = GetPackageReferences(projectElements, configurationName, properties);
-        RuntimeScores scores = ScoreRuntime(configurationName, targetFramework, defines, references, packageReferences);
+        RuntimeScores scores = ScoreRuntime(
+            configurationName,
+            targetFramework,
+            defines,
+            references,
+            packageReferences,
+            properties.GetValueOrDefault("S1InteropTargetRuntime"),
+            string.Equals(properties.GetValueOrDefault("S1InteropGameReferences"), "true", StringComparison.OrdinalIgnoreCase));
         RuntimeKind runtime = ChooseRuntime(configurationName, scores);
 
         return new ConfigurationAnalysis(
@@ -242,12 +249,32 @@ public sealed class CsprojAnalyzer
         string? targetFramework,
         IReadOnlyList<string> defines,
         IReadOnlyList<ReferenceInfo> references,
-        IReadOnlyList<PackageReferenceInfo> packageReferences)
+        IReadOnlyList<PackageReferenceInfo> packageReferences,
+        string? targetRuntimeProperty,
+        bool packageProvidesGameReferences)
     {
         var evidence = new List<string>();
         int mono = 0;
         int il2Cpp = 0;
         int crossCompat = 0;
+
+        // S1InteropTargetRuntime is an explicit declaration, so it outweighs any single inferred signal.
+        if (string.Equals(targetRuntimeProperty, "Mono", StringComparison.OrdinalIgnoreCase))
+        {
+            mono += 8;
+            evidence.Add("S1InteropTargetRuntime=Mono");
+        }
+
+        if (string.Equals(targetRuntimeProperty, "Il2Cpp", StringComparison.OrdinalIgnoreCase))
+        {
+            il2Cpp += 8;
+            evidence.Add("S1InteropTargetRuntime=Il2Cpp");
+        }
+
+        if (packageProvidesGameReferences)
+        {
+            evidence.Add("S1InteropGameReferences: S1Interop.Generators references the game for the selected runtime");
+        }
 
         RuntimeNameIntent nameIntent = GetRuntimeNameIntent(configurationName);
         if (nameIntent == RuntimeNameIntent.Mono)

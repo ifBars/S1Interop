@@ -15,6 +15,7 @@ namespace S1Interop.Compiler;
 /// native object keeps its managed peer alive through a strong GC handle until the native object is finalized, so a
 /// native event that owns the converted delegate roots the callback. The cache holds only a managed weak reference to
 /// the callback and a native weak (non-resurrection-tracking) GC handle to the converted delegate, so it roots neither.
+/// The bridge's own native handle is weakened after conversion to break its mutually strong ownership cycle.
 /// <para>
 /// Residual race: between <c>il2cpp_gchandle_get_target</c> returning a pointer and <c>Il2CppObjectPool.Get</c>
 /// creating a wrapper (which takes a strong handle), the only reference is the pointer on this thread's stack. That is
@@ -42,6 +43,40 @@ internal static class NativeDelegateCacheSource
             public static class S1InteropNativeDelegate
             {
                 private static class EventGate<T> { internal static readonly object Value = new object(); }
+
+                private static class BridgeOwnership
+                {
+                    private static readonly global::System.Type BridgeType = typeof(global::Il2CppInterop.Runtime.DelegateSupport)
+                        .GetNestedType("Il2CppToMonoDelegateReference", global::System.Reflection.BindingFlags.NonPublic);
+                    private static readonly global::System.Reflection.FieldInfo CallbackField = BridgeType == null ? null :
+                        BridgeType.GetField("ReferencedDelegate", global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.Public);
+
+                    internal static void Validate()
+                    {
+                        if (BridgeType == null || !typeof(global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase).IsAssignableFrom(BridgeType) ||
+                            CallbackField == null || CallbackField.FieldType != typeof(global::System.Delegate))
+                            throw new global::System.NotSupportedException("The installed Il2CppInterop delegate bridge layout cannot support callback ownership.");
+                        S1InteropInjection.ValidateWeakOwnership();
+                    }
+
+                    internal static void ReleaseCycle(global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase converted, global::System.Delegate callback)
+                    {
+                        var target = converted.Cast<global::Il2CppSystem.Delegate>().m_target;
+                        if (target is null)
+                            throw new global::System.NotSupportedException("The converted delegate has no injected callback target.");
+                        var bridge = global::Il2CppInterop.Runtime.Runtime.ClassInjectorBase.GetMonoObjectFromIl2CppPointer(target.Pointer)
+                            as global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
+                        if (bridge == null || bridge.GetType() != BridgeType)
+                            throw new global::System.NotSupportedException("The converted delegate does not own the expected managed callback bridge.");
+                        var owner = new global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase(target.Pointer);
+                        S1InteropInjection.WeakenNativeReference(bridge, owner);
+                        // Once its known ownership cycle is released, reject an unexpected callback
+                        // without permanently retaining the failed conversion's bridge.
+                        if (!global::System.Object.ReferenceEquals(CallbackField.GetValue(bridge), callback))
+                            throw new global::System.NotSupportedException("The converted delegate bridge owns a different managed callback.");
+                        global::System.GC.KeepAlive(converted);
+                    }
+                }
 
                 public static void Add<T>(ref T location, T callback) where T : global::Il2CppSystem.Delegate
                 {
@@ -92,8 +127,10 @@ internal static class NativeDelegateCacheSource
                         }
 
                         // Convert outside the lock: class injection and native allocation can be slow or re-enter.
+                        BridgeOwnership.Validate();
                         T converted = global::Il2CppInterop.Runtime.DelegateSupport.ConvertDelegate<T>(callback);
                         if (converted is null) return null;
+                        BridgeOwnership.ReleaseCycle(converted, callback);
 
                         lock (Gate)
                         {
@@ -108,11 +145,15 @@ internal static class NativeDelegateCacheSource
                                 Buckets.Add(hash, bucket);
                             }
 
-                            bucket.Add(new Entry
+                            var handle = global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_new_weakref(converted.Pointer, false);
+                            if (handle == default(__S1_GCHANDLE__))
+                                throw new global::System.InvalidOperationException("Native delegate cache weak handle allocation failed.");
+                            try { bucket.Add(new Entry
                             {
                                 Callback = new global::System.WeakReference(callback),
-                                Handle = global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_new_weakref(converted.Pointer, false),
-                            });
+                                Handle = handle,
+                            }); }
+                            catch { global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_free(handle); throw; }
 
                             if (++insertsSinceSweep >= SweepInterval)
                             {

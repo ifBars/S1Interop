@@ -278,8 +278,10 @@ public sealed partial class S1InteropTypeRegistryGenerator
         /// </summary>
         internal static class S1InteropUnityEventBridge
         {
-            private static readonly System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, System.Delegate>> WrappedListeners =
-                new System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, System.Delegate>>();
+            // Values are the runtime UnityAction instances that were registered. On IL2CPP these are native wrapper
+            // objects, and RemoveListener only matches the same instance, so a listener must be converted exactly once.
+            private static readonly System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, object>> WrappedListeners =
+                new System.Collections.Generic.Dictionary<object, System.Collections.Generic.Dictionary<System.Delegate, object>>();
 
             /// <summary>
             /// Adds a parameterless listener to a UnityEvent using the delegate shape required by the active runtime.
@@ -294,12 +296,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 }
 
         #if IL2CPP
-                System.Action wrapped = new System.Action(listener);
-                unityEvent.AddListener(wrapped);
+                UnityEngine.Events.UnityAction wrapped = listener;
         #else
                 UnityEngine.Events.UnityAction wrapped = new UnityEngine.Events.UnityAction(listener);
-                unityEvent.AddListener(wrapped);
         #endif
+                unityEvent.AddListener(wrapped);
                 StoreWrapper(unityEvent, listener, wrapped);
             }
 
@@ -310,23 +311,16 @@ public sealed partial class S1InteropTypeRegistryGenerator
             /// <param name="listener">The managed listener originally passed to the matching <c>Add</c> overload.</param>
             public static void Remove(UnityEngine.Events.UnityEvent unityEvent, System.Action listener)
             {
-                System.Delegate wrapped;
+                object wrapped;
                 if (object.ReferenceEquals(unityEvent, null) || object.ReferenceEquals(listener, null) || !TryRemoveWrapper(unityEvent, listener, out wrapped))
                 {
                     return;
                 }
 
-        #if IL2CPP
-                if (wrapped is System.Action action)
-                {
-                    unityEvent.RemoveListener(action);
-                }
-        #else
                 if (wrapped is UnityEngine.Events.UnityAction action)
                 {
                     unityEvent.RemoveListener(action);
                 }
-        #endif
             }
 
             /// <summary>
@@ -343,12 +337,11 @@ public sealed partial class S1InteropTypeRegistryGenerator
                 }
 
         #if IL2CPP
-                System.Action<T0> wrapped = new System.Action<T0>(listener);
-                unityEvent.AddListener(wrapped);
+                UnityEngine.Events.UnityAction<T0> wrapped = listener;
         #else
                 UnityEngine.Events.UnityAction<T0> wrapped = new UnityEngine.Events.UnityAction<T0>(listener);
-                unityEvent.AddListener(wrapped);
         #endif
+                unityEvent.AddListener(wrapped);
                 StoreWrapper(unityEvent, listener, wrapped);
             }
 
@@ -360,45 +353,38 @@ public sealed partial class S1InteropTypeRegistryGenerator
             /// <param name="listener">The managed listener originally passed to the matching <c>Add</c> overload.</param>
             public static void Remove<T0>(UnityEngine.Events.UnityEvent<T0> unityEvent, System.Action<T0> listener)
             {
-                System.Delegate wrapped;
+                object wrapped;
                 if (object.ReferenceEquals(unityEvent, null) || object.ReferenceEquals(listener, null) || !TryRemoveWrapper(unityEvent, listener, out wrapped))
                 {
                     return;
                 }
 
-        #if IL2CPP
-                if (wrapped is System.Action<T0> action)
-                {
-                    unityEvent.RemoveListener(action);
-                }
-        #else
                 if (wrapped is UnityEngine.Events.UnityAction<T0> action)
                 {
                     unityEvent.RemoveListener(action);
                 }
-        #endif
             }
 
             private static bool HasWrapper(object unityEvent, System.Delegate listener) =>
-                WrappedListeners.TryGetValue(unityEvent, out System.Collections.Generic.Dictionary<System.Delegate, System.Delegate> listeners) &&
+                WrappedListeners.TryGetValue(unityEvent, out System.Collections.Generic.Dictionary<System.Delegate, object> listeners) &&
                 listeners.ContainsKey(listener);
 
-            private static void StoreWrapper(object unityEvent, System.Delegate listener, System.Delegate wrapped)
+            private static void StoreWrapper(object unityEvent, System.Delegate listener, object wrapped)
             {
-                System.Collections.Generic.Dictionary<System.Delegate, System.Delegate> listeners;
+                System.Collections.Generic.Dictionary<System.Delegate, object> listeners;
                 if (!WrappedListeners.TryGetValue(unityEvent, out listeners))
                 {
-                    listeners = new System.Collections.Generic.Dictionary<System.Delegate, System.Delegate>();
+                    listeners = new System.Collections.Generic.Dictionary<System.Delegate, object>();
                     WrappedListeners[unityEvent] = listeners;
                 }
 
                 listeners[listener] = wrapped;
             }
 
-            private static bool TryRemoveWrapper(object unityEvent, System.Delegate listener, out System.Delegate wrapped)
+            private static bool TryRemoveWrapper(object unityEvent, System.Delegate listener, out object wrapped)
             {
                 wrapped = null;
-                System.Collections.Generic.Dictionary<System.Delegate, System.Delegate> listeners;
+                System.Collections.Generic.Dictionary<System.Delegate, object> listeners;
                 if (!WrappedListeners.TryGetValue(unityEvent, out listeners) ||
                     !listeners.TryGetValue(listener, out wrapped))
                 {

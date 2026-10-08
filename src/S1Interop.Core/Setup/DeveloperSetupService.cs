@@ -55,11 +55,20 @@ public sealed class DeveloperSetupService
             il2CppGamePath,
             GetProperty(existingProperties, "Il2CppGamePath"),
             DiscoverGameInstalls().FirstOrDefault(IsIl2CppInstall));
+        bool requiresMono = RequiresMonoReferences(path, projectDirectory);
+        DeveloperSetupCheck monoCheck = ValidateMonoInstall(resolvedMonoPath);
+        DeveloperSetupCheck il2CppCheck = ValidateIl2CppInstall(resolvedIl2CppPath);
+        bool hasUsableRuntime = monoCheck.Status == "ready" || (!requiresMono && il2CppCheck.Status == "ready");
+        if (hasUsableRuntime && !requiresMono && monoCheck.Status != "ready")
+        {
+            monoCheck = monoCheck with { Status = "optional" };
+        }
+
         var checks = new List<DeveloperSetupCheck>
         {
             ValidateProjectDirectory(projectDirectory),
-            ValidateMonoInstall(resolvedMonoPath),
-            ValidateIl2CppInstall(resolvedIl2CppPath),
+            monoCheck,
+            il2CppCheck,
             ValidateIgnoreSafety(projectDirectory, localPropsPath)
         };
 
@@ -73,8 +82,8 @@ public sealed class DeveloperSetupService
                 "setup will not overwrite it; edit it explicitly or move it aside before applying a new setup plan."));
         }
 
-        bool ready = checks
-            .Where(check => check.Id is "project" or "mono" or "ignore_safety")
+        bool ready = hasUsableRuntime && checks
+            .Where(check => check.Id is "project" or "ignore_safety")
             .All(check => check.Status == "ready");
         bool canApply = ready && !localPropsExists;
 
@@ -87,6 +96,27 @@ public sealed class DeveloperSetupService
             canApply,
             localPropsExists,
             checks);
+    }
+
+    private static bool RequiresMonoReferences(string path, string projectDirectory)
+    {
+        string fullPath = Path.GetFullPath(path);
+        string[] projects = Directory.Exists(projectDirectory)
+            ? Directory.GetFiles(projectDirectory, "*.csproj")
+            : [];
+        string? projectPath = File.Exists(fullPath) && Path.GetExtension(fullPath).Equals(".csproj", StringComparison.OrdinalIgnoreCase)
+            ? fullPath
+            : projects.Length == 1 ? projects[0] : null;
+        if (projectPath is null)
+        {
+            return false;
+        }
+
+        // The experimental scaffold ships a Mono-reference assembly with runtime detection.
+        return XDocument.Load(projectPath).Descendants()
+            .Any(element => element.Name.LocalName == "S1InteropTargetRuntime" && element.Value.Trim() == "Unknown" ||
+                element.Name.LocalName == "Import" &&
+                (element.Attribute("Project")?.Value.EndsWith("S1Interop.Compiler.props", StringComparison.OrdinalIgnoreCase) ?? false));
     }
 
     /// <summary>
@@ -175,7 +205,7 @@ public sealed class DeveloperSetupService
             path,
             required,
             required: false,
-            "Optional for the first Mono build. Pass --il2cpp-game-path <path-to-public-install> after MelonLoader generates Il2CppAssemblies.");
+            "Needed for an IL2CPP build. Pass --il2cpp-game-path <path-to-public-install> after MelonLoader generates Il2CppAssemblies.");
     }
 
     private static DeveloperSetupCheck ValidateInstall(

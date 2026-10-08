@@ -8,6 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/S1Interop.Compiler/S1Interop.Compiler.csproj" />
-    <ProjectReference Include="../../src/S1Interop.Compiler.Cli/S1Interop.Compiler.Cli.csproj" />
+    <ProjectReference Include="../../src/S1Interop.Cli/S1Interop.Cli.csproj" />
   </ItemGroup>
 </Project>

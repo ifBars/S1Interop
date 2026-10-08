@@ -5,10 +5,13 @@ internal static class RuntimeContracts
 {
     public const string Mono = """
         namespace ScheduleOne.Testing {
+            public enum WideKind : ulong { High = ulong.MaxValue }
             public static class ArrayStore {
                 public static int[] Values = new[] { 1 };
+                public static WideKind[] WideKinds = new[] { WideKind.High };
                 public static byte[] Bytes = new byte[] { 1 };
                 public static bool[] Flags = new[] { true };
+                public static Actor.Kind[] Kinds = new[] { Actor.Kind.Customer };
                 public static int[] Read(int[] unused) => Values;
                 public static void Replace(int[] values) { Values = values; }
                 public static void Replace(string unrelated) { }
@@ -55,6 +58,15 @@ internal static class RuntimeContracts
                 public string Name = "actor";
                 public Employee ReflectionChild;
                 public static int ReflectionCount;
+                public static System.Collections.Generic.Dictionary<string, int> ReflectionScores = new() { ["one"] = 1 };
+                public static int reflectionScores;
+                public static System.Collections.Generic.List<int> ReflectionNumbers = new() { 1 };
+                private static int ReflectionPrivate;
+                protected static int ReflectionProtected;
+                internal static int ReflectionInternal;
+                public static event System.Action ReflectionEvent;
+                public event System.Action<int> ReflectionInstanceEvent;
+                public static event System.Action ReflectionWithoutStorage { add { } remove { } }
                 public static int Calls;
                 public static Actor Current = new Employee();
                 public static Actor Next() { Calls++; return Current; }
@@ -72,6 +84,8 @@ internal static class RuntimeContracts
                 public enum Kind { Customer, Employee }
             }
             public class Employee : Actor { public int Salary = 7; }
+            public class PropertyShadowActor : Actor { public new Employee ReflectionChild => null; }
+            public class FieldShadowActor : Actor { public new Employee ReflectionChild = new Employee { Salary = 21 }; }
             public class Customer : Actor { }
             public class KeyActor : Actor
             {
@@ -103,6 +117,13 @@ internal static class RuntimeContracts
             [System.AttributeUsage(System.AttributeTargets.Field)]
             public sealed class SerializeField : System.Attribute { }
             public class Object { }
+            public class AudioClip
+            {
+                public delegate void PCMReaderCallback(float[] data);
+                public delegate float[] SampleProvider();
+                public static float[] Provide(SampleProvider callback) => callback();
+                public static void Read(PCMReaderCallback callback, float[] data) => callback(data);
+            }
             public class ObjectSequence : Object, System.Collections.Generic.IEnumerable<Object>
             {
                 private readonly System.Collections.Generic.List<Object> values = new();
@@ -186,10 +207,13 @@ internal static class RuntimeContracts
             }
         }
         namespace Il2CppScheduleOne.Testing {
+            public enum WideKind : ulong { High = ulong.MaxValue }
             public static class ArrayStore {
                 public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int> Values = new int[] { 1 };
+                public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<WideKind> WideKinds = new WideKind[] { WideKind.High };
                 public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte> Bytes = new byte[] { 1 };
                 public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<bool> Flags = new bool[] { true };
+                public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Actor.Kind> Kinds = new Actor.Kind[] { Actor.Kind.Customer };
                 public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int> Read(
                     Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int> unused) => Values == null ? null : new(Values);
                 public static void Replace(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int> values) { Values = values; }
@@ -273,7 +297,7 @@ internal static class RuntimeContracts
                 protected internal object Native;
                 private uint myGcHandle = 0;
                 public Il2CppObjectBase() { Native = this; }
-                public Il2CppObjectBase(System.IntPtr pointer) { Native = this; }
+                public Il2CppObjectBase(System.IntPtr pointer) { Native = Il2CppInterop.Runtime.FakeNativeHeap.Resolve(pointer) ?? this; }
                 public System.IntPtr Pointer => Il2CppInterop.Runtime.FakeNativeHeap.PointerOf(Native);
                 public bool WasCollected => false;
                 public T TryCast<T>() where T : Il2CppObjectBase =>
@@ -312,6 +336,16 @@ internal static class RuntimeContracts
                 public string Name { get; set; } = "actor";
                 public Employee ReflectionChild { get; set; }
                 public static int ReflectionCount { get; set; }
+                public static Il2CppSystem.Collections.Generic.Dictionary<string, int> ReflectionScores { get; set; } = CreateReflectionScores();
+                public static int reflectionScores { get; set; }
+                private static Il2CppSystem.Collections.Generic.Dictionary<string, int> CreateReflectionScores() { var values = new Il2CppSystem.Collections.Generic.Dictionary<string, int>(); values.Add("one", 1); return values; }
+                public static Il2CppSystem.Collections.Generic.List<int> ReflectionNumbers { get; set; } = new();
+                public static int ReflectionPrivate { get; set; }
+                public static int ReflectionProtected { get; set; }
+                public static int ReflectionInternal { get; set; }
+                public static System.Action ReflectionEvent { get; set; }
+                public System.Action<int> ReflectionInstanceEvent { get; set; }
+                public static System.Action ReflectionWithoutStorage { get; set; }
                 public static int Calls;
                 // CLR type is Actor, but its native identity is Employee: ordinary CLR casts fail.
                 public static Actor Current = Wrap(new Employee());
@@ -331,6 +365,10 @@ internal static class RuntimeContracts
                 public enum Kind { Customer, Employee }
             }
             public class Employee : Actor { public int Salary { get; set; } = 7; }
+            public class PropertyShadowActor : Actor {
+                [Il2CppInterop.Runtime.OriginalProperty] public new Employee ReflectionChild => null;
+            }
+            public class FieldShadowActor : Actor { public new Employee ReflectionChild { get; set; } = new Employee { Salary = 21 }; }
             public class Customer : Actor { }
             public class KeyActor : Actor { public int Key { get; set; } }
         }
@@ -359,6 +397,7 @@ internal static class RuntimeContracts
             public class Delegate : Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase
             {
                 protected internal readonly System.Delegate Callback;
+                public Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase m_target;
                 protected Delegate(System.Delegate callback) { Callback = callback; }
                 public static Delegate Combine(Delegate left, Delegate right) {
                     if (left is null) return right;
@@ -416,6 +455,8 @@ internal static class RuntimeContracts
         }
         namespace Il2CppInterop.Runtime
         {
+            [System.AttributeUsage(System.AttributeTargets.Property)]
+            public sealed class OriginalPropertyAttribute : System.Attribute { }
             public static class Il2CppClassPointerStore {
                 public static System.IntPtr GetNativeClassPointer(System.Type type) => FakeNativeHeap.PointerOf(type);
             }
@@ -453,6 +494,20 @@ internal static class RuntimeContracts
             }
             public static class IL2CPP
             {
+                public static System.IntPtr il2cpp_class_get_field_from_name(System.IntPtr klass, string name) {
+                    for (var type = (System.Type)FakeNativeHeap.Resolve(klass); type != null; type = type.BaseType) {
+                        var property = type.GetProperty(name, System.Reflection.BindingFlags.DeclaredOnly | System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance);
+                        if (property != null && property.GetCustomAttributes(typeof(OriginalPropertyAttribute), false).Length == 0)
+                            return FakeNativeHeap.PointerOf(property);
+                    }
+                    return System.IntPtr.Zero;
+                }
+                public static System.IntPtr il2cpp_field_get_parent(System.IntPtr field) =>
+                    FakeNativeHeap.PointerOf(((System.Reflection.PropertyInfo)FakeNativeHeap.Resolve(field)).DeclaringType);
+                public static uint il2cpp_field_get_flags(System.IntPtr field) =>
+                    (uint)(System.Reflection.FieldAttributes.Public | (((System.Reflection.PropertyInfo)FakeNativeHeap.Resolve(field)).GetMethod.IsStatic
+                        ? System.Reflection.FieldAttributes.Static : 0));
                 public static System.IntPtr il2cpp_object_get_class(System.IntPtr pointer) {
                     object value = FakeNativeHeap.Resolve(pointer);
                     var type = value is InteropTypes.Arrays.ReferenceStorage array ? array.Values.GetType() : value.GetType();
@@ -482,15 +537,29 @@ internal static class RuntimeContracts
             }
             public static class DelegateSupport
             {
+                private sealed class Il2CppToMonoDelegateReference : InteropTypes.Il2CppObjectBase
+                {
+                    public System.Delegate ReferencedDelegate;
+                    public Il2CppToMonoDelegateReference(System.Delegate callback) { ReferencedDelegate = callback; }
+                }
                 // Like the real runtime, every conversion allocates a new native delegate.
-                public static T ConvertDelegate<T>(System.Delegate @delegate) where T : InteropTypes.Il2CppObjectBase =>
-                    @delegate is null ? null : (T)System.Activator.CreateInstance(typeof(T),
+                public static T ConvertDelegate<T>(System.Delegate @delegate) where T : InteropTypes.Il2CppObjectBase {
+                    if (@delegate is null) return null;
+                    var converted = (T)System.Activator.CreateInstance(typeof(T),
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
                         System.Reflection.BindingFlags.NonPublic, null, new object[] { @delegate }, null);
+                    ((Il2CppSystem.Delegate)(object)converted).m_target = new Il2CppToMonoDelegateReference(@delegate);
+                    return converted;
+                }
             }
         }
         namespace Il2CppInterop.Runtime.Runtime
         {
+            public static class ClassInjectorBase
+            {
+                public static object GetMonoObjectFromIl2CppPointer(System.IntPtr pointer) =>
+                    Il2CppInterop.Runtime.FakeNativeHeap.Resolve(pointer);
+            }
             public static class Il2CppObjectPool
             {
                 public static T Get<T>(System.IntPtr ptr) where T : Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase =>
@@ -654,6 +723,23 @@ internal static class RuntimeContracts
             {
                 public Object() { }
                 public Object(System.IntPtr pointer) : base(pointer) { }
+            }
+            public class AudioClip : Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase
+            {
+                public class SampleProvider : Il2CppSystem.Delegate
+                {
+                    protected SampleProvider(System.Delegate callback) : base(callback) { }
+                    public Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float> Invoke() =>
+                        ((System.Func<Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float>>)Callback)();
+                }
+                public static Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float> Provide(SampleProvider callback) => callback.Invoke();
+                public class PCMReaderCallback : Il2CppSystem.Delegate
+                {
+                    protected PCMReaderCallback(System.Delegate callback) : base(callback) { }
+                    public void Invoke(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float> data) =>
+                        ((System.Action<Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float>>)Callback)(data);
+                }
+                public static void Read(PCMReaderCallback callback, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float> data) => callback.Invoke(data);
             }
             public class ObjectSequence : Object
             {

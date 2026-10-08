@@ -1,35 +1,43 @@
 # S1Interop
 
-S1Interop is an alpha .NET toolchain for Schedule I mod developers working across Mono and IL2CPP. It analyzes projects, reports known interop risks, plans reversible migrations, and can generate selected backend-neutral helpers.
+S1Interop is an experimental compiler toolchain for Schedule I mods. Write ordinary `ScheduleOne.*` C# against Mono game metadata, then build separate Mono and IL2CPP outputs from the same source. The compiler adapts supported runtime differences automatically, using game metadata rather than a maintained catalog of game wrappers.
 
-It is low-level tooling. Use S1API, MAPI, networking libraries, and dedicated-server APIs for the workflows they already own. Use S1Interop for direct `ScheduleOne.*` and `Il2CppScheduleOne.*` seams that would otherwise need duplicated runtime code.
+The compiler is the primary development direction. It does not yet provide unrestricted compatibility: unsupported cases and runtime limits are listed in the [compiler guide](docs/SOURCE_COMPILER.md). Gameplay libraries such as S1API can still be used where their higher-level APIs help your mod.
 
-Licensed under [GPL-3.0-only](LICENSE).
+Licensed under [GPL-3.0-only](https://github.com/ifBars/S1Interop/blob/main/LICENSE).
 
-For ordinary `ScheduleOne.*` source with build-time adaptation, see the separate [source compiler experiment](docs/SOURCE_COMPILER.md). Its unchanged-source probe has live Mono and IL2CPP 0.4.7f9 evidence. It is an opt-in source-checkout prototype with documented limits, separate from the published packages and the workflow below.
+This checkout prepares **0.1.0-alpha.2**, an unpublished candidate. The published version remains **0.1.0-alpha.1**. See [release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md) for the stable-release gates.
 
 ## Start here
 
-Use the [Start here guide](docs/docfx/articles/adoption-guide.md). It gives new modders a complete first-mod route, lets experienced mod authors begin with read-only analysis, and sends tool authors directly to the relevant reference.
-
-| Your situation | First route |
-| --- | --- |
-| New to Schedule I modding | [Install, build, and load a small mod](docs/docfx/articles/adoption-guide.md#new-to-schedule-i-modding) |
-| Already maintaining a mod | [Inspect it without changing files](docs/docfx/articles/adoption-guide.md#already-maintaining-a-mod) |
-| Already know the S1Interop feature you need | [Jump to a task or reference](docs/docfx/articles/adoption-guide.md#already-know-what-you-need) |
-
-The default new-project path produces explicit Mono and IL2CPP builds. Generated backend-neutral facades are experimental. Keep a dual-runtime fallback until the shipped assembly has in-game evidence on both runtime branches.
-
-## Install
-
-Install the current alpha with .NET SDK 8 or newer:
+Use the [compiler setup guide](docs/SOURCE_COMPILER.md#try-the-source-checkout) and [sample project](samples/SourceCompiler). This is currently a source-checkout workflow; the published alpha.1 package does not contain the compiler.
 
 ```powershell
-dotnet tool install --global S1Interop --version 0.1.0-alpha.1
-s1interop --help
+dotnet build src/S1Interop.Cli/S1Interop.Cli.csproj -c Release
+dotnet run --project src/S1Interop.Cli -c Release --no-build -- compiler --help
 ```
 
-Use `dotnet tool update --global S1Interop --version 0.1.0-alpha.1` when the tool is already installed. See [Install S1Interop](docs/docfx/articles/getting-started.md) for local tool installation and contributor package builds.
+Configure matching Mono and IL2CPP game installations as described in the guide, then build the sample for each runtime. There is one CLI, `s1interop`; compiler build commands live under `compiler`. `s1interop new <path> --apply` creates a compiler-enabled project with a pinned local tool manifest and matching build files. Follow its generated README or the first-mod guide to restore the candidate tool and build both runtimes.
+
+## Install and create a mod
+
+Use the [candidate installation guide](docs/docfx/articles/getting-started.md#build-and-install-the-candidate-from-source) to build and install alpha.2 with a .NET 8 SDK. Then:
+
+```powershell
+s1interop new MyMod --apply
+cd MyMod
+dotnet tool restore --add-source <candidate-feed>
+dotnet tool run s1interop -- setup . --mono-game-path <mono-install> --il2cpp-game-path <il2cpp-install> --apply
+dotnet tool run s1interop -- doctor .
+dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
+dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
+```
+
+Replace the placeholders with your package feed and matching game directories. Follow [Build your first mod](docs/docfx/articles/first-mod.md) for loading and testing, or [Adopt the compiler](docs/docfx/articles/compiler-adoption.md) for an existing mod. Compiler builds do not deploy automatically.
+
+## Earlier package workflows
+
+Published alpha.1 does not include the compiler. Existing users can follow the [legacy generator walkthrough](docs/docfx/articles/legacy-generator-first-mod.md). The candidate preserves that scaffold through `new --legacy-generator`; `new --backend-neutral` retains the experimental facade route. Neither is required for compiler authoring. `S1Interop.Generators` is a separate library package for those workflows, not a second CLI.
 
 ## Safety model
 
@@ -41,19 +49,23 @@ Use `dotnet tool update --global S1Interop --version 0.1.0-alpha.1` when the too
 
 ## Documentation
 
-The documentation starts with one route by experience and outcome: [Start here](docs/docfx/articles/adoption-guide.md).
+The documentation starts with one route by experience and outcome: [Start here](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/adoption-guide.md).
 
-- [Core concepts](docs/docfx/articles/core-concepts.md)
-- [Common tasks](docs/docfx/articles/common-tasks.md)
-- [Commands](docs/docfx/articles/commands.md)
-- [Troubleshooting](docs/docfx/articles/troubleshooting.md)
-- [Contributing](docs/CONTRIBUTING.md)
+- [Core concepts](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/core-concepts.md)
+- [Common tasks](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/common-tasks.md)
+- [Commands](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/commands.md)
+- [Troubleshooting](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/troubleshooting.md)
+- [Test and distribute a mod](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/distributing-mods.md)
+- [Release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md)
+- [Contributing](https://github.com/ifBars/S1Interop/blob/main/docs/CONTRIBUTING.md)
 
 ## Repository layout
 
 ```text
 src/S1Interop.Cli/          command parsing and user-facing reporting
-src/S1Interop.Core/         analysis, migration, generation, rollback, verification
+src/S1Interop.Compiler/     metadata-driven source lowering and runtime support
+src/S1Interop.Core/         scaffolding, setup, analysis, migration and verification
+tests/S1Interop.Compiler.Tests/  compiler contracts without game installations
 tests/S1Interop.Tests/      portable and local integration coverage
 docs/docfx/                 public documentation site
 ```

@@ -46,6 +46,9 @@ jobs:
       - name: Portable tests
         run: dotnet run --project tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
 
+      - name: Compiler contracts
+        run: dotnet run --project tests\S1Interop.Compiler.Tests --configuration Release --no-build
+
       - name: Pack
         shell: pwsh
         run: |
@@ -54,14 +57,19 @@ jobs:
           dotnet pack src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output artifacts\packages
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Smoke packaged CLI
+      - name: Test packaged compiler workflow on .NET 8
         shell: pwsh
-        run: |
-          dotnet tool install S1Interop --tool-path .\.tools --add-source artifacts\packages --version $env:PACKAGE_VERSION
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\.tools\s1interop --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\.tools\s1interop --help
+        run: ./tests/Test-CompilerPackage.ps1 -PackageDirectory artifacts/packages
+
+      - name: Test legacy generator package compatibility on .NET 8
+        shell: pwsh
+        run: ./tests/Test-Packages.ps1
+
+      - name: Restore documentation tool
+        run: dotnet tool restore
+
+      - name: Validate documentation
+        run: dotnet tool run docfx docs/docfx/docfx.json --warningsAsErrors
 
       - name: Publish NuGet packages
         shell: pwsh

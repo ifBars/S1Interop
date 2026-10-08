@@ -10,5 +10,7 @@
   href: testing.md
 - name: Publishing docs
   href: publishing-docs.md
+- name: Release readiness
+  href: release-readiness.md
 - name: Contributing
   href: contributing.md

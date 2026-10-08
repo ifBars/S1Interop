@@ -30,7 +30,13 @@ public static class GameReferencePublicizer
     /// Version of the publicized output shape. Increment it whenever the transformation changes so callers can
     /// invalidate cached references.
     /// </summary>
-    public const string FormatVersion = "2";
+    public const string FormatVersion = "5";
+
+    /// <summary>Assembly metadata key binding a publicized reference to its original image bytes.</summary>
+    public const string OriginalHashMetadataKey = "S1Interop.OriginalImageSha256";
+
+    /// <summary>Assembly metadata key retaining original nonpublic field visibility for reflection lowering.</summary>
+    public const string OriginalFieldVisibilityMetadataKey = "S1Interop.OriginalFieldVisibility";
 
     private const string ReferenceAssemblyAttributeNamespace = "System.Runtime.CompilerServices";
     private const string ReferenceAssemblyAttributeName = "ReferenceAssemblyAttribute";
@@ -61,6 +67,22 @@ public static class GameReferencePublicizer
 
         using var input = new MemoryStream(image, writable: false);
         using var assembly = AssemblyDefinition.ReadAssembly(input, readerParameters);
+        if (assembly.CustomAttributes.Any(a => a.AttributeType.FullName == "System.Reflection.AssemblyMetadataAttribute" &&
+            a.ConstructorArguments.Count == 2 && a.ConstructorArguments[0].Value is string key &&
+            (key == OriginalHashMetadataKey || key == OriginalFieldVisibilityMetadataKey)))
+            throw new ArgumentException("This image contains reserved publicizer metadata. Prepare references from the original game assembly.", nameof(image));
+
+        // Capture before publicization. The metadata contains names and access flags only,
+        // never executable bodies, and includes fields hidden by event/property symbols.
+        var fieldVisibility = assembly.Modules.SelectMany(module => module.GetTypes())
+            .SelectMany(type => type.Fields.Select((field, index) => new
+            {
+                Type = type.FullName.Replace('/', '+'),
+                Name = field.Name,
+                Index = index,
+                Access = (int)(field.Attributes & FieldAttributes.FieldAccessMask)
+            }).Where(field => field.Access != (int)FieldAttributes.Public)).ToArray();
+        AddMetadata(assembly, OriginalFieldVisibilityMetadataKey, System.Text.Json.JsonSerializer.Serialize(fieldVisibility));
 
         foreach (var module in assembly.Modules)
         {
@@ -68,6 +90,7 @@ public static class GameReferencePublicizer
         }
 
         AddReferenceAssemblyAttribute(assembly);
+        AddMetadata(assembly, OriginalHashMetadataKey, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image)));
 
         var writerParameters = new WriterParameters
         {
@@ -103,6 +126,19 @@ public static class GameReferencePublicizer
         {
             TransformType(type);
         }
+    }
+
+    private static void AddMetadata(AssemblyDefinition assembly, string key, string value)
+    {
+        var module = assembly.MainModule;
+        var type = new TypeReference("System.Reflection", "AssemblyMetadataAttribute", module, module.TypeSystem.CoreLibrary);
+        var constructor = new MethodReference(".ctor", module.TypeSystem.Void, type) { HasThis = true };
+        constructor.Parameters.Add(new ParameterDefinition(module.TypeSystem.String));
+        constructor.Parameters.Add(new ParameterDefinition(module.TypeSystem.String));
+        var attribute = new CustomAttribute(constructor);
+        attribute.ConstructorArguments.Add(new CustomAttributeArgument(module.TypeSystem.String, key));
+        attribute.ConstructorArguments.Add(new CustomAttributeArgument(module.TypeSystem.String, value));
+        assembly.CustomAttributes.Add(attribute);
     }
 
     private static void TransformType(TypeDefinition type)

@@ -1,55 +1,39 @@
 # Core concepts
 
-Read this page when the task guides use a term that needs context. It explains the model, not every command or generated symbol.
+## One source, two outputs
 
-## Mono, IL2CPP, and backend-neutral code
+The source compiler binds ordinary C# against Mono game metadata. For Mono, it builds that source with local game references. For IL2CPP, it maps types and lowers supported operations before compiling against the generated native proxy assemblies. Original source files remain unchanged; generated inputs stay under `obj`.
 
-Schedule I exposes different C# surfaces on its Mono and IL2CPP branches. Mono code normally uses `ScheduleOne.*`. IL2CPP code uses generated wrapper types such as `Il2CppScheduleOne.*`. Direct casts, delegates, reflection, and Harmony targets can therefore need different code.
+Both builds select the Mono authoring branch in existing conditional source. The generated MelonLoader domain attribute identifies the actual output runtime independently. Custom and framework symbols remain available, so framework-specific conditionals can still differ.
 
-S1Interop supports two project shapes:
+The result is two mod DLLs. This is the default candidate workflow; it does not aim to put both managed type systems into one shipping assembly.
 
-| Shape | What you ship | When it fits |
-| --- | --- | --- |
-| Dual-runtime | Separate Mono and IL2CPP assemblies from one source tree. | The mod has meaningful runtime-specific code, or you want the clearest validation boundary. |
-| Backend-neutral | One assembly that uses generated `S1Interop.*` facades for selected direct game access. | The direct game seam is narrow and both runtime branches are already validated. This path is experimental. |
+## One CLI and its build integration
 
-Dual-runtime is a complete outcome. Backend-neutral does not replace it by default. Even a backend-neutral project benefits from separate Mono and IL2CPP reference builds.
+| Component | Role |
+| --- | --- |
+| `s1interop` | Project creation, setup, analysis, and compiler operations. The project imports invoke its `compiler` commands during builds. |
+| `.s1interop/S1Interop.Compiler.props` and `.targets` | Select references and outputs, verify installations, and invoke the compiler. New projects contain matching copies. |
+| `.config/dotnet-tools.json` | Pins the local CLI package version. Run `dotnet tool restore` before building. |
+| `S1Interop.Runtime.dll` | Shared support required by compiler-built IL2CPP mods. Deploy a compatible generation to `UserLibs`. |
+| `S1Interop.Generators` | Older declaration/helper workflow. Not required by the default compiler scaffold. |
 
-## Two packages, two jobs
+The compiler implementation remains a library inside the toolchain. There is no second CLI to install.
 
-| Package | Runs when | Owns |
-| --- | --- | --- |
-| `S1Interop` | You run `s1interop` in a terminal. | Project analysis, scaffolding, migration plans, reversible changes, and sandbox verification. |
-| `S1Interop.Generators` | The mod project builds. | Compiler diagnostics and generated interop helpers or facades. |
+## Game metadata and authoring companions
 
-The CLI never runs as part of a mod build. The generator package is a build dependency, not a player-installed runtime library.
+The compiler needs matching Mono and IL2CPP game versions for native output. It prepares local reference-only copies that expose supported nonpublic access. Those copies are build inputs, not runtime dependencies, and must not be distributed.
 
-## What a declaration does
+A compiler-built IL2CPP library also produces `.s1interop/authoring` metadata companions. They let a consuming compiler project bind original signatures and verify that they match the compiled library. Keep these companions with developer-facing library distributions; players do not need them.
 
-A declaration is an assembly attribute that tells the generator which game type or member to resolve. `sdkgen` can write declarations from source usage and local metadata. You can add a narrow declaration by hand when automatic discovery cannot express the binding.
+## Compatibility evidence
 
-- `S1InteropNamespace` registers types from a namespace.
-- `S1InteropType` requests a facade and compatible public members for one type.
-- `S1InteropMember` binds an explicit, private, or ambiguous member.
+A build proves that the selected source binds and emits. A loader initialization check proves that a specific artifact loads. A runtime probe tests only its exercised behavior. Gameplay, saves, networking, and arbitrary content creation need their own evidence on each supported backend.
 
-Generated facades preserve the game namespace under `S1Interop`. For example, `ScheduleOne.PlayerScripts.PlayerCamera` becomes `S1Interop.ScheduleOne.PlayerScripts.PlayerCamera`.
+Metadata discovery avoids a manually maintained game wrapper catalog. It does not remove compiler maintenance or restore code absent from the native game. See the [compiler support guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for current limits.
 
-Read [Declarations](backend-neutral-declarations.md) before editing attributes. Read [Generated output](generator-package.md) to see the symbols available after a build.
+## Older workflows
 
-## Safe migration workflow
+Legacy dual-runtime migration retains explicit runtime-specific code and may add generator helpers. Backend-neutral facades expose selected types through generated `S1Interop.*` declarations. Neither is the default compiler route.
 
-S1Interop treats migration as a reviewable sequence:
-
-1. Analyze the project.
-2. Review a dry-run plan.
-3. Apply only the plan you accept.
-4. Verify it in a temporary copy.
-5. Use the recorded manifest to roll back an applied migration if needed.
-
-Unsafe or ambiguous source patterns remain review items. S1Interop does not promise to convert every mod automatically. [Migration overview](migrating-mono-mods.md) covers the commands and outputs.
-
-## Boundaries that stay outside S1Interop
-
-S1Interop handles low-level game-wrapper access. It does not replace S1API gameplay workflows, MAPI building workflows, networking frameworks, or dedicated-server lifecycle APIs. Use it beside those libraries when a mod still needs direct Schedule One access.
-
-It reads local game references but must not package or commit game assemblies, generated IL2CPP wrappers, decompiled code, or game assets. Keep install paths in the ignored `local.build.props` file. [Local game paths](local-paths.md) explains that setup.
+Existing migration commands still preview changes and preserve rollback manifests. Their [migration guide](migrating-mono-mods.md), [declaration reference](backend-neutral-declarations.md), and [generated output reference](generator-package.md) remain available for those projects.

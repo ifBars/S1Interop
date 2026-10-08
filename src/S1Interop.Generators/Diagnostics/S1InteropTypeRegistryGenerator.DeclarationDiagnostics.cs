@@ -200,28 +200,60 @@ public sealed partial class S1InteropTypeRegistryGenerator
         RuntimeBackend runtime,
         IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
     {
-        IEnumerable<ISymbol> members = ownerType.GetMembers(entry.MemberName);
-        if (entry.IsStatic)
-        {
-            members = members.Where(member => member.IsStatic);
-        }
+        IEnumerable<ISymbol> members = GetDeclaredAndInheritedPublicMembers(ownerType, entry.MemberName)
+            .Where(member => member.IsStatic == entry.IsStatic);
 
-        IEnumerable<IMethodSymbol> methodMembers = GetPatchMethods(ownerType, entry.MemberName);
-        if (entry.IsStatic)
-        {
-            methodMembers = methodMembers.Where(member => member.IsStatic);
-        }
+        IEnumerable<IMethodSymbol> methodMembers = GetDeclaredAndInheritedPublicMethods(ownerType, entry.MemberName)
+            .Where(member => member.IsStatic == entry.IsStatic);
 
         return entry.Kind switch
         {
             S1InteropMemberKind.Field => members.Any(member => member.Kind == SymbolKind.Field),
             S1InteropMemberKind.Property => members.Any(member => member.Kind == SymbolKind.Property),
             S1InteropMemberKind.Method => methodMembers.Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias)),
-            _ => members.Any(member =>
+            S1InteropMemberKind.FieldOrProperty => members.Any(member =>
                 member.Kind == SymbolKind.Field ||
-                member.Kind == SymbolKind.Property) ||
-                methodMembers.Any(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias))
+                member.Kind == SymbolKind.Property),
+            _ => false
         };
+    }
+
+    private static IEnumerable<ISymbol> GetDeclaredAndInheritedPublicMembers(
+        INamedTypeSymbol ownerType,
+        string memberName)
+    {
+        bool isDeclaredOwner = true;
+        for (INamedTypeSymbol? currentType = ownerType; currentType is not null; currentType = currentType.BaseType)
+        {
+            foreach (ISymbol member in currentType.GetMembers(memberName))
+            {
+                if (isDeclaredOwner || member.DeclaredAccessibility == Accessibility.Public)
+                {
+                    yield return member;
+                }
+            }
+
+            isDeclaredOwner = false;
+        }
+    }
+
+    private static IEnumerable<IMethodSymbol> GetDeclaredAndInheritedPublicMethods(
+        INamedTypeSymbol ownerType,
+        string memberName)
+    {
+        bool isDeclaredOwner = true;
+        for (INamedTypeSymbol? currentType = ownerType; currentType is not null; currentType = currentType.BaseType)
+        {
+            foreach (IMethodSymbol method in GetPatchMethods(currentType, memberName))
+            {
+                if (isDeclaredOwner || method.DeclaredAccessibility == Accessibility.Public)
+                {
+                    yield return method;
+                }
+            }
+
+            isDeclaredOwner = false;
+        }
     }
 
     private static void ReportPatchMissingMemberDiagnostics(
@@ -399,11 +431,8 @@ public sealed partial class S1InteropTypeRegistryGenerator
         RuntimeBackend runtime,
         IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias)
     {
-        IEnumerable<IMethodSymbol> methods = GetPatchMethods(ownerType, entry.MemberName);
-        if (entry.IsStatic)
-        {
-            methods = methods.Where(method => method.IsStatic);
-        }
+        IEnumerable<IMethodSymbol> methods = GetPatchMethods(ownerType, entry.MemberName)
+            .Where(method => method.IsStatic == entry.IsStatic);
 
         return methods.Where(method => ParameterTypesMatch(method, entry, runtime, entriesByAlias));
     }

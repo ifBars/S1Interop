@@ -1,0 +1,119 @@
+<Project>
+  <!--
+    S1Interop build integration. Every feature is opt-in so diagnostics-only adoption never changes references or output:
+
+      S1InteropGameReferences=true   reference MelonLoader plus the game/Unity assemblies for the selected runtime,
+                                     and fail early with setup guidance when the local install is incomplete.
+      S1InteropDeployToGame=true     copy the built mod into the selected install's Mods folder after each build.
+      <S1InteropUsing Include="ScheduleOne.NPCs" />
+                                     import a game namespace in every file; IL2CPP builds import Il2CppScheduleOne.NPCs.
+
+    The runtime comes from S1InteropReferenceRuntime, which defaults to S1InteropTargetRuntime (Mono or Il2Cpp).
+    The install comes from S1InteropGamePath, then GamePath, then MonoGamePath or Il2CppGamePath.
+  -->
+  <PropertyGroup>
+    <S1InteropReferenceRuntime Condition="'$(S1InteropReferenceRuntime)'=='' and ('$(S1InteropTargetRuntime)'=='Mono' or '$(S1InteropTargetRuntime)'=='Il2Cpp')">$(S1InteropTargetRuntime)</S1InteropReferenceRuntime>
+
+    <S1InteropGamePath Condition="'$(S1InteropGamePath)'==''">$(GamePath)</S1InteropGamePath>
+    <S1InteropGamePath Condition="'$(S1InteropGamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Mono'">$(MonoGamePath)</S1InteropGamePath>
+    <S1InteropGamePath Condition="'$(S1InteropGamePath)'=='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(Il2CppGamePath)</S1InteropGamePath>
+    <S1InteropGamePath Condition="'$(S1InteropGamePath)'!=''">$([MSBuild]::EnsureTrailingSlash('$(S1InteropGamePath)'))</S1InteropGamePath>
+
+    <S1InteropManagedPath Condition="'$(S1InteropManagedPath)'=='' and '$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Mono'">$(S1InteropGamePath)Schedule I_Data\Managed</S1InteropManagedPath>
+    <S1InteropManagedPath Condition="'$(S1InteropManagedPath)'=='' and '$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(S1InteropGamePath)MelonLoader\Il2CppAssemblies</S1InteropManagedPath>
+    <S1InteropMelonLoaderPath Condition="'$(S1InteropMelonLoaderPath)'=='' and '$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Mono'">$(S1InteropGamePath)MelonLoader\net35</S1InteropMelonLoaderPath>
+    <S1InteropMelonLoaderPath Condition="'$(S1InteropMelonLoaderPath)'=='' and '$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp'">$(S1InteropGamePath)MelonLoader\net6</S1InteropMelonLoaderPath>
+    <S1InteropModsPath Condition="'$(S1InteropModsPath)'=='' and '$(S1InteropGamePath)'!=''">$(S1InteropGamePath)Mods</S1InteropModsPath>
+
+    <!-- A build that declares its runtime explicitly is runtime-specific, so MelonLoader should refuse to load it on the other branch. -->
+    <S1InteropEmitPlatformDomain Condition="'$(S1InteropEmitPlatformDomain)'=='' and ('$(S1InteropTargetRuntime)'=='Mono' or '$(S1InteropTargetRuntime)'=='Il2Cpp')">true</S1InteropEmitPlatformDomain>
+  </PropertyGroup>
+
+  <!-- `dotnet run -c "<configuration>"` builds, deploys when enabled, and starts the matching install. -->
+  <PropertyGroup Condition="'$(S1InteropGameReferences)'=='true' and '$(S1InteropGamePath)'!='' and '$(RunCommand)'==''">
+    <RunCommand>$(S1InteropGamePath)Schedule I.exe</RunCommand>
+    <RunArguments>$(S1InteropRunArguments)</RunArguments>
+    <RunWorkingDirectory>$(S1InteropGamePath)</RunWorkingDirectory>
+  </PropertyGroup>
+
+  <!-- Game namespaces carry an Il2Cpp prefix in MelonLoader's generated IL2CPP assemblies; Unity and BCL namespaces do not. -->
+  <ItemGroup Condition="'$(S1InteropReferenceRuntime)'=='Il2Cpp'">
+    <Using Include="@(S1InteropUsing->'Il2Cpp%(Identity)')" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(S1InteropReferenceRuntime)'!='Il2Cpp'">
+    <Using Include="@(S1InteropUsing)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(S1InteropGameReferences)'=='true' and '$(S1InteropMelonLoaderPath)'!='' and '$(S1InteropManagedPath)'!=''">
+    <Reference Include="$(S1InteropMelonLoaderPath)\MelonLoader.dll" Private="false" />
+    <Reference Include="$(S1InteropMelonLoaderPath)\0Harmony.dll" Private="false" />
+  </ItemGroup>
+
+  <!--
+    The Mono Managed folder also ships the game's BCL, which must come from the target framework instead.
+    Edgegap (server hosting) is built against a newer System.Net.Http than netstandard2.1 and only adds an MSB3277 warning.
+  -->
+  <ItemGroup Condition="'$(S1InteropGameReferences)'=='true' and '$(S1InteropReferenceRuntime)'=='Mono' and '$(S1InteropManagedPath)'!=''">
+    <Reference Include="$(S1InteropManagedPath)\*.dll"
+               Exclude="$(S1InteropManagedPath)\mscorlib.dll;$(S1InteropManagedPath)\netstandard.dll;$(S1InteropManagedPath)\System.dll;$(S1InteropManagedPath)\System.*.dll;$(S1InteropManagedPath)\Mono.*.dll;$(S1InteropManagedPath)\Accessibility.dll;$(S1InteropManagedPath)\Novell.*.dll;$(S1InteropManagedPath)\Edgegap.dll;$(S1InteropExcludedGameReferences)"
+               Private="false" />
+  </ItemGroup>
+
+  <!-- Every generated IL2CPP proxy assembly is Il2Cpp-prefixed or Unity-owned, so the whole folder is safe to reference. -->
+  <ItemGroup Condition="'$(S1InteropGameReferences)'=='true' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and '$(S1InteropManagedPath)'!=''">
+    <Reference Include="$(S1InteropMelonLoaderPath)\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(S1InteropMelonLoaderPath)\Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="$(S1InteropManagedPath)\*.dll" Exclude="$(S1InteropExcludedGameReferences)" Private="false" />
+  </ItemGroup>
+
+  <Target Name="S1InteropValidateGameReferences"
+          BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(S1InteropGameReferences)'=='true'">
+    <Error Code="S1I101"
+           Condition="'$(S1InteropReferenceRuntime)'!='Mono' and '$(S1InteropReferenceRuntime)'!='Il2Cpp'"
+           Text="S1InteropGameReferences needs a runtime. Set S1InteropTargetRuntime to Mono or Il2Cpp for configuration '$(Configuration)'." />
+    <Error Code="S1I102"
+           Condition="('$(S1InteropReferenceRuntime)'=='Mono' or '$(S1InteropReferenceRuntime)'=='Il2Cpp') and '$(S1InteropGamePath)'==''"
+           Text="No $(S1InteropReferenceRuntime) game install is configured. Run 's1interop setup . --apply' to write local.build.props, or set $(S1InteropReferenceRuntime)GamePath there." />
+    <Error Code="S1I103"
+           Condition="'$(S1InteropGamePath)'!='' and !Exists('$(S1InteropMelonLoaderPath)\MelonLoader.dll')"
+           Text="MelonLoader was not found at '$(S1InteropMelonLoaderPath)'. Install MelonLoader into '$(S1InteropGamePath)', launch the game once, then run 's1interop doctor .'." />
+    <Error Code="S1I104"
+           Condition="'$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Mono' and !Exists('$(S1InteropManagedPath)\Assembly-CSharp.dll')"
+           Text="Mono game assemblies were not found at '$(S1InteropManagedPath)'. MonoGamePath must point at an install of the 'alternate' or 'alternate-beta' Steam branch." />
+    <Error Code="S1I105"
+           Condition="'$(S1InteropGamePath)'!='' and '$(S1InteropReferenceRuntime)'=='Il2Cpp' and !Exists('$(S1InteropManagedPath)\Assembly-CSharp.dll')"
+           Text="IL2CPP game assemblies were not found at '$(S1InteropManagedPath)'. Launch this install once with MelonLoader so it generates Il2CppAssemblies, and check that Il2CppGamePath points at the default or 'beta' Steam branch." />
+  </Target>
+
+  <Target Name="S1InteropDeployToGame"
+          AfterTargets="Build"
+          Condition="'$(S1InteropDeployToGame)'=='true'">
+    <Warning Code="S1I106"
+             Condition="'$(S1InteropModsPath)'==''"
+             Text="S1InteropDeployToGame is enabled, but no game install is configured for '$(Configuration)'. Run 's1interop setup . --apply'." />
+    <ItemGroup Condition="'$(S1InteropModsPath)'!=''">
+      <_S1InteropDeployFile Include="$(TargetPath)" />
+      <!-- Symbols give MelonLoader stack traces line numbers. -->
+      <_S1InteropDeployFile Include="$(TargetDir)$(TargetName).pdb"
+                            Condition="'$(S1InteropDeploySymbols)'!='false' and Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    <MakeDir Directories="$(S1InteropModsPath)" Condition="'$(S1InteropModsPath)'!=''" ContinueOnError="WarnAndContinue" />
+    <Copy SourceFiles="@(_S1InteropDeployFile)"
+          DestinationFolder="$(S1InteropModsPath)"
+          SkipUnchangedFiles="true"
+          Retries="2"
+          RetryDelayMilliseconds="500"
+          ContinueOnError="WarnAndContinue"
+          Condition="'@(_S1InteropDeployFile)'!=''">
+      <Output TaskParameter="CopiedFiles" ItemName="_S1InteropDeployedFile" />
+    </Copy>
+    <!-- The usual cause is a running game holding the previous DLL open; the build output itself is still valid. -->
+    <Warning Code="S1I107"
+             Condition="'@(_S1InteropDeployFile)'!='' and '$(MSBuildLastTaskResult)'=='false'"
+             Text="S1Interop could not copy $(TargetFileName) to '$(S1InteropModsPath)'. Close Schedule I and build again." />
+    <Message Importance="high"
+             Condition="'@(_S1InteropDeployedFile)'!=''"
+             Text="$(MSBuildProjectName) -> $(S1InteropModsPath)\$(TargetFileName)" />
+  </Target>
+</Project>

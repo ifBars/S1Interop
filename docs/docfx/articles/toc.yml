@@ -6,6 +6,10 @@
       href: getting-started.md
     - name: Build your first mod
       href: first-mod.md
+    - name: Adopt the compiler in an existing mod
+      href: compiler-adoption.md
+    - name: Test and distribute a mod
+      href: distributing-mods.md
     - name: S1API and S1Interop
       href: s1api-and-s1interop.md
 - name: Guides
@@ -16,12 +20,6 @@
       href: new-projects.md
     - name: Local game paths
       href: local-paths.md
-    - name: Migration overview
-      href: migrating-mono-mods.md
-    - name: Migrate to dual-runtime
-      href: migrate-to-dual-runtime.md
-    - name: Migrate to backend-neutral
-      href: migrate-to-backend-neutral.md
 - name: Understand S1Interop
   items:
     - name: What S1Interop does
@@ -32,8 +30,18 @@
       href: use-cases.md
     - name: Architecture
       href: architecture.md
-- name: Generated interop
+- name: Legacy generator workflows
   items:
+    - name: Legacy first mod
+      href: legacy-generator-first-mod.md
+    - name: Write code with runtime helpers
+      href: dual-runtime-code.md
+    - name: Migration overview
+      href: migrating-mono-mods.md
+    - name: Migrate to dual-runtime
+      href: migrate-to-dual-runtime.md
+    - name: Migrate to backend-neutral
+      href: migrate-to-backend-neutral.md
     - name: Generated output
       href: generator-package.md
     - name: Backend-neutral SDK

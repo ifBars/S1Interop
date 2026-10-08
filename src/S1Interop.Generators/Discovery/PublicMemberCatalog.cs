@@ -188,7 +188,8 @@ internal static class PublicMemberCatalog
         S1InteropMemberEntry member,
         out DiscoveredMember discovered)
     {
-        foreach (ISymbol symbol in ownerType.GetMembers(member.MemberName).Where(symbol => symbol.IsStatic == member.IsStatic))
+        foreach (ISymbol symbol in EnumerateExplicitMemberCandidates(ownerType, member.MemberName)
+            .Where(symbol => symbol.IsStatic == member.IsStatic))
         {
             switch (symbol)
             {
@@ -228,32 +229,57 @@ internal static class PublicMemberCatalog
         IReadOnlyDictionary<string, S1InteropTypeEntry> entriesByAlias,
         out DiscoveredMember discovered)
     {
-        IMethodSymbol[] methods = ownerType
-            .GetMembers(member.MemberName)
+        var methods = new List<IMethodSymbol>();
+        foreach (IMethodSymbol method in EnumerateExplicitMemberCandidates(ownerType, member.MemberName)
             .OfType<IMethodSymbol>()
             .Where(method =>
                 method.IsStatic == member.IsStatic &&
                 method.MethodKind == MethodKind.Ordinary &&
                 !method.IsImplicitlyDeclared &&
                 !method.IsGenericMethod &&
-                ExplicitParameterTypesMatch(method, member, runtime, entriesByAlias))
-            .ToArray();
-        if (methods.Length != 1)
+                ExplicitParameterTypesMatch(method, member, runtime, entriesByAlias)))
+        {
+            if (methods.All(existing => !HaveSameMethodSignature(existing, method)))
+            {
+                methods.Add(method);
+            }
+        }
+
+        if (methods.Count != 1)
         {
             discovered = default;
             return false;
         }
 
-        IMethodSymbol method = methods[0];
+        IMethodSymbol selectedMethod = methods[0];
         discovered = new DiscoveredMember(
             member.MemberName,
             S1InteropMemberKind.Method,
-            method.IsStatic,
+            selectedMethod.IsStatic,
             canWrite: false,
-            method.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
-            GetTypeName(method.ReturnType),
-            CreateParameterNames(method.Parameters));
+            selectedMethod.Parameters.Select(GetParameterTypeName).ToImmutableArray(),
+            GetTypeName(selectedMethod.ReturnType),
+            CreateParameterNames(selectedMethod.Parameters));
         return true;
+    }
+
+    private static IEnumerable<ISymbol> EnumerateExplicitMemberCandidates(
+        INamedTypeSymbol ownerType,
+        string memberName)
+    {
+        bool isDeclaredOwner = true;
+        foreach (INamedTypeSymbol currentType in EnumerateTypeHierarchy(ownerType))
+        {
+            foreach (ISymbol symbol in currentType.GetMembers(memberName))
+            {
+                if (isDeclaredOwner || symbol.DeclaredAccessibility == Accessibility.Public)
+                {
+                    yield return symbol;
+                }
+            }
+
+            isDeclaredOwner = false;
+        }
     }
 
     private static bool ExplicitParameterTypesMatch(
@@ -415,14 +441,15 @@ internal static class PublicMemberCatalog
     {
         IReadOnlyDictionary<string, DiscoveredMember> monoMembers = DiscoverPublicFieldPropertyMembers(monoType);
         IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers = DiscoverPublicFieldPropertyMembers(il2CppType);
-        foreach (DiscoveredMember member in SelectCompatibleMembers(monoMembers, il2CppMembers))
+        bool requireBothBackends = monoType is not null && il2CppType is not null;
+        foreach (DiscoveredMember member in SelectCompatibleMembers(monoMembers, il2CppMembers, requireBothBackends))
         {
             yield return member;
         }
 
         IReadOnlyDictionary<string, DiscoveredMember> monoMethods = DiscoverPublicMethods(monoType);
         IReadOnlyDictionary<string, DiscoveredMember> il2CppMethods = DiscoverPublicMethods(il2CppType);
-        foreach (DiscoveredMember method in SelectCompatibleMembers(monoMethods, il2CppMethods))
+        foreach (DiscoveredMember method in SelectCompatibleMembers(monoMethods, il2CppMethods, requireBothBackends))
         {
             yield return method;
         }
@@ -430,9 +457,10 @@ internal static class PublicMemberCatalog
 
     private static IEnumerable<DiscoveredMember> SelectCompatibleMembers(
         IReadOnlyDictionary<string, DiscoveredMember> monoMembers,
-        IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers)
+        IReadOnlyDictionary<string, DiscoveredMember> il2CppMembers,
+        bool requireBothBackends)
     {
-        if (monoMembers.Count > 0 && il2CppMembers.Count > 0)
+        if (requireBothBackends || (monoMembers.Count > 0 && il2CppMembers.Count > 0))
         {
             foreach (DiscoveredMember monoMember in monoMembers.Values.OrderBy(member => member.Name, StringComparer.Ordinal))
             {
@@ -523,16 +551,19 @@ internal static class PublicMemberCatalog
             return members;
         }
 
-        foreach (ISymbol symbol in type.GetMembers())
+        foreach (INamedTypeSymbol currentType in EnumerateTypeHierarchy(type))
         {
-            if (!TryCreateDiscoveredMember(symbol, out DiscoveredMember member))
+            foreach (ISymbol symbol in currentType.GetMembers())
             {
-                continue;
-            }
+                if (!TryCreateDiscoveredMember(symbol, out DiscoveredMember member))
+                {
+                    continue;
+                }
 
-            if (!members.ContainsKey(member.Name))
-            {
-                members.Add(member.Name, member);
+                if (!members.ContainsKey(member.Name))
+                {
+                    members.Add(member.Name, member);
+                }
             }
         }
 
@@ -547,20 +578,26 @@ internal static class PublicMemberCatalog
             return new Dictionary<string, DiscoveredMember>(StringComparer.Ordinal);
         }
 
-        foreach (IMethodSymbol method in type.GetMembers().OfType<IMethodSymbol>())
+        foreach (INamedTypeSymbol currentType in EnumerateTypeHierarchy(type))
         {
-            if (!IsPublicMethodCandidate(method))
+            foreach (IMethodSymbol method in currentType.GetMembers().OfType<IMethodSymbol>())
             {
-                continue;
-            }
+                if (!IsPublicMethodCandidate(method))
+                {
+                    continue;
+                }
 
-            if (!methodsByName.TryGetValue(method.Name, out List<IMethodSymbol>? overloads))
-            {
-                overloads = new List<IMethodSymbol>();
-                methodsByName.Add(method.Name, overloads);
-            }
+                if (!methodsByName.TryGetValue(method.Name, out List<IMethodSymbol>? overloads))
+                {
+                    overloads = new List<IMethodSymbol>();
+                    methodsByName.Add(method.Name, overloads);
+                }
 
-            overloads.Add(method);
+                if (overloads.All(existing => !HaveSameMethodSignature(existing, method)))
+                {
+                    overloads.Add(method);
+                }
+            }
         }
 
         var members = new Dictionary<string, DiscoveredMember>(StringComparer.Ordinal);
@@ -585,6 +622,35 @@ internal static class PublicMemberCatalog
         }
 
         return members;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> EnumerateTypeHierarchy(INamedTypeSymbol type)
+    {
+        for (INamedTypeSymbol? currentType = type; currentType is not null; currentType = currentType.BaseType)
+        {
+            yield return currentType;
+        }
+    }
+
+    private static bool HaveSameMethodSignature(IMethodSymbol first, IMethodSymbol second)
+    {
+        if (first.Parameters.Length != second.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < first.Parameters.Length; index++)
+        {
+            IParameterSymbol firstParameter = first.Parameters[index];
+            IParameterSymbol secondParameter = second.Parameters[index];
+            if (firstParameter.RefKind != secondParameter.RefKind ||
+                !SymbolEqualityComparer.Default.Equals(firstParameter.Type, secondParameter.Type))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsPublicMethodCandidate(IMethodSymbol method) =>

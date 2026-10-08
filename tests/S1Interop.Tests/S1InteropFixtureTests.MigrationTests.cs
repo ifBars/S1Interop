@@ -2015,6 +2015,12 @@ internal sealed partial class S1InteropFixtureTests
     {
         string sourceDirectory = Path.Combine(WorkspaceRoot, "Hoverboard");
         string sourceProject = Path.Combine(sourceDirectory, "Hoverboard.csproj");
+        if (!File.Exists(sourceProject))
+        {
+            Console.WriteLine("Skipping Hoverboard migration convergence fixture because Hoverboard is not available.");
+            return;
+        }
+
         string originalProjectHash = ComputeSha256(sourceProject);
         string runsDirectory = Path.Combine(sourceDirectory, "s1interop-runs");
         string localProps = Path.Combine(sourceDirectory, "local.build.props");

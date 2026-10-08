@@ -4,8 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using S1Interop.Compiler;
 
-return CompilerCommand.Run(args);
-
 internal static class CompilerCommand
 {
     public static int Run(string[] args)
@@ -13,10 +11,10 @@ internal static class CompilerCommand
         if (args.Length == 0 || args is ["--help"])
         {
             Console.WriteLine("S1Interop experimental source compiler");
-            Console.WriteLine("lower --sources <list> --author-references <list> --target-references <list> --output <directory> [--assembly-name <name>] [--defines <semicolon-list>] [--lang-version <version>] [--nullable <context>]");
+            Console.WriteLine("s1interop compiler lower --sources <list> --author-references <list> --target-references <list> --output <directory> [--assembly-name <name>] [--defines <semicolon-list>] [--lang-version <version>] [--nullable <context>]");
             Console.WriteLine("Lists contain one absolute file path per line. Original source files are never edited.");
-            Console.WriteLine("verify-installations --mono-game-path <install> --il2cpp-game-path <install> [--report <json>]");
-            Console.WriteLine("prepare-references --references <list> --output <directory>");
+            Console.WriteLine("s1interop compiler verify-installations --mono-game-path <install> --il2cpp-game-path <install> [--report <json>]");
+            Console.WriteLine("s1interop compiler prepare-references --references <list> --output <directory>");
             return 0;
         }
 
@@ -45,7 +43,10 @@ internal static class CompilerCommand
                     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             var trees = sources.Select(path => CSharpSyntaxTree.ParseText(
                 SourceText.From(File.ReadAllText(path), Encoding.UTF8), parseOptions, path)).ToArray();
-            var authorReferences = AuthoringReferences.Resolve(ReadFileList(Required(options, "author-references")));
+            string[] authorPaths = ReadFileList(Required(options, "author-references"));
+            string[] targetPaths = ReadFileList(Required(options, "target-references"));
+            var repairPlans = EventRepairPreparation.Create(authorPaths, targetPaths);
+            var authorReferences = AuthoringReferences.Resolve(authorPaths);
             var author = CSharpCompilation.Create(options.GetValueOrDefault("assembly-name", "Mod"), trees,
                 authorReferences.References,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true,
@@ -61,6 +62,14 @@ internal static class CompilerCommand
             {
                 Console.Error.WriteLine("S1C909: IL2CPP support metadata is missing. Regenerate the install's interop assemblies before lowering source.");
                 return 1;
+            }
+            if (repairPlans.Count != 0)
+            {
+                result = result with { Compilation = result.Compilation.AddSyntaxTrees(EventRepairPreparation.Initializer(repairPlans,
+                    (CSharpParseOptions)result.Compilation.SyntaxTrees.First().Options)) };
+                var repairErrors = result.Compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+                foreach (var error in repairErrors) Console.Error.WriteLine(error);
+                if (repairErrors.Length != 0) return 1;
             }
             var authoring = AuthoringReferences.Create(author, (CSharpParseOptions)result.Compilation.SyntaxTrees.First().Options);
             foreach (var diagnostic in authoring.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
@@ -105,6 +114,7 @@ internal static class CompilerCommand
             // Only the current invocation's manifest is consumed; stale generated files are never globbed.
             File.WriteAllLines(listPath, outputs.Select(item => item.Path), new UTF8Encoding(false));
             Console.WriteLine($"S1Interop: lowered {sources.Length} source files; {result.RewrittenNodes} transformations.");
+            if (repairPlans.Count != 0) Console.WriteLine($"S1Interop: planned {repairPlans.Sum(p => p.Accessors.Count)} source-recognized event accessor repairs.");
             return 0;
         }
         catch (AuthoringReferenceException exception)

@@ -142,6 +142,8 @@ internal static class InjectionSupportSource
                         var field = WeakOwnership.Handle;
                         var previous = ({{NativeDelegateCacheSource.ResolveHandleType(map)}})field.GetValue(adapter);
                         var weak = global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_new_weakref(adapter.Pointer, false);
+                        if (weak == default({{NativeDelegateCacheSource.ResolveHandleType(map)}}))
+                            throw new global::System.InvalidOperationException("Native weak ownership handle allocation failed.");
                         try { field.SetValue(adapter, weak); }
                         catch { global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_free(weak); throw; }
                         global::Il2CppInterop.Runtime.IL2CPP.il2cpp_gchandle_free(previous);

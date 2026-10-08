@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\S1Interop.Core\S1Interop.Core.csproj" />
+    <ProjectReference Include="..\S1Interop.Compiler\S1Interop.Compiler.csproj" />
+    <InternalsVisibleTo Include="S1Interop.Compiler.Tests" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -13,10 +15,10 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>s1interop</ToolCommandName>
     <PackageId>S1Interop</PackageId>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>0.1.0-alpha.2</Version>
     <Authors>ifBars</Authors>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Description>Schedule One mod diagnostics, safe migration, and Mono/IL2CPP validation toolchain.</Description>
+    <Description>Write Schedule One mods from one C# source with automatic Mono/IL2CPP compiler adaptation, project setup, diagnostics, and migration tools.</Description>
     <PackageTags>schedule-one;il2cpp;melonloader;modding;dotnet</PackageTags>
     <RepositoryUrl>https://github.com/ifBars/S1Interop</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ifBars/S1Interop</PackageProjectUrl>

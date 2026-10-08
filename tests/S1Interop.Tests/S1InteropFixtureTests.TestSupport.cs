@@ -447,6 +447,11 @@ internal sealed partial class S1InteropFixtureTests
         return RunProcess("dotnet", arguments);
     }
 
+    private static ProcessResult RunDotNetWithTimeout(int timeoutMilliseconds, params string[] arguments)
+    {
+        return RunProcess("dotnet", timeoutMilliseconds, arguments);
+    }
+
     private static ProcessResult RunCli(params string[] arguments)
     {
         string cliAssembly = Path.Combine(AppContext.BaseDirectory, "S1Interop.Cli.dll");
@@ -460,6 +465,16 @@ internal sealed partial class S1InteropFixtureTests
 
     private static ProcessResult RunProcess(string fileName, params string[] arguments)
     {
+        return RunProcess(fileName, 120_000, arguments);
+    }
+
+    private const int PROCESS_CLEANUP_TIMEOUT_MILLISECONDS = 5_000;
+
+    private static ProcessResult RunProcess(
+        string fileName,
+        int timeoutMilliseconds,
+        params string[] arguments)
+    {
         using var process = new Process();
         process.StartInfo.FileName = fileName;
         foreach (string argument in arguments)
@@ -472,15 +487,70 @@ internal sealed partial class S1InteropFixtureTests
         process.StartInfo.UseShellExecute = false;
         process.Start();
 
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
-        if (!process.WaitForExit(milliseconds: 120_000))
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(timeoutMilliseconds))
         {
-            process.Kill(entireProcessTree: true);
-            throw new TimeoutException($"{fileName} {string.Join(' ', arguments)} timed out.");
+            bool terminated = TryTerminateProcess(process);
+            ObserveRedirectedReadTasks(outputTask, errorTask);
+            string cleanupStatus = terminated
+                ? string.Empty
+                : $" Process did not exit within {PROCESS_CLEANUP_TIMEOUT_MILLISECONDS} ms after termination was requested.";
+            throw new TimeoutException($"{fileName} {string.Join(' ', arguments)} timed out.{cleanupStatus}");
         }
 
+        string output = outputTask.GetAwaiter().GetResult();
+        string error = errorTask.GetAwaiter().GetResult();
         return new ProcessResult(process.ExitCode, output + error);
+    }
+
+    private static bool TryTerminateProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or
+            NotSupportedException or
+            System.ComponentModel.Win32Exception)
+        {
+            // The bounded wait below determines whether cleanup still completed.
+        }
+
+        try
+        {
+            return process.HasExited || process.WaitForExit(PROCESS_CLEANUP_TIMEOUT_MILLISECONDS);
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
+    private static void ObserveRedirectedReadTasks(Task<string> outputTask, Task<string> errorTask)
+    {
+        Task allReads = Task.WhenAll(outputTask, errorTask);
+        _ = allReads.ContinueWith(
+            completed =>
+            {
+                _ = completed.Exception;
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        try
+        {
+            _ = allReads.Wait(PROCESS_CLEANUP_TIMEOUT_MILLISECONDS);
+        }
+        catch (AggregateException)
+        {
+            // The continuation observes stream failures caused by process teardown.
+        }
     }
 
     private string CreateLocalGeneratorPackageSource(string tempRoot)

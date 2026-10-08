@@ -5,11 +5,14 @@ internal static class NewProjectCommand
 {
     public static int Run(ParsedCommand command)
     {
+        if (!command.BackendNeutral && !command.LegacyGenerator)
+            return CompilerProjectCommand.Run(command);
+
         var scaffolder = new BackendNeutralProjectScaffolder();
         NewProjectPlan plan;
         try
         {
-            plan = scaffolder.CreatePlan(command.Path);
+            plan = scaffolder.CreatePlan(command.Path, command.BackendNeutral);
         }
         catch (ArgumentException ex)
         {
@@ -30,7 +33,7 @@ internal static class NewProjectCommand
             return 0;
         }
 
-        scaffolder.Apply(plan, command.BackendNeutral);
+        scaffolder.Apply(plan);
 
         if (command.Format == OutputFormat.Json)
         {
@@ -47,7 +50,7 @@ internal static class NewProjectCommand
         }
 
         Console.WriteLine($"S1Interop project created: {plan.ProjectName}");
-        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "dual-runtime (recommended)")}");
+        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "legacy generator dual-runtime")}");
         Console.WriteLine($"Directory: {plan.TargetDirectory}");
         foreach (string file in plan.PlannedFiles)
         {
@@ -75,7 +78,7 @@ internal static class NewProjectCommand
         }
 
         Console.WriteLine($"S1Interop new project dry-run: {plan.ProjectName}");
-        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "dual-runtime (recommended)")}");
+        Console.WriteLine($"Mode: {(command.BackendNeutral ? "experimental backend-neutral" : "legacy generator dual-runtime")}");
         Console.WriteLine($"Directory: {plan.TargetDirectory}");
         foreach (string file in plan.PlannedFiles)
         {
@@ -117,14 +120,9 @@ internal static class NewProjectCommand
                 $"Set-Location \"{plan.TargetDirectory}\"",
                 "s1interop doctor .",
                 "s1interop setup . --apply",
-                $"dotnet build .\\{plan.ProjectName}.sln -c \"Debug Mono\"",
-                $"dotnet build .\\{plan.ProjectName}.sln -c \"Debug Il2Cpp\"",
-                $"Mono DLL: bin\\Mono\\Debug Mono\\netstandard2.1\\{plan.ProjectName}.dll",
-                $"IL2CPP DLL: bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{plan.ProjectName}.dll",
-                $"Mono deploy: Copy-Item \".\\bin\\Mono\\Debug Mono\\netstandard2.1\\{plan.ProjectName}.dll\" \"<MonoGamePath>\\Mods\\{plan.ProjectName}.dll\" -Force",
-                "Mono run: & \"<MonoGamePath>\\Schedule I.exe\"",
-                $"IL2CPP deploy: Copy-Item \".\\bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{plan.ProjectName}.dll\" \"<Il2CppGamePath>\\Mods\\{plan.ProjectName}.dll\" -Force",
-                "IL2CPP run: & \"<Il2CppGamePath>\\Schedule I.exe\"",
-                $"Expected log: {plan.ProjectName} loaded on Mono. (or Il2Cpp)"
+                "dotnet build -c \"Debug Il2Cpp\"   (builds and copies the DLL into <Il2CppGamePath>\\Mods)",
+                "dotnet run -c \"Debug Il2Cpp\"     (builds, deploys, and starts that install)",
+                "Use \"Debug Mono\" for the Mono install. Close the game before building.",
+                $"Expected log: {plan.ProjectName} loaded on Il2Cpp. (or Mono)"
             ];
 }

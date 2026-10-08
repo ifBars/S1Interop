@@ -67,7 +67,7 @@ When metadata is available, `S1InteropType` can generate:
 
 The facade layer favors correctness over pretending every game API is a normal C# wrapper. You will still see `Handle`, `As`, `TryAs`, `Get<T>`, `Get...Value<T>`, `TrySet...`, and `Invoke`.
 
-Use named facade members first. Discovered public fields, properties, and methods use concrete signatures when metadata is safe for both backends: scalar values, `string`, `object`, `void`, declared enum mirrors, and game-object values whose types are also declared as S1Interop facades. Read-only fields/properties get getters; named `TrySet...` helpers require writable metadata.
+Use named facade members first. Discovered declared or inherited public fields, properties, and methods use concrete signatures when metadata is safe for both backends: scalar values, `string`, `object`, `void`, declared enum mirrors, and game-object values whose types are also declared as S1Interop facades. Read-only fields/properties get getters; named `TrySet...` helpers require writable metadata.
 
 Use `S1InteropMember` for private members, aliases, pinned bindings, or migration-generated reflection targets. If the binding is unresolved or ambiguous, it stays on object/generic fallback helpers.
 

@@ -18,3 +18,8 @@ jobs:
         run: dotnet build tests/S1Interop.Compiler.Tests -c Release
       - name: Run compiler contracts without game installations
         run: dotnet run --project tests/S1Interop.Compiler.Tests -c Release --no-build
+      - name: Pack the compiler CLI
+        run: dotnet pack src/S1Interop.Cli -c Release --no-build -o artifacts/compiler-packages
+      - name: Verify isolated compiler package adoption
+        shell: pwsh
+        run: ./tests/Test-CompilerPackage.ps1

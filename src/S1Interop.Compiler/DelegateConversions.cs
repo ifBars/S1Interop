@@ -26,6 +26,11 @@ internal sealed class DelegateConversions(SemanticModel model, MetadataSymbolMap
 
     public ExpressionSyntax Rewrite(ExpressionSyntax original, ExpressionSyntax visited)
     {
+        // Convert an explicit delegate creation as a whole; converting its method-group
+        // argument first would construct a native wrapper around another native wrapper.
+        if (original.Parent is ArgumentSyntax { Parent: ArgumentListSyntax { Parent: BaseObjectCreationExpressionSyntax creation } } &&
+            model.GetOperation(creation) is IDelegateCreationOperation)
+            return visited;
         if (original.Parent is MemberAccessExpressionSyntax member && member.Name == original ||
             original.Parent is MemberBindingExpressionSyntax or QualifiedNameSyntax or AliasQualifiedNameSyntax)
             return visited;
@@ -37,7 +42,8 @@ internal sealed class DelegateConversions(SemanticModel model, MetadataSymbolMap
         INamedTypeSymbol? targetDelegate = NativeDelegate(sourceDelegate) ?? ExpectedSlot(original);
         if (targetDelegate is null || !IsNativeDelegate(targetDelegate)) return visited;
 
-        bool createsDelegate = original is AnonymousFunctionExpressionSyntax ||
+        bool explicitCreation = original is BaseObjectCreationExpressionSyntax && model.GetOperation(original) is IDelegateCreationOperation;
+        bool createsDelegate = explicitCreation || original is AnonymousFunctionExpressionSyntax ||
             original is IdentifierNameSyntax or MemberAccessExpressionSyntax &&
             model.GetSymbolInfo(original).Symbol is IMethodSymbol && model.GetTypeInfo(original).Type is null;
         if (!createsDelegate && InferExpression(original, new HashSet<ISymbol>(SymbolEqualityComparer.Default)) is { } expressionType &&
@@ -58,15 +64,31 @@ internal sealed class DelegateConversions(SemanticModel model, MetadataSymbolMap
             ? map.TargetDisplay(sourceDelegate)
             : RenderSlot(targetDelegate, sourceDelegate);
         string managedType = "global::System.Action";
-        var arguments = signature.Parameters.Select(parameter => map.TargetDisplay(parameter.Type)).ToList();
+        var nativeSignature = InvokeSignature(targetDelegate);
+        string CallbackType(ITypeSymbol source, ITypeSymbol? target)
+        {
+            if (source is IArrayTypeSymbol && target is INamedTypeSymbol array && IsNativeArray(array))
+            {
+                if (CollectionStorageAnalysis.SupportsNativeArraySlot(map, array, source) && array.Name != "Il2CppArrayBase")
+                    return target.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                diagnostics.Add(Diagnostic.Create(UnsupportedSignature, original.GetLocation(), sourceDelegate.ToDisplayString(),
+                    $"array slot '{source}' -> '{target}' does not have a supported concrete shared-storage representation"));
+            }
+            return map.TargetDisplay(source);
+        }
+        var arguments = signature.Parameters.Select(parameter => CallbackType(parameter.Type,
+            nativeSignature is not null && parameter.Ordinal < nativeSignature.Parameters.Length
+                ? nativeSignature.Parameters[parameter.Ordinal].Type : null)).ToList();
         if (!signature.ReturnsVoid)
         {
             managedType = "global::System.Func";
-            arguments.Add(map.TargetDisplay(signature.ReturnType));
+            arguments.Add(CallbackType(signature.ReturnType, nativeSignature?.ReturnType));
         }
         if (arguments.Count > 0) managedType += "<" + string.Join(", ", arguments) + ">";
+        ExpressionSyntax callbackExpression = explicitCreation && visited is BaseObjectCreationExpressionSyntax { ArgumentList.Arguments: [var callbackArgument] }
+            ? callbackArgument.Expression : visited;
         ExpressionSyntax callback = createsDelegate
-            ? CastExpression(ParseTypeName(managedType), ParenthesizedExpression(visited.WithoutTrivia()))
+            ? CastExpression(ParseTypeName(managedType), ParenthesizedExpression(callbackExpression.WithoutTrivia()))
             : visited.WithoutTrivia();
         Used = true;
         return InvocationExpression(ParseExpression(NativeDelegateCacheSource.TypeName + ".Convert<" + targetName + ">"),
@@ -163,7 +185,10 @@ internal sealed class DelegateConversions(SemanticModel model, MetadataSymbolMap
         map.Resolve(named) is { Status: TypeMappingStatus.Mapped, Target: { } target } && IsNativeDelegate(target)
             ? target : null;
 
-    private static bool IsNativeDelegate(INamedTypeSymbol type)
+    internal static IMethodSymbol? InvokeSignature(INamedTypeSymbol type) => type.DelegateInvokeMethod ??
+        (IsNativeDelegate(type) && type.GetMembers("Invoke").OfType<IMethodSymbol>().ToArray() is [var invoke] ? invoke : null);
+
+    internal static bool IsNativeDelegate(INamedTypeSymbol type)
     {
         for (var current = type; current is not null; current = current.BaseType)
             if (current.ToDisplayString() == "Il2CppSystem.Delegate") return true;

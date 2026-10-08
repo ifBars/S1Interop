@@ -2,7 +2,15 @@
 
 S1Interop turns common IL2CPP runtime failures into compile-time feedback.
 
-All diagnostics on this page are reported by the `S1Interop.Generators` Roslyn package during compilation. They do not require the CLI to run. The generator reports them alongside your normal build errors and warnings, so you see them in your IDE error list and in `dotnet build` output the same way you would see any other compiler diagnostic.
+Compiler projects report `S1IC` diagnostics through the pinned tool invoked by MSBuild. Start with [compiler troubleshooting](troubleshooting.md#ordinary-game-source-fails-in-the-native-build) and the [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for those diagnostics. Installing the generator package is not a fix for unsupported compiler adaptation.
+
+## Event repair startup failures
+
+`S1IC040` means the generated event repair cannot validate its runtime prerequisites. A wrapper hash or module-ID mismatch requires rebuilding the mod and its compiler-built dependencies against the installed, matching game versions, then deploying their matching `S1Interop.Runtime.dll`. An unavailable IL2CPP domain or unattached loader thread means the assembly initialized outside its supported game-loader context. These are startup failures; the runtime does not silently apply a repair to an unverified image.
+
+## Earlier generator diagnostics
+
+The `S1I` diagnostics below are reported by the `S1Interop.Generators` Roslyn package during compilation. They do not require the CLI to run. The generator reports them alongside your normal build errors and warnings, so you see them in your IDE error list and in `dotnet build` output the same way you would see any other compiler diagnostic.
 
 You can use these diagnostics even if you keep manual Mono and IL2CPP code. Generated facades are optional; the diagnostics are still useful as build-time guardrails.
 
@@ -55,9 +63,10 @@ You get `S1I003` when the `memberName` in an `S1InteropMember` declaration, comb
 
 - A typo in the member name.
 - The wrong `Kind` is set (for example, `FieldOrProperty` when the target is a method).
+- `IsStatic` does not match the target's static or instance shape.
 - `ParameterTypeNames` specifies a signature that does not match any overload.
 
-**Fix:** Check the member name and signature against the game reference assemblies. Set `Kind = S1InteropMemberKind.Method` and supply the correct `ParameterTypeNames` when resolving an overloaded method.
+**Fix:** Check the member name, kind, static shape, and signature against the game reference assemblies. Set `Kind = S1InteropMemberKind.Method` and supply the correct `ParameterTypeNames` when resolving an overloaded method.
 
 ## IL2CPP boundary diagnostics (S1I004-S1I007)
 
@@ -117,11 +126,14 @@ A plain C# cast (`as` expression or `is` pattern) from an `object` or `Il2CppObj
 object rawValue = GetSomeValue();
 var component = rawValue as MyMonoBehaviour;
 
-// Fix: route through S1InteropObjectCast for backend-neutral unwrapping.
+// Fix in a dual-runtime project (with `using S1Interop;`): same call on Mono and IL2CPP.
+var component = rawValue.TryCast<MyMonoBehaviour>();
+
+// Fix in a backend-neutral single-assembly project.
 var component = S1Interop.Generated.S1InteropObjectCast.As<MyMonoBehaviour>(rawValue);
 ```
 
-**Fix:** Replace the plain cast with `S1Interop.Generated.S1InteropObjectCast.As<T>(value)`. This helper applies the correct unwrapping strategy for the active backend, including IL2CPP proxy handling.
+**Fix:** In a dual-runtime project, replace the plain cast with `value.TryCast<T>()`, `value.Cast<T>()`, or `value.Is(out T result)` from the [runtime helpers](dual-runtime-code.md#cast-game-objects). In a backend-neutral project, use `S1Interop.Generated.S1InteropObjectCast.As<T>(value)`, which picks the unwrapping strategy at runtime.
 
 > [!NOTE]
 > `S1I007` is a **warning**, not an error. The cast may work in many cases; the diagnostic flags it because silent failure under IL2CPP is common enough to warrant review at every occurrence.
@@ -158,6 +170,51 @@ internal static class MoveItemPatch
 ```
 
 **Fix:** Add `ParameterTypeNames` for overloaded targets. For accessor-like or aggressively inlined targets, prefer a higher-level method that still runs on IL2CPP. If you intentionally keep the target, validate that the handler fires on the actual IL2CPP branch you support.
+
+## Generated code diagnostics (S1I009-S1I010)
+
+| Diagnostic | Severity | Meaning |
+| --- | --- | --- |
+| `S1I009` | Warning | An IL2CPP build has a `[RegisterTypeInIl2Cpp]` class without an `IntPtr` constructor that S1Interop cannot generate. |
+| `S1I010` | Warning | The project compiles below C# 9, so S1Interop reports diagnostics but generates no code. |
+
+### S1I009 - Injected type needs an IntPtr constructor
+
+Il2CppInterop creates a managed wrapper for each native instance of an injected class through its `IntPtr` constructor. Without one, registration or wrapping fails when the game runs. S1Interop generates the constructor for IL2CPP builds when it can extend the class:
+
+```csharp
+// S1I009 on IL2CPP builds: the class is not partial.
+[RegisterTypeInIl2Cpp]
+public class Spinner : MonoBehaviour { }
+
+// Fix: S1Interop generates `Spinner(IntPtr)` for IL2CPP builds only.
+[RegisterTypeInIl2Cpp]
+public partial class Spinner : MonoBehaviour { }
+```
+
+**Fix:** Mark the class and every class that contains it `partial`, or write the constructor yourself inside `#if IL2CPP`. S1Interop also reports this when the base class has no accessible `IntPtr` constructor.
+
+### S1I010 - Generated code needs C# 9
+
+A `netstandard2.1` project defaults to C# 8. S1Interop's generated helpers, registries, and facades need C# 9, so the generator skips them and keeps reporting the other diagnostics.
+
+**Fix:** Add `<LangVersion>latest</LangVersion>` (or `10.0` or later, which `S1InteropUsing` needs) to the project. Ignore the warning if you only want diagnostics.
+
+## Build errors (S1I101-S1I107)
+
+The `S1Interop.Generators` build targets report these before compilation when [build integration](dual-runtime-code.md#enable-in-an-existing-project) is enabled.
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `S1I101` | Error | `S1InteropGameReferences` is on, but the configuration does not set `S1InteropTargetRuntime`. |
+| `S1I102` | Error | No game install is configured for the runtime. Run `s1interop setup . --apply`. |
+| `S1I103` | Error | The configured install has no MelonLoader. |
+| `S1I104` | Error | The Mono install has no `Schedule I_Data\Managed\Assembly-CSharp.dll`. |
+| `S1I105` | Error | The IL2CPP install has no generated `MelonLoader\Il2CppAssemblies`. Launch it once with MelonLoader. |
+| `S1I106` | Warning | `S1InteropDeployToGame` is on, but no install is configured. |
+| `S1I107` | Warning | The built DLL could not be copied to `Mods`, usually because the game is running. The build output is still valid. |
+
+[Local game paths](local-paths.md) explains which folder each property needs.
 
 ## Related pages
 

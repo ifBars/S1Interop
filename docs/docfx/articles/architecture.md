@@ -1,11 +1,33 @@
 # Architecture
 
-This page shows the moving parts behind compile-time diagnostics, migration automation, and the experimental backend-neutral single-assembly workflow.
+The primary candidate workflow is the source compiler. One CLI owns project creation and build operations; the compiler implementation remains a separate library.
+
+## Source compiler flow
+
+```mermaid
+flowchart TD
+    Source["Ordinary mod source"] --> Bind["Bind against Mono metadata"]
+    Mono["Local Mono references"] --> Bind
+    Bind --> MonoBuild["Mono mod DLL"]
+    Bind --> Lower["Map types and lower supported operations"]
+    Native["Matching IL2CPP metadata"] --> Lower
+    Lower --> NativeBuild["IL2CPP mod DLL"]
+    Lower --> Support["S1Interop.Runtime.dll"]
+    Lower --> Authoring["Authoring companions for library consumers"]
+```
+
+Project imports invoke `s1interop compiler` for reference preparation, installation verification, and lowering. Generated inputs remain under `obj`; original source stays unchanged. The IL2CPP output uses shared runtime support and verified authoring companions for compiler-built dependencies. There is no per-game-type facade catalog in this path.
+
+See [Core concepts](core-concepts.md) for build and player dependencies and the [compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for implementation limits and evidence.
+
+## Legacy generator architecture
+
+The remainder describes the older declaration-based generator and migration workflow, not the default compiler scaffold.
 
 > [!WARNING]
 > The single-assembly facade flow below is opt-in and fragile. The supported default is explicit Mono and IL2CPP builds; keep that shape as the fallback until a mod has sustained real-world validation.
 
-S1Interop has two halves:
+The legacy workflow has two halves:
 
 - the CLI, which inspects projects and writes declaration files;
 - the generator package, which runs during compilation and emits the code your mod uses.

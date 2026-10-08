@@ -37,11 +37,11 @@ jobs:
       - name: Build
         run: dotnet build S1Interop.sln --no-restore --configuration Release
 
-      - name: Install DocFX
-        run: dotnet tool install -g docfx
+      - name: Restore DocFX
+        run: dotnet tool restore
 
       - name: Build documentation
-        run: docfx docs/docfx/docfx.json
+        run: dotnet tool run docfx docs/docfx/docfx.json --warningsAsErrors
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'

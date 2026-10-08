@@ -1,0 +1,90 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using S1Interop.Compiler;
+
+internal static class EventRepairPreparation
+{
+    internal static IReadOnlyList<AtomicEventRepairPlan> Create(IEnumerable<string> authors, IEnumerable<string> targets)
+    {
+        var originals = ReadOriginals(authors);
+        var plans = new List<AtomicEventRepairPlan>();
+        foreach (var target in ReadOriginals(targets))
+        {
+            if (!originals.TryGetValue(target.Key, out byte[]? author)) continue;
+            var plan = AtomicEventRepairPlan.Create(author, target.Value);
+            if (plan.Accessors.Count != 0) plans.Add(plan);
+        }
+        return plans.OrderBy(p => p.TargetAssembly, StringComparer.Ordinal).ToArray();
+    }
+
+    private static Dictionary<string, byte[]> ReadOriginals(IEnumerable<string> paths)
+    {
+        var result = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (string path in paths)
+        {
+            byte[] reference = File.ReadAllBytes(path);
+            using var referenceStream = new MemoryStream(reference, writable: false);
+            using var referenceAssembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(referenceStream);
+            var markers = referenceAssembly.CustomAttributes.Where(a => a.AttributeType.FullName == "System.Reflection.AssemblyMetadataAttribute" &&
+                a.ConstructorArguments.Count == 2 && a.ConstructorArguments[0].Value as string == GameReferencePublicizer.OriginalHashMetadataKey).ToArray();
+            if (markers.Length > 1) throw new ArgumentException("Duplicate original-image markers: " + path);
+            string? markedHash = markers.SingleOrDefault()?.ConstructorArguments[1].Value as string;
+            string provenance = path + ".s1interop-origin.json";
+            if (!File.Exists(provenance))
+            {
+                if (markers.Length != 0) throw new ArgumentException("Publicized reference is missing original-image provenance; prepare references again: " + path);
+                // Framework reference packs and compiler authoring companions intentionally contain no executable IL.
+                if (referenceAssembly.CustomAttributes.Any(a => a.AttributeType.FullName == "System.Runtime.CompilerServices.ReferenceAssemblyAttribute")) continue;
+                Add(referenceAssembly.Name.Name, reference);
+                continue;
+            }
+            ReferencePreparation.ReferenceOrigin origin;
+            try {
+                origin = JsonSerializer.Deserialize<ReferencePreparation.ReferenceOrigin>(File.ReadAllText(provenance))
+                    ?? throw new ArgumentException("Missing compiler reference provenance: " + path);
+            } catch (JsonException exception) {
+                throw new ArgumentException("Invalid compiler reference provenance; prepare references again: " + provenance, exception);
+            }
+            byte[] image = File.ReadAllBytes(origin.Path);
+            if (Convert.ToHexString(SHA256.HashData(image)) != origin.OriginalSha256 ||
+                Convert.ToHexString(SHA256.HashData(reference)) != origin.ReferenceSha256 ||
+                markers.Length != 0 && markedHash != origin.OriginalSha256)
+                throw new ArgumentException("Compiler reference provenance changed; prepare references again: " + path);
+            using var stream = new MemoryStream(image, writable: false);
+            using var pe = new System.Reflection.PortableExecutable.PEReader(stream);
+            var metadata = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+            string name = metadata.GetString(metadata.GetAssemblyDefinition().Name);
+            Add(name, image);
+        }
+        return result;
+
+        void Add(string name, byte[] image)
+        {
+            if (result.TryGetValue(name, out var existing))
+            {
+                if (existing.AsSpan().SequenceEqual(image)) return;
+                throw new ArgumentException("Ambiguous original assembly identity: " + name);
+            }
+            result.Add(name, image);
+        }
+    }
+
+    internal static SyntaxTree Initializer(IReadOnlyList<AtomicEventRepairPlan> plans, CSharpParseOptions options)
+    {
+        string Literal(string value) => SyntaxFactory.Literal(value).ToFullString();
+        var calls = plans.SelectMany(plan => plan.Accessors.Select(repair =>
+            $"global::S1Interop.Compiler.Generated.S1InteropEventRepair.Install({Literal(plan.TargetAssembly)}, {Literal(plan.TargetSha256)}, " +
+            $"{Literal(plan.TargetModuleMvid.ToString())}, {repair.MetadataToken}, {Literal(repair.DeclaringType)}, {Literal(repair.FieldName)}, " +
+            $"{Literal(repair.CallbackType)}, {(repair.Add ? "true" : "false")}, {(repair.IsStatic ? "true" : "false")});"));
+        return CSharpSyntaxTree.ParseText("""
+            // <auto-generated/>
+            namespace S1Interop.Compiler.Generated {
+                internal static class S1InteropEventRepairInitialization {
+                    [global::System.Runtime.CompilerServices.ModuleInitializer]
+                    internal static void Initialize() {
+            """ + string.Join("\n", calls) + "\n} } }", options,
+            "S1Interop.Compiler/EventRepairs.g.cs", System.Text.Encoding.UTF8);
+    }
+}

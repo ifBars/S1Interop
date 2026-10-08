@@ -74,6 +74,23 @@ internal static class PublicizerTests
         Require(assembly.Name.FullName == originalAssembly.Name.FullName, "Assembly identity changed.");
         Require(assembly.CustomAttributes.Any(attribute => attribute.AttributeType.FullName ==
             "System.Runtime.CompilerServices.ReferenceAssemblyAttribute"), "Missing reference-only marker.");
+        var visibility = assembly.CustomAttributes.Single(attribute => attribute.AttributeType.FullName ==
+            "System.Reflection.AssemblyMetadataAttribute" && attribute.ConstructorArguments[0].Value as string ==
+            GameReferencePublicizer.OriginalFieldVisibilityMetadataKey);
+        using (var document = System.Text.Json.JsonDocument.Parse((string)visibility.ConstructorArguments[1].Value))
+        {
+            var fields = document.RootElement.EnumerateArray().ToDictionary(
+                item => (item.GetProperty("Type").GetString(), item.GetProperty("Name").GetString()),
+                item => item.GetProperty("Access").GetInt32());
+            Require(fields.Count == originalAssembly.MainModule.GetTypes().Sum(type => type.Fields.Count(field => !field.IsPublic)),
+                "Visibility metadata should contain exactly the original nonpublic fields.");
+            foreach (var type in originalAssembly.MainModule.GetTypes())
+                foreach (var field in type.Fields.Where(field => !field.IsPublic))
+                    Require(fields[(type.FullName.Replace('/', '+'), field.Name)] ==
+                        (int)(field.Attributes & FieldAttributes.FieldAccessMask), "Original field visibility was lost.");
+            Require(assembly.MainModule.GetType("HiddenGame.Secret").Fields.Single(field => field.Name == "Changed").IsPrivate &&
+                fields[("HiddenGame.Secret", "Changed")] == (int)FieldAttributes.Private, "Event backing visibility changed.");
+        }
         foreach (var method in assembly.MainModule.GetTypes().SelectMany(type => type.Methods).Where(method => method.HasBody))
             Require(method.Body.Instructions.Count == 2 && method.Body.Instructions[0].OpCode == OpCodes.Ldnull &&
                 method.Body.Instructions[1].OpCode == OpCodes.Throw, "An executable game body was retained.");

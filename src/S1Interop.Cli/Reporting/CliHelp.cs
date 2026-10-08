@@ -6,11 +6,15 @@ internal static class CliHelp
             """
             S1Interop
 
-            Usage:
+            Compiler projects:
+              s1interop new <path> [--dry-run|--apply] [--format text|json]
               s1interop doctor [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--format text|json]
               s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--dry-run|--apply] [--format text|json]
+              s1interop compiler --help
+
+            Existing project analysis and earlier generator workflows:
               s1interop analyze [path=.] [--configuration name] [--format text|json]
-              s1interop new <path> [--backend-neutral] [--dry-run|--apply] [--format text|json]
+              s1interop new <path> <--legacy-generator|--backend-neutral> [--dry-run|--apply] [--format text|json]
               s1interop init [path=.] [--dry-run|--apply] [--format text|json]
               s1interop lint [path=.] [--configuration name] [--format text|json]
               s1interop sdkgen [path=.] [--full-sdk] [--dry-run|--apply] [--format text|json]
@@ -21,10 +25,14 @@ internal static class CliHelp
               s1interop --version
 
             What it does:
+              Start with new, restore the project's tool with dotnet tool restore, then configure local paths with setup.
+              Inside the project, dotnet tool run s1interop -- <command> uses its pinned version.
+              Build with dotnet build -c Release -p:S1InteropCompilerRuntime=Mono, then repeat with Il2Cpp.
+              compiler hosts automatic source lowering and reference preparation used by compiler-enabled builds.
               doctor detects and validates local game references without changing files.
               setup previews or writes an ignored local.build.props file; it never installs software or edits committed project files.
               analyze/lint inspect .csproj files and infer Mono, IL2CPP, and CrossCompat configurations without requiring generated facades.
-              new creates a dual-runtime starter by default; --backend-neutral opts into the experimental one-DLL facade scaffold.
+              new creates a compiler-enabled project with ordinary game source and a pinned local tool; --legacy-generator and --backend-neutral retain earlier scaffolds.
               init adds an editable declaration file and generator support for diagnostics, helpers, or facades.
               sdkgen emits facade declarations when you want generated game access; --full-sdk seeds broad ScheduleOne coverage for exploration.
               migrate can scaffold dual-runtime build settings, generated helper declarations, and source-risk reports without forcing one-DLL adoption.

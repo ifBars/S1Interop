@@ -1,52 +1,36 @@
 # Product Direction
 
-S1Interop should make direct Schedule One interop safer and more repeatable across Mono and IL2CPP.
+S1Interop aims to let mod authors write ordinary game C# once and build it for Mono and IL2CPP without maintaining wrappers or runtime conditionals. The source compiler is the primary authoring workflow. The current implementation is experimental; known unsupported behavior prevents a claim of unrestricted compatibility.
 
-The core product promise is:
+## Primary developer experience
 
-- New developers get a guided first build, actionable environment diagnostics, and explicit Mono and IL2CPP outputs.
-- Existing mods get compile-time IL2CPP warnings, read-only analysis, reviewable migration plans, safe transformations, and dual-runtime validation.
-- Commands preview changes by default and preserve an explicit fallback whenever automation cannot prove a transformation.
-- Backend-neutral facades remain an opt-in experiment until sustained real-world validation shows that they are reliable enough to promote.
+- One `s1interop` command creates projects, configures local installations, and hosts the compiler operations invoked by MSBuild.
+- Plain `new` creates a compiler project with ordinary `ScheduleOne.*` source, a pinned local tool, and matching build imports.
+- Authors restore that tool, configure matching game installations, and build separate Mono and IL2CPP outputs from the same source.
+- Builds do not deploy or launch the game. Mod authors validate each runtime's actual behavior separately.
+- Existing projects can be evaluated in controlled copies with explicit source and dependency inputs. Automatic adoption of arbitrary projects is still unfinished.
 
-The experimental facade direction is:
+Follow [the first-mod walkthrough](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/first-mod.md) and [existing-mod compiler evaluation](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/compiler-adoption.md) for the implemented path. The alpha.2 candidate is unpublished; published alpha.1 retains the earlier generator workflow.
 
-- Developers opt into or infer a game type once, then work through a generated facade where Mono and IL2CPP metadata agree.
-- `S1InteropNamespace` is the broad type-registration path, not an instruction to generate every public member for every type.
-- `S1InteropType` is a declaration of type coverage, not a requirement to manually list the type's public members.
-- `S1InteropMember` is an override and escape hatch for surfaces that cannot be safely discovered yet.
-- The generated SDK must come from local reference metadata so drift is visible and no proprietary game artifacts are committed.
+## Architecture and coverage
 
-## Positioning
+Compiler adaptation comes from authoring and target metadata plus reusable language/runtime transformations. It must not become a manually maintained catalog of gameplay APIs. Higher-level APIs can own domain abstractions independently.
 
-S1Interop is the low-level tooling and interop layer for direct Schedule One game-wrapper work. Its stable early value is compile-time help, diagnostics, migration planning, safe transformations, and validation against both runtime reference surfaces. It should make IL2CPP development approachable without becoming a hand-written replacement for every higher-level modding API.
+The compiler must preserve observable behavior across supported boundaries: identity, aliases, mutations, exceptions, lifetimes, and serialization. A transformation that compiles while losing those properties is insufficient. Unsupported constructs need actionable diagnostics and a reproducible case that can drive broader coverage.
 
-That means:
+Use unchanged real mods and separately compiled libraries as inputs. Keep author compilation, target compilation, contract execution, live game checks, and gameplay/multiplayer validation distinct. Passing a selected corpus does not establish full-game coverage or eliminate future compiler/runtime maintenance. Stripped native implementations and AOT limitations require explicit investigation rather than claims based on available metadata alone.
 
-- S1Interop should automate repetitive Mono/IL2CPP project setup, risk detection, migration planning, and build-validation mechanics.
-- Backend-neutral type lookup, member binding, casts, and delegate conversion are useful experiments, not a default compatibility promise.
-- S1Interop should not grow into a manually maintained S1API-style catalog of gameplay concepts, item builders, NPC builders, shops, saveables, or UI workflows.
-- Higher-level APIs can build on top of S1Interop when they need backend-neutral internals, while still owning their own domain abstractions.
-- Generated metadata-backed coverage is preferred over a committed static wrapper catalog because Schedule One and MelonLoader wrapper output can drift.
+See [the source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for current support and limits. The delivery bar includes isolated package installation, project setup, both builds, and matching live evidence for runtime changes.
 
-## Explicit runtimes first; backend-neutral only by opt-in
+## Existing workflows
 
-The supported default is one project with explicit Mono and IL2CPP build configurations. The starter reports which runtime it was compiled for, produces separate DLLs, and makes both reference checks visible. This keeps failures attributable and gives developers a dependable fallback.
+`analyze`, `lint`, migration previews, and reversible migration remain available for existing projects. They do not enable the source compiler automatically. `new --legacy-generator` creates the earlier helper-based project, and `new --backend-neutral` creates the opt-in facade experiment. Neither is the default compiler authoring model.
 
-Backend-neutral is an experimental authoring model: an opted-in mod moves selected direct game access toward one generated source surface under `S1Interop.ScheduleOne.*`. It must retain a dual-runtime build or branch-based fallback until its exact gameplay paths have sustained validation on both game branches.
+The facade design below documents that separate experiment. It does not define the compiler's public surface or require compiler users to adopt handles, declarations, or conditional code.
 
-## Current alpha bar
+## Earlier facade design
 
-The current generated facade is intentionally conservative and fragile. `Handle`, `As`, `TryAs`, `Is`, `Create`, named member accessors, and low-level `Get`/`TrySet`/`Invoke` helpers are useful experiments, but they are not yet the primary onboarding path or a general runtime-compatibility guarantee.
-
-Near-term SDK quality should prioritize:
-
-- typed property and method facades where Mono and IL2CPP metadata agree, including backend-neutral scalar, string, object, void method shapes, declared enum mirrors, and declared facade handles for game-object members;
-- clear diagnostics or generated reports for members skipped because they are overloaded, generic, ambiguous, missing, or incompatible across backends;
-- broader constructor and conversion rules for common wrapper differences such as arrays, `Il2CppSystem.Guid`, `Il2CppSystem.Collections.Generic.List<T>`, and Unity object/proxy casts;
-- keeping `S1Interop.Generated.S1InteropMemberRegistry` and other registry types as implementation details in docs, examples, and migration rewrites whenever a type facade can express the same operation.
-
-## Target Experience
+### Target Experience
 
 Today, backend-neutral code can use generated type handles:
 
@@ -89,7 +73,7 @@ Player.Handle driver = LandVehicle.GetAssignedDriver(vehicle);
 
 `S1InteropMemberRegistry` can remain the low-level generated layer, but it should not be the normal mod-authoring API. Do not emit both shortened and root-preserving namespaces for the same game type. Schedule One facades belong under `S1Interop.ScheduleOne.*`; future supported surfaces should preserve their own roots, such as `S1Interop.FishNet.Runtime.*`.
 
-## Type-First SDK Generation
+### Type-First SDK Generation
 
 `S1InteropNamespace` should cover broad type registration without forcing developers to emit thousands of per-type attributes:
 
@@ -112,7 +96,7 @@ now starts generating:
 - Mono and IL2CPP runtime type resolution.
 - A typed backend-neutral handle or wrapper.
 - `As`, `TryAs`, and `Is` helpers for object/proxy conversion.
-- Accessors for compatible public fields and properties.
+- Accessors for compatible public fields and properties, including inherited members when both runtime hierarchies agree.
 - Invokers for unambiguous compatible public methods.
 
 It should continue toward:
@@ -125,7 +109,7 @@ It should continue toward:
 
 The generated member surface should come from local reference metadata. Do not commit game assemblies, generated IL2CPP wrappers, decompiled source, or a static hand-maintained catalog of Schedule One APIs.
 
-## Member Declarations Are Overrides
+### Member Declarations Are Overrides
 
 `S1InteropMember` should become the exception path, not the main workflow.
 
@@ -137,27 +121,30 @@ Use explicit member declarations when:
 - Mono and IL2CPP surfaces disagree and the developer wants to pin a specific binding.
 - Migration inferred a reflection pattern that cannot be represented by the automatic type facade yet.
 
-Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. Explicit declarations remain the safer alpha path for aliases, private members, pinned bindings, and ambiguous overloads, but they should still be enriched from metadata whenever one compatible member can be identified. The escape hatch should not permanently downgrade a mod back to object-only helpers.
+Normal public fields, properties, and unambiguous public methods should come from the generated type facade after a type is included. That includes inherited public members when the Mono and IL2CPP hierarchies expose the same compatible shape. Explicit declarations remain the safer alpha path for aliases, private members, pinned bindings, and ambiguous overloads, but they should still be enriched from metadata whenever one compatible member can be identified. The escape hatch should not permanently downgrade a mod back to object-only helpers.
 
-## Experimental SDK Generation Modes
+### Experimental SDK Generation Modes
 
 The opt-in SDK experiment supports two generation entry points:
 
 - `sdkgen --apply`: infer the narrow SDK a mod needs from source usage, aliases, string-held type names, and local reference metadata.
 - `sdkgen --full-sdk --apply`: seed a blank or exploratory project with all discoverable Schedule One type facades from local reference metadata.
 
-`new --backend-neutral` creates the experimental single-assembly project shape. Plain `new` creates the supported explicit Mono/IL2CPP starter. All facade-generation paths should produce the same style of facade, but developers must be able to return to the explicit dual-runtime shape when metadata or runtime behavior diverges.
+`new --backend-neutral` creates the experimental single-assembly project shape. Plain `new` creates the compiler starter described above. All facade-generation paths should produce the same style of facade, but developers must be able to return to the explicit dual-runtime shape when metadata or runtime behavior diverges.
 
-## CLI Shape
+### CLI Shape
 
 For new mods:
 
 ```batch
-s1interop new .\MyMod --apply
-s1interop doctor .\MyMod
-dotnet build .\MyMod\MyMod.sln -c "Debug Mono"
-dotnet build .\MyMod\MyMod.sln -c "Debug Il2Cpp"
+s1interop new .\MyMod --legacy-generator --apply
+cd .\MyMod
+s1interop setup . --apply
+dotnet run -c "Debug Il2Cpp"
+dotnet run -c "Debug Mono"
 ```
+
+`dotnet run` builds, deploys the DLL into that install's `Mods` folder, and starts the game.
 
 For existing mods:
 
@@ -178,7 +165,7 @@ s1interop sdkgen .\MyExperiment --full-sdk --apply
 
 `migrate` should first produce reviewable plans and safe transformations. Generated SDK convergence is an optional migration outcome. When S1Interop cannot safely rewrite a runtime-specific call, it should leave a focused report or explicit conditional fallback instead of guessing.
 
-## Non-Goals
+### Non-Goals
 
 - Do not hide every runtime difference behind fragile reflection guesses.
 - Do not generate broad aliases that make the developer forget whether a value is backend-neutral or native.

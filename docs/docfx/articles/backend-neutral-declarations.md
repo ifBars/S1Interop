@@ -76,7 +76,7 @@ A `S1Interop.ScheduleOne.Vehicles.LandVehicle` facade with:
 - `Type`, `TypeName`, `Create(...)`, `Create<T>(...)`, `CreateHandle(...)`, `TryCreate(out Handle, ...)`;
 - `Is(object?)`, `TryAs(object?, out Handle)`, `As(object?)`;
 - `Get`/`TrySet`/`Invoke`/`Invoke<T>` reflection helpers for both `Handle` and raw `object?` receivers;
-- accessors for compatible public fields/properties and typed `Handle` methods for unambiguous public methods, discovered from the referenced Mono and IL2CPP metadata;
+- accessors for compatible declared or inherited public fields/properties and typed `Handle` methods for unambiguous public methods, discovered from the referenced Mono and IL2CPP metadata;
 - the underlying registry `Tag` and resolution entries in `S1Interop.Generated.S1InteropTypeRegistry`.
 
 `S1InteropType` is the difference between a generic wrapper and useful mod code. It opts the type into member discovery, so `Handle` can expose named members instead of only `HasValue`, `Instance`, and `Value`.
@@ -135,7 +135,7 @@ When Mono and IL2CPP metadata identify one compatible member, the generator enri
 
 If metadata is missing, ambiguous, incompatible, generic, or uses a conversion S1Interop does not understand yet, the explicit binding stays on the object/generic `Get<T>`, `Get...Value<T>`, `TrySet`, and `Invoke<T>` fallback helpers.
 
-If the owner alias is unknown, the generator reports `S1I002`. If the member is not found on the resolved owner type, it reports `S1I003`.
+If the owner alias is unknown, the generator reports `S1I002`. If the member name, `Kind`, `IsStatic` shape, or method signature does not match the resolved owner type, it reports `S1I003`.
 
 Use `S1InteropMember` for:
 

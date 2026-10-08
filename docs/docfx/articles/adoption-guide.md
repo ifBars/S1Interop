@@ -6,10 +6,10 @@ uid: s1interop.start
 
 # Start here
 
-Choose the section that matches your experience. You do not need to read the documentation in order, and you do not need to migrate an entire mod to use S1Interop.
+Start with the source compiler when evaluating S1Interop's current direction. It adapts ordinary `ScheduleOne.*` C# into separate Mono and IL2CPP outputs using game metadata. Follow the [compiler setup and sample](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md#try-the-source-checkout), including its requirements for matching game installations and its known compatibility limits.
 
 > [!TIP]
-> If you are unsure, keep Mono and IL2CPP as explicit build targets. This is the recommended starting point for new and existing mods. The one-assembly backend-neutral path is an experimental opt-in.
+> Use the locally built candidate for the compiler workflow. Its `s1interop new` command creates a compiler-enabled project by default. The published alpha.1 package has the earlier behavior; `--legacy-generator` preserves that scaffold in the candidate. Follow the first-mod guide for the compiler route.
 
 ## New to Schedule I modding
 
@@ -35,12 +35,28 @@ s1interop analyze .
 
 | Outcome | Next step |
 | --- | --- |
-| Keep the current architecture and add compiler guardrails | Run `s1interop lint .`, then read [Diagnostics](diagnostics.md). |
-| Produce separate Mono and IL2CPP assemblies | Preview [dual-runtime migration](migrate-to-dual-runtime.md). |
+| Compile ordinary game source for both backends | Follow [Adopt the compiler in an existing mod](compiler-adoption.md). |
+| Keep the current architecture and inspect known risks | Run `s1interop lint .`, then read [Diagnostics](diagnostics.md). |
+| Add diagnostics to normal compiler builds | Add the private generator reference below. |
+| Retain handwritten runtime branches and add the older helper workflow | Preview [legacy dual-runtime migration](migrate-to-dual-runtime.md). |
 | Verify a migration without touching the original project | Use the sandbox flow in [Migration overview](migrating-mono-mods.md). |
 | Share one direct game seam across runtimes | Evaluate a narrow [backend-neutral migration](migrate-to-backend-neutral.md). |
 
 Start at the direct `ScheduleOne.*` or `Il2CppScheduleOne.*` seam causing the compatibility problem. Keep content registration, saves, networking, deployment, and packaging in their existing libraries and workflows.
+
+### Add compiler diagnostics without migrating
+
+The CLI's `lint` command runs only when invoked. To get generator diagnostics during compilation, add this inside an existing `<ItemGroup>` in your `.csproj`:
+
+```xml
+<PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.2" PrivateAssets="all" />
+```
+
+This is the candidate version; follow the [candidate installation](getting-started.md#build-and-install-the-candidate-from-source) for its local feed. If staying on the published alpha.1, use `0.1.0-alpha.1` and its documented compiler requirements instead. Keep the version pinned for repeatable builds.
+
+Build each existing runtime configuration, inspect warnings, and keep your source and dependencies in their current shape. No facade declaration or `sdkgen` run is needed for diagnostics-only adoption. The package's build integration stays off until you opt in, so references and output do not change. A project on C# 8, the `netstandard2.1` default, also gets one `S1I010` warning; set `<LangVersion>latest</LangVersion>` when you want the [cross-runtime helpers](dual-runtime-code.md). Declaration diagnostics require matching game references; silence without those references is not a compatibility result.
+
+Remove this package reference to undo diagnostics-only adoption. If you later call generated helpers, remove or replace those usages before removing the package. It is a build dependency, so players do not install it.
 
 ## Already know what you need
 

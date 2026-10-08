@@ -90,11 +90,14 @@ The `Publish release` workflow:
 
 1. rejects a tag that does not match both package projects;
 2. runs the Release build and portable tests;
-3. packs and smoke-installs the CLI;
-4. publishes `S1Interop` and `S1Interop.Generators` to NuGet.org;
-5. creates a GitHub release with both `.nupkg` files.
+3. packs both packages and tests installation and starter compilation in an isolated .NET 8 consumer;
+4. builds documentation with the pinned DocFX tool and treats warnings as errors;
+5. publishes `S1Interop` and `S1Interop.Generators` to NuGet.org;
+6. creates a GitHub release with both `.nupkg` files.
 
 Prerelease versions such as `0.1.0-alpha.1` produce a GitHub prerelease. Do not reuse a published NuGet version; bump every version source before creating the next tag.
+
+Follow the Release readiness page in the Contributors section (source: `docs/RELEASING.md`) for candidate validation, live-game gates, and post-publication checks.
 
 ## Pull Request Checklist
 

@@ -1,161 +1,68 @@
 ---
 title: Build your first mod
-description: Create, configure, build, install, and check a small Schedule I mod with explicit Mono and IL2CPP targets.
+description: Create a compiler-enabled mod and build the same game source for Mono and IL2CPP.
 uid: s1interop.first-mod
 ---
 
 # Build your first mod
 
-This walkthrough creates a mod that prints the active Schedule I runtime to the MelonLoader console.
+Write ordinary `ScheduleOne.*` C# and build separate Mono and IL2CPP assemblies. The compiler adapts supported runtime differences; you do not need facade declarations or conditional imports for this starter. This remains experimental and does not establish unrestricted game compatibility.
 
-The default project creates separate Mono and IL2CPP builds. Use this path for your first mod. Backend-neutral facades remain experimental.
+## Prerequisites
 
-## Before you start
+Use the [candidate installation](getting-started.md#build-and-install-the-candidate-from-source). The published alpha.1 package does not contain this compiler workflow. You need a .NET 8 SDK and matching Mono and IL2CPP Schedule I installations with MelonLoader. Launch each installation once; IL2CPP must finish generating `MelonLoader/Il2CppAssemblies`. Close the game before deploying mods.
 
-You need:
+The `alternate` branches are Mono; the default and `beta` branches are IL2CPP. Match exact game patch versions. The compiler checks version and native generation provenance, but those checks do not prove gameplay compatibility.
 
-- Windows and Command Prompt;
-- .NET SDK 8 or newer;
-- the installed `s1interop` tool;
-- a Mono or IL2CPP Schedule I install with MelonLoader.
+## Create and configure
 
-Check the tools:
+Run these PowerShell commands separately:
 
-```batch
-dotnet --version
-s1interop --version
+```powershell
+s1interop new .\MyMod
+s1interop new .\MyMod --apply
+Set-Location .\MyMod
 ```
 
-Follow [Install S1Interop](getting-started.md) if the command is not available.
+The first command previews the files. Apply requires an empty destination.
 
-## 1. Preview the project
+Restore the project's pinned compiler tool. For an unpublished candidate, use the package directory produced by the installation guide:
 
-```batch
-s1interop new ..\MyFirstMod
+```powershell
+dotnet tool restore --add-source $candidateFeed
 ```
 
-The preview lists every planned file and identifies the recommended dual-runtime mode. It does not write files.
+Once the pinned version is published, `dotnet tool restore` is sufficient. Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use the local tool rather than a globally installed version.
 
-## 2. Create the project
+Configure the installations using the project's restored tool. Replace the example paths with your installations:
 
-```batch
-s1interop new ..\MyFirstMod --apply
-cd ..\MyFirstMod
+```powershell
+dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' --il2cpp-game-path 'C:\Games\ScheduleI-Il2Cpp' --apply
+dotnet tool run s1interop -- doctor .
 ```
 
-S1Interop refuses to write into a non-empty target directory.
+`setup` writes an ignored `local.build.props` and refuses to overwrite an existing file. To configure it manually, copy `local.build.props.example` to `local.build.props` and edit both paths. `doctor` checks local reference availability; the build also checks matching game versions and native generation provenance.
 
-The generated `ModCore.cs` already reports the selected runtime:
+## Build both runtimes
 
-```csharp
-LoggerInstance.Msg($"{ModName} loaded on {S1Interop.Generated.S1InteropRuntime.Backend}.");
+```powershell
+dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
+dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```
 
-You do not need to edit code before the first build.
+Run these serially. Their outputs are:
 
-## 3. Diagnose local setup
+| Runtime | Mod DLL |
+| --- | --- |
+| Mono | `bin/Release/Mono/netstandard2.1/MyMod.dll` |
+| IL2CPP | `bin/Release/Il2Cpp/net6.0/MyMod.dll` |
 
-Try automatic detection:
+Builds do not deploy or launch the game. Copy the matching DLL into that installation's `Mods` directory. For IL2CPP, also copy the adjacent `S1Interop.Runtime.dll` into `UserLibs`. Do not ship game references, the compiler tool, or authoring metadata. Compiler-built mods must use compatible runtime support generations.
 
-```batch
-s1interop doctor .
-```
+## Verify and edit
 
-`doctor` checks:
+Launch each installation separately and check MelonLoader for `MyMod loaded.`. After loading a save, press F8: the starter logs the NPC count using ordinary game API access from `Mod.cs`. Build success and the load message alone do not prove this gameplay behavior; verify it on both runtimes.
 
-- exactly one project exists in the target directory;
-- the Mono install has the managed game and MelonLoader references;
-- the optional IL2CPP install has generated wrapper assemblies and MelonLoader references;
-- `local.build.props` is covered by `.gitignore`.
+Change the log message in `Mod.cs`, rebuild the selected runtime, replace its deployed DLL with the game closed, and confirm the new message after launch. There is no Unity Editor project or generated wrapper catalog to edit.
 
-It is always read-only.
-
-If a path is not detected, pass it explicitly:
-
-```batch
-s1interop doctor . ^
-  --mono-game-path "D:\Games\Schedule I_alternate" ^
-  --il2cpp-game-path "D:\Games\Schedule I_public"
-```
-
-You only need Mono for the first Mono build. Add an IL2CPP install when you are ready to build and test the IL2CPP branch.
-
-## 4. Preview and write local configuration
-
-Preview the generated `local.build.props`:
-
-```batch
-s1interop setup .
-```
-
-If the preview is correct, write the file:
-
-```batch
-s1interop setup . --apply
-```
-
-`setup` writes only `local.build.props`. It does not install software, edit the project, or overwrite an existing file. The target must be covered by a recognized `.gitignore` rule.
-
-## 5. Build one runtime
-
-Build for your installed runtime:
-
-```batch
-dotnet build .\MyFirstMod.sln -c "Debug Mono"
-```
-
-or:
-
-```batch
-dotnet build .\MyFirstMod.sln -c "Debug Il2Cpp"
-```
-
-The build writes the DLL to:
-
-```text
-bin\Mono\Debug Mono\netstandard2.1\MyFirstMod.dll
-```
-
-or:
-
-```text
-bin\Il2Cpp\Debug Il2Cpp\net6.0\MyFirstMod.dll
-```
-
-## 6. Run it in Schedule I
-
-Copy the DLL for your installed runtime into that install's `Mods` folder, then launch the game.
-
-Expected Mono log marker:
-
-```text
-MyFirstMod loaded on Mono.
-```
-
-Expected IL2CPP log marker:
-
-```text
-MyFirstMod loaded on Il2Cpp.
-```
-
-`Unknown` means the runtime probes did not find the expected assemblies. Keep the log and use [Troubleshooting](troubleshooting.md).
-
-## What you have now
-
-You have a normal MelonLoader mod with:
-
-- explicit Mono and IL2CPP build targets;
-- compile-time S1Interop diagnostics;
-- read-only diagnosis and analysis commands;
-- ignored machine-local paths;
-- a deterministic runtime success marker.
-
-Continue with [Common tasks](common-tasks.md) to analyze code, add a safe migration plan, or validate both builds.
-
-The backend-neutral one-DLL scaffold is an experimental opt-in:
-
-```batch
-s1interop new ..\MyExperiment --backend-neutral --apply
-```
-
-Keep separate Mono and IL2CPP builds for production until the mod has sustained in-game validation on both runtime branches.
+For existing mods and unsupported constructs, see the [compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md). Existing users of generator-based projects can still use the [earlier walkthrough](legacy-generator-first-mod.md) with `--legacy-generator`.

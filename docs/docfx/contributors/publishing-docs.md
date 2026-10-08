@@ -6,7 +6,8 @@ Build it locally:
 
 ```batch
 dotnet build .\S1Interop.sln -c Release
-docfx .\docs\docfx\docfx.json
+dotnet tool restore
+dotnet tool run docfx .\docs\docfx\docfx.json --warningsAsErrors
 ```
 
 The generated site is written to:
@@ -22,7 +23,7 @@ The GitHub Actions workflow at `.github/workflows/docs.yml` builds the solution,
 Use DocFX's built-in preview server:
 
 ```batch
-docfx .\docs\docfx\docfx.json --serve
+dotnet tool run docfx .\docs\docfx\docfx.json --serve
 ```
 
 Do not commit `_site` or generated API metadata. The workflow regenerates both during publish.

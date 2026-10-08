@@ -1075,7 +1075,19 @@ internal sealed partial class S1InteropFixtureTests
             """
             namespace ScheduleOne.UI
             {
-                public sealed class Hud
+                public class HudBase
+                {
+                    public static int InheritedStaticCount;
+
+                    public int InheritedAlertCount { get; set; }
+
+                    public string InheritedRename(string text)
+                    {
+                        return text;
+                    }
+                }
+
+                public sealed class Hud : HudBase
                 {
                     public int AlertCount { get; set; }
 
@@ -1106,7 +1118,19 @@ internal sealed partial class S1InteropFixtureTests
             """
             namespace Il2CppScheduleOne.UI
             {
-                public sealed class Hud
+                public class HudBase
+                {
+                    public static int InheritedStaticCount;
+
+                    public int InheritedAlertCount;
+
+                    public string InheritedRename(string text)
+                    {
+                        return text;
+                    }
+                }
+
+                public sealed class Hud : HudBase
                 {
                     public int AlertCount;
 
@@ -1139,6 +1163,9 @@ internal sealed partial class S1InteropFixtureTests
             [assembly: S1Interop.S1InteropMember("Hud", "AlertCount", Alias = "HudAlertCount")]
             [assembly: S1Interop.S1InteropMember("Hud", "Rename", Alias = "HudRename", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "Player", "string" })]
             [assembly: S1Interop.S1InteropMember("Hud", "Overloaded", Alias = "HudOverloaded", Kind = S1Interop.S1InteropMemberKind.Method)]
+            [assembly: S1Interop.S1InteropMember("Hud", "InheritedAlertCount", Alias = "HudInheritedAlertCount")]
+            [assembly: S1Interop.S1InteropMember("Hud", "InheritedStaticCount", Alias = "HudInheritedStaticCount", Kind = S1Interop.S1InteropMemberKind.Field, IsStatic = true)]
+            [assembly: S1Interop.S1InteropMember("Hud", "InheritedRename", Alias = "HudInheritedRename", Kind = S1Interop.S1InteropMemberKind.Method, ParameterTypeNames = new[] { "string" })]
 
             namespace SyntheticMod
             {
@@ -1165,6 +1192,11 @@ internal sealed partial class S1InteropFixtureTests
             generated.Contains("public static object? Overloaded(Handle instance, params object?[] args) => S1Interop.Generated.S1InteropMemberRegistry.InvokeHudOverloaded(instance.Value.Instance, args);", StringComparison.Ordinal) &&
             !generated.Contains("public static void Overloaded(Handle instance)", StringComparison.Ordinal),
             $"Ambiguous explicit methods should keep object/params fallback helpers until the declaration identifies one overload. Generated source:{Environment.NewLine}{generated}");
+        Assert(
+            generated.Contains("public int? InheritedAlertCount => S1Interop.Generated.S1InteropMemberRegistry.GetHudInheritedAlertCountValue<int>(this.value.Instance);", StringComparison.Ordinal) &&
+            generated.Contains("public static int? GetInheritedStaticCount() => S1Interop.Generated.S1InteropMemberRegistry.GetHudInheritedStaticCountValue<int>();", StringComparison.Ordinal) &&
+            generated.Contains("public static string? InheritedRename(Handle instance, string? text) => S1Interop.Generated.S1InteropMemberRegistry.InvokeHudInheritedRename<string>(instance.Value.Instance, text);", StringComparison.Ordinal),
+            $"Explicit declarations should preserve typed facade generation for inherited public values, static values, and methods. Generated source:{Environment.NewLine}{generated}");
     }
 
     private void S1InteropTypeRegistryGeneratorExpandsNamespaceDeclarations()
@@ -3140,23 +3172,32 @@ internal sealed partial class S1InteropFixtureTests
 
             namespace UnityEngine.Events
             {
+            #if IL2CPP
+                // Il2CppInterop delegates are wrapper classes that convert implicitly from System delegates.
+                public sealed class UnityAction
+                {
+                    public static implicit operator UnityAction(System.Action action) => new UnityAction();
+                }
+
+                public sealed class UnityAction<T0>
+                {
+                    public static implicit operator UnityAction<T0>(System.Action<T0> action) => new UnityAction<T0>();
+                }
+            #else
                 public delegate void UnityAction();
                 public delegate void UnityAction<T0>(T0 value);
+            #endif
 
                 public sealed class UnityEvent
                 {
                     public void AddListener(UnityAction listener) { }
-                    public void AddListener(System.Action listener) { }
                     public void RemoveListener(UnityAction listener) { }
-                    public void RemoveListener(System.Action listener) { }
                 }
 
                 public sealed class UnityEvent<T0>
                 {
                     public void AddListener(UnityAction<T0> listener) { }
-                    public void AddListener(System.Action<T0> listener) { }
                     public void RemoveListener(UnityAction<T0> listener) { }
-                    public void RemoveListener(System.Action<T0> listener) { }
                 }
             }
 
@@ -3194,8 +3235,10 @@ internal sealed partial class S1InteropFixtureTests
             "Compile-time UnityEvent bridge should include Mono UnityAction wrapping.");
         Assert(
             il2CppUnityBridge.Contains("#if IL2CPP", StringComparison.Ordinal) &&
-            il2CppUnityBridge.Contains("global::System.Action wrapped = new global::System.Action(listener);", StringComparison.Ordinal),
-            "Compile-time UnityEvent bridge should include IL2CPP System.Action wrapping.");
+            il2CppUnityBridge.Contains("UnityEngine.Events.UnityAction wrapped = listener;", StringComparison.Ordinal) &&
+            il2CppUnityBridge.Contains("unityEvent.RemoveListener(action);", StringComparison.Ordinal) &&
+            !il2CppUnityBridge.Contains("new global::System.Action(listener)", StringComparison.Ordinal),
+            "IL2CPP UnityEvent bridge should convert each listener once and remove that converted instance.");
         Assert(
             monoDelegateBridge.Contains("S1InteropDelegateEventBridge", StringComparison.Ordinal) &&
             il2CppDelegateBridge.Contains("global::System.Delegate.Combine", StringComparison.Ordinal) &&
@@ -3652,15 +3695,31 @@ internal sealed partial class S1InteropFixtureTests
 
     private void DuplicateLangVersionRealModsDoNotRequireCSharp10Migration()
     {
-        ProjectAnalysis hoverboard = AnalyzeProject(@"Hoverboard\Hoverboard.csproj");
-        Assert(
-            hoverboard.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
-            "Hoverboard's later LangVersion=latest should satisfy generated facade support.");
+        string hoverboardProject = Path.Combine(WorkspaceRoot, @"Hoverboard\Hoverboard.csproj");
+        if (File.Exists(hoverboardProject))
+        {
+            ProjectAnalysis hoverboard = AnalyzeProject(@"Hoverboard\Hoverboard.csproj");
+            Assert(
+                hoverboard.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+                "Hoverboard's later LangVersion=latest should satisfy generated facade support.");
+        }
+        else
+        {
+            Console.WriteLine("Skipping Hoverboard duplicate LangVersion fixture because Hoverboard is not available.");
+        }
 
-        ProjectAnalysis modernCheatMenu = AnalyzeProject(@"Modern-Cheat-Menu\Cheat Menu\Modern Cheat Menu.csproj");
-        Assert(
-            modernCheatMenu.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
-            "Modern-Cheat-Menu's later LangVersion=latest should satisfy generated facade support.");
+        string modernCheatMenuProject = Path.Combine(WorkspaceRoot, @"Modern-Cheat-Menu\Cheat Menu\Modern Cheat Menu.csproj");
+        if (File.Exists(modernCheatMenuProject))
+        {
+            ProjectAnalysis modernCheatMenu = AnalyzeProject(@"Modern-Cheat-Menu\Cheat Menu\Modern Cheat Menu.csproj");
+            Assert(
+                modernCheatMenu.Diagnostics.All(diagnostic => diagnostic.RuleId != "global_usings_require_langversion"),
+                "Modern-Cheat-Menu's later LangVersion=latest should satisfy generated facade support.");
+        }
+        else
+        {
+            Console.WriteLine("Skipping Modern-Cheat-Menu duplicate LangVersion fixture because Modern-Cheat-Menu is not available.");
+        }
     }
 
     private void MigrationApplyAndRollbackWorkOnCopiedFixture()

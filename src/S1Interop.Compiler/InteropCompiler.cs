@@ -75,6 +75,7 @@ public sealed class InteropCompiler
         {
             cancellationToken.ThrowIfCancellationRequested();
             diagnostics.AddRange(NativeReflectionVerifier.Verify(authorCompilation.GetSemanticModel(tree), map, cancellationToken));
+            diagnostics.AddRange(NativeTraverseLowering.Verify(authorCompilation.GetSemanticModel(tree), map, cancellationToken));
             var rewriter = new SemanticLoweringRewriter(authorCompilation.GetSemanticModel(tree), map, diagnostics, enumerationAdapters, collectionStorage);
             SyntaxNode root = rewriter.Rewrite(tree.GetRoot(cancellationToken));
             rewrittenNodes += rewriter.RewrittenNodes;

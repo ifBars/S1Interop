@@ -3,7 +3,9 @@
   <!-- Experimental opt-in source lowering. Import this instead of the generator's game-reference integration. -->
   <PropertyGroup>
     <S1InteropCompilerRuntime Condition="'$(S1InteropCompilerRuntime)'==''">Mono</S1InteropCompilerRuntime>
-    <S1InteropCompilerTool Condition="'$(S1InteropCompilerTool)'==''">$(MSBuildThisFileDirectory)..\src\S1Interop.Compiler.Cli\bin\Release\net8.0\S1Interop.Compiler.Cli.dll</S1InteropCompilerTool>
+    <S1InteropCompilerTool Condition="'$(S1InteropCompilerTool)'==''">$(MSBuildThisFileDirectory)..\src\S1Interop.Cli\bin\Release\net8.0\S1Interop.Cli.dll</S1InteropCompilerTool>
+    <_S1CompilerCommand Condition="'$(S1InteropCompilerUseLocalTool)'=='true'">dotnet tool run s1interop --</_S1CompilerCommand>
+    <_S1CompilerCommand Condition="'$(S1InteropCompilerUseLocalTool)'!='true'">dotnet &quot;$(S1InteropCompilerTool)&quot;</_S1CompilerCommand>
     <S1InteropCompilerMonoManaged Condition="'$(S1InteropCompilerMonoManaged)'==''">$(MonoGamePath)\Schedule I_Data\Managed</S1InteropCompilerMonoManaged>
     <S1InteropCompilerNativeManaged Condition="'$(S1InteropCompilerNativeManaged)'==''">$(Il2CppGamePath)\MelonLoader\Il2CppAssemblies</S1InteropCompilerNativeManaged>
     <_S1CompilerNullable Condition="'$(Nullable)'==''">disable</_S1CompilerNullable>
@@ -45,14 +47,14 @@
   </Target>
 
   <Target Name="S1InteropPrepareGameReferences" BeforeTargets="ResolveAssemblyReferences" DependsOnTargets="S1InteropCompilerValidate">
-    <Error Code="S1C904" Condition="!Exists('$(S1InteropCompilerTool)')"
-      Text="Build src/S1Interop.Compiler.Cli/S1Interop.Compiler.Cli.csproj in Release before building a compiler-enabled mod." />
+    <Error Code="S1C904" Condition="'$(S1InteropCompilerUseLocalTool)'!='true' and !Exists('$(S1InteropCompilerTool)')"
+      Text="Build src/S1Interop.Cli/S1Interop.Cli.csproj in Release before building a compiler-enabled mod." />
     <PropertyGroup>
       <_S1CompilerReferenceRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)s1interop-references', '$(MSBuildProjectDirectory)'))</_S1CompilerReferenceRoot>
     </PropertyGroup>
     <MakeDir Directories="$(_S1CompilerReferenceRoot)" />
     <WriteLinesToFile File="$(_S1CompilerReferenceRoot)\mono.list" Lines="@(_S1CompilerMonoAssembly->'%(FullPath)')" Overwrite="true" Encoding="UTF-8" WriteOnlyWhenDifferent="true" />
-    <Exec Command="dotnet &quot;$(S1InteropCompilerTool)&quot; prepare-references --references &quot;$(_S1CompilerReferenceRoot)\mono.list&quot; --output &quot;$(_S1CompilerReferenceRoot)\mono&quot;" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="$(_S1CompilerCommand) compiler prepare-references --references &quot;$(_S1CompilerReferenceRoot)\mono.list&quot; --output &quot;$(_S1CompilerReferenceRoot)\mono&quot;" />
     <ReadLinesFromFile File="$(_S1CompilerReferenceRoot)\mono\references.list">
       <Output TaskParameter="Lines" ItemName="_S1CompilerPublicMonoAssembly" />
     </ReadLinesFromFile>
@@ -62,7 +64,7 @@
       <Compile Include="$(_S1CompilerReferenceRoot)\mono\Access.g.cs" />
     </ItemGroup>
     <WriteLinesToFile Condition="'$(_S1CompilerUseMono)'!='true'" File="$(_S1CompilerReferenceRoot)\native.list" Lines="@(_S1CompilerNativeAssembly->'%(FullPath)')" Overwrite="true" Encoding="UTF-8" WriteOnlyWhenDifferent="true" />
-    <Exec Condition="'$(_S1CompilerUseMono)'!='true'" Command="dotnet &quot;$(S1InteropCompilerTool)&quot; prepare-references --references &quot;$(_S1CompilerReferenceRoot)\native.list&quot; --output &quot;$(_S1CompilerReferenceRoot)\native&quot;" />
+    <Exec Condition="'$(_S1CompilerUseMono)'!='true'" WorkingDirectory="$(MSBuildProjectDirectory)" Command="$(_S1CompilerCommand) compiler prepare-references --references &quot;$(_S1CompilerReferenceRoot)\native.list&quot; --output &quot;$(_S1CompilerReferenceRoot)\native&quot;" />
     <ReadLinesFromFile Condition="'$(_S1CompilerUseMono)'!='true'" File="$(_S1CompilerReferenceRoot)\native\references.list">
       <Output TaskParameter="Lines" ItemName="_S1CompilerPublicNativeAssembly" />
     </ReadLinesFromFile>
@@ -74,6 +76,15 @@
     <ItemGroup>
       <FileWrites Include="$(_S1CompilerReferenceRoot)\**\*" />
     </ItemGroup>
+  </Target>
+
+  <!-- Both backends bind ordinary Mono author source. Configuration-derived IL2CPP must not
+       activate handwritten proxy branches; other configuration/framework symbols stay intact. -->
+  <Target Name="S1InteropCompilerAuthoringDefines" BeforeTargets="S1InteropLowerSources;CoreCompile"
+    DependsOnTargets="AddImplicitDefineConstants">
+    <PropertyGroup>
+      <DefineConstants>$([System.Text.RegularExpressions.Regex]::Replace('$(DefineConstants)', '(^|[;,\s])(?:IL2CPP|MONO)(?=$|[;,\s])', '$1'));MONO</DefineConstants>
+    </PropertyGroup>
   </Target>
 
   <Target Name="S1InteropCompilerDomain" BeforeTargets="S1InteropLowerSources;CoreCompile"
@@ -94,13 +105,13 @@
 
   <Target Name="S1InteropLowerSources" BeforeTargets="CoreCompile" DependsOnTargets="ResolveReferences"
     Condition="'$(S1InteropCompilerRuntime)'=='Il2Cpp' and '$(DesignTimeBuild)'!='true'">
-    <Error Code="S1C904" Condition="!Exists('$(S1InteropCompilerTool)')"
-      Text="Build src/S1Interop.Compiler.Cli/S1Interop.Compiler.Cli.csproj in Release before building a compiler-enabled mod." />
+    <Error Code="S1C904" Condition="'$(S1InteropCompilerUseLocalTool)'!='true' and !Exists('$(S1InteropCompilerTool)')"
+      Text="Build src/S1Interop.Cli/S1Interop.Cli.csproj in Release before building a compiler-enabled mod." />
     <PropertyGroup>
       <_S1CompilerOutput>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)s1interop-lowered', '$(MSBuildProjectDirectory)'))</_S1CompilerOutput>
     </PropertyGroup>
     <MakeDir Directories="$(_S1CompilerOutput)" />
-    <Exec Command="dotnet &quot;$(S1InteropCompilerTool)&quot; verify-installations --mono-game-path &quot;$(MonoGamePath)&quot; --il2cpp-game-path &quot;$(Il2CppGamePath)&quot; --report &quot;$(_S1CompilerOutput)\versions.json&quot;" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="$(_S1CompilerCommand) compiler verify-installations --mono-game-path &quot;$(MonoGamePath)&quot; --il2cpp-game-path &quot;$(Il2CppGamePath)&quot; --report &quot;$(_S1CompilerOutput)\versions.json&quot;" />
     <ItemGroup>
       <_S1CompilerAuthorReference Include="@(ReferencePath)" Exclude="@(_S1CompilerPublicNativeAssembly)" />
       <_S1CompilerAuthorReference Include="@(_S1CompilerPublicMonoAssembly)" />
@@ -108,7 +119,7 @@
     <WriteLinesToFile File="$(_S1CompilerOutput)\author-sources.list" Lines="@(Compile->'%(FullPath)')" Overwrite="true" Encoding="UTF-8" />
     <WriteLinesToFile File="$(_S1CompilerOutput)\author-references.list" Lines="@(_S1CompilerAuthorReference->'%(FullPath)')" Overwrite="true" Encoding="UTF-8" />
     <WriteLinesToFile File="$(_S1CompilerOutput)\target-references.list" Lines="@(ReferencePath->'%(FullPath)')" Overwrite="true" Encoding="UTF-8" />
-    <Exec Command="dotnet &quot;$(S1InteropCompilerTool)&quot; lower --sources &quot;$(_S1CompilerOutput)\author-sources.list&quot; --author-references &quot;$(_S1CompilerOutput)\author-references.list&quot; --target-references &quot;$(_S1CompilerOutput)\target-references.list&quot; --output &quot;$(_S1CompilerOutput)\sources&quot; --assembly-name &quot;$(AssemblyName)&quot; --defines &quot;$(DefineConstants)&quot; --lang-version &quot;$(LangVersion)&quot; --nullable &quot;$(_S1CompilerNullable)&quot;" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="$(_S1CompilerCommand) compiler lower --sources &quot;$(_S1CompilerOutput)\author-sources.list&quot; --author-references &quot;$(_S1CompilerOutput)\author-references.list&quot; --target-references &quot;$(_S1CompilerOutput)\target-references.list&quot; --output &quot;$(_S1CompilerOutput)\sources&quot; --assembly-name &quot;$(AssemblyName)&quot; --defines &quot;$(DefineConstants)&quot; --lang-version &quot;$(LangVersion)&quot; --nullable &quot;$(_S1CompilerNullable)&quot;" />
     <ReadLinesFromFile File="$(_S1CompilerOutput)\sources\sources.list">
       <Output TaskParameter="Lines" ItemName="_S1CompilerLoweredSource" />
     </ReadLinesFromFile>

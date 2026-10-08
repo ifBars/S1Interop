@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Imported before the project body. Keep this file to items and defaults that projects may override;
+    anything that depends on project properties belongs in S1Interop.Generators.targets.
+  -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="S1InteropTargetRuntime" />
+    <CompilerVisibleProperty Include="S1InteropEmitRuntimeHelpers" />
+    <CompilerVisibleProperty Include="S1InteropEmitPlatformDomain" />
+  </ItemGroup>
+</Project>

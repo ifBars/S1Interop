@@ -2,6 +2,12 @@
 
 Most mods use only part of S1Interop. These combinations are normal.
 
+## Ordinary game source across runtimes
+
+The default candidate workflow uses the source compiler. Write ordinary Mono game source and build separate Mono and IL2CPP outputs; the compiler adapts supported runtime differences without facade declarations. Start with [a new mod](first-mod.md) or [an existing mod](compiler-adoption.md). The [support guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) records current limits; the goal of unrestricted compatibility is not yet achieved.
+
+The routes below retain the older analysis, migration, helper, and facade surfaces for projects that use them.
+
 ## Guardrails without migration
 
 Keep manual Mono and IL2CPP code. Run `analyze` to inspect the project and `lint` to report known risks. Add `build-hook` only when you want those checks in the build. You do not need generated facades for this path.

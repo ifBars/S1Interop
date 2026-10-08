@@ -7,4 +7,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="../../build/S1Interop.Compiler.props" LogicalName="Compiler.props" />
+    <EmbeddedResource Include="../../build/S1Interop.Compiler.targets" LogicalName="Compiler.targets" />
+  </ItemGroup>
 </Project>

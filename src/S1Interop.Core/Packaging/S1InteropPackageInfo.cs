@@ -1,4 +1,4 @@
-﻿namespace S1Interop.Core.Packaging;
+namespace S1Interop.Core.Packaging;
 
 /// <summary>
 /// Provides package IDs, versions, and MSBuild property names shared by S1Interop tooling.
@@ -8,7 +8,7 @@ public static class S1InteropPackageInfo
     /// <summary>
     /// Gets the current alpha version used by the CLI and generator packages.
     /// </summary>
-    public const string AlphaPackageVersion = "0.1.0-alpha.1";
+    public const string AlphaPackageVersion = "0.1.0-alpha.2";
 
     /// <summary>
     /// Gets the NuGet package ID for the Roslyn generator package.

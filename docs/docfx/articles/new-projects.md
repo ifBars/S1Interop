@@ -1,52 +1,28 @@
 # New projects
 
-Use `new` to create a normal MelonLoader project with explicit Mono and IL2CPP configurations:
+`new` creates a compiler-enabled project by default:
 
 ```batch
 s1interop new .\MyMod
 s1interop new .\MyMod --apply
 ```
 
-The first command is a dry run. The second writes only to an empty target directory.
+Preview does not create files. Apply requires an empty directory. The generated project contains ordinary game source, a pinned `.config/dotnet-tools.json`, matching `.s1interop` MSBuild files, an ignored local-path example, and a build/load README. It does not reference the generator package or deploy automatically.
 
-The default scaffold includes:
+Follow [Build your first mod](first-mod.md) to restore the tool, configure matching game installations, build both runtimes serially, and deploy their separate outputs. The compiler is an unpublished-candidate workflow; the published alpha.1 tool still has the earlier behavior.
 
-- `Debug Mono`, `Release Mono`, `Debug Il2Cpp`, and `Release Il2Cpp` configurations;
-- `S1Interop.Generators` for compile-time diagnostics and runtime reporting;
-- a `ModCore.cs` entry point that logs the selected runtime;
-- `local.build.props.example` and an explicit `.gitignore` rule;
-- an opt-in declaration file for later generated-helper experiments.
+## Earlier project styles
 
-## Configure local inputs
+Existing generator users can request the former default explicitly:
 
 ```batch
-cd .\MyMod
-s1interop doctor .
-s1interop setup .
-s1interop setup . --apply
+s1interop new .\GeneratorMod --legacy-generator --apply
 ```
 
-`doctor` is read-only. `setup` writes only ignored local configuration, never installs software, and never overwrites an existing `local.build.props`.
-
-## Build
+The separate one-DLL facade experiment remains opt-in:
 
 ```batch
-dotnet build .\MyMod.sln -c "Debug Mono"
-dotnet build .\MyMod.sln -c "Debug Il2Cpp"
+s1interop new .\FacadeMod --backend-neutral --apply
 ```
 
-Build and test the runtime matching the active game branch. When both installs are available, keep both builds as the compatibility proof.
-
-## Experimental backend-neutral project
-
-The generated one-DLL facade model is experimental and fragile. It is not the default.
-
-Create it only with the explicit flag:
-
-```batch
-s1interop new .\MyBackendNeutralExperiment --backend-neutral --apply
-```
-
-Validate that project against both reference surfaces and on both runtime branches. Keep the default dual-runtime project until the mod has sustained in-game validation.
-
-See [Use cases](use-cases.md), [Backend-neutral SDK](backend-neutral-sdk.md), and [Real-mod evidence](../contributors/real-mod-evidence.md).
+These options are mutually exclusive. Neither route is the compiler workflow. See the [earlier generator walkthrough](legacy-generator-first-mod.md) for its helper APIs and deployment conventions.

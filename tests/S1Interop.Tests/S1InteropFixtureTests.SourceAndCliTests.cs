@@ -11,6 +11,21 @@ internal sealed partial class S1InteropFixtureTests
             $"s1interop --version should print the package version. Output: {version.Output}");
     }
 
+    private void ProcessRunnerDrainsStandardOutputAndErrorConcurrently()
+    {
+        string testAssembly = typeof(S1InteropFixtureTests).Assembly.Location;
+        ProcessResult result = RunDotNetWithTimeout(
+            10_000,
+            testAssembly,
+            "--emit-large-redirected-output");
+
+        Assert(result.ExitCode == 0, $"Redirected-output child should exit successfully. Output: {result.Output}");
+        Assert(
+            result.Output.Contains("stdout-complete", StringComparison.Ordinal) &&
+            result.Output.Contains("stderr-complete", StringComparison.Ordinal),
+            "Process runner should drain large standard-error output without blocking standard-output completion.");
+    }
+
     private void CliRejectsInvalidOptionsBeforeDispatch()
     {
         ProcessResult unknownOption = RunCli("analyze", "--aply");
@@ -2163,31 +2178,29 @@ internal sealed partial class S1InteropFixtureTests
             string gitignorePath = Path.Combine(targetDirectory, ".gitignore");
             string readmePath = Path.Combine(targetDirectory, "README.md");
 
-            ProcessResult dryRun = RunCli("new", targetDirectory);
+            ProcessResult dryRun = RunCli("new", "--legacy-generator", targetDirectory);
             Assert(dryRun.ExitCode == 0, $"s1interop new dry-run should succeed. Output: {dryRun.Output}");
             Assert(
                 dryRun.Output.Contains("S1Interop new project dry-run", StringComparison.Ordinal) &&
                 dryRun.Output.Contains(projectPath, StringComparison.Ordinal) &&
-                dryRun.Output.Contains(starterPath, StringComparison.Ordinal),
-                $"s1interop new dry-run should print planned scaffold files. Output: {dryRun.Output}");
+                !dryRun.Output.Contains(starterPath, StringComparison.Ordinal),
+                $"s1interop new dry-run should print planned scaffold files, without facade declarations. Output: {dryRun.Output}");
             Assert(!Directory.Exists(targetDirectory), "s1interop new dry-run should not create the target directory.");
 
-            ProcessResult apply = RunCli("new", targetDirectory, "--apply");
+            ProcessResult apply = RunCli("new", "--legacy-generator", targetDirectory, "--apply");
             Assert(apply.ExitCode == 0, $"s1interop new --apply should succeed. Output: {apply.Output}");
             Assert(
-                apply.Output.Contains("Mode: dual-runtime (recommended)", StringComparison.Ordinal) &&
-                apply.Output.Contains($"dotnet build .\\{projectName}.sln -c \"Debug Mono\"", StringComparison.Ordinal) &&
-                apply.Output.Contains($"dotnet build .\\{projectName}.sln -c \"Debug Il2Cpp\"", StringComparison.Ordinal) &&
-                apply.Output.Contains($"bin\\Mono\\Debug Mono\\netstandard2.1\\{projectName}.dll", StringComparison.Ordinal) &&
-                apply.Output.Contains($"bin\\Il2Cpp\\Debug Il2Cpp\\net6.0\\{projectName}.dll", StringComparison.Ordinal) &&
-                apply.Output.Contains("Mono deploy: Copy-Item", StringComparison.Ordinal) &&
-                apply.Output.Contains("IL2CPP run:", StringComparison.Ordinal) &&
-                apply.Output.Contains($"Expected log: {projectName} loaded on Mono. (or Il2Cpp)", StringComparison.Ordinal),
-                $"s1interop new should print exact build, output, deploy, run, and log guidance. Output: {apply.Output}");
+                apply.Output.Contains("Mode: legacy generator dual-runtime", StringComparison.Ordinal) &&
+                apply.Output.Contains("dotnet build -c \"Debug Il2Cpp\"", StringComparison.Ordinal) &&
+                apply.Output.Contains("dotnet run -c \"Debug Il2Cpp\"", StringComparison.Ordinal) &&
+                apply.Output.Contains("<Il2CppGamePath>\\Mods", StringComparison.Ordinal) &&
+                apply.Output.Contains("\"Debug Mono\"", StringComparison.Ordinal) &&
+                apply.Output.Contains($"Expected log: {projectName} loaded on Il2Cpp. (or Mono)", StringComparison.Ordinal),
+                $"s1interop new should print the build, deploy, run, and log guidance. Output: {apply.Output}");
             Assert(File.Exists(solutionPath), "s1interop new should create a solution file for IDE builds.");
             Assert(File.Exists(projectPath), "s1interop new should create the project file.");
             Assert(File.Exists(corePath), "s1interop new should create the core source file.");
-            Assert(File.Exists(starterPath), "s1interop new should create the backend-neutral starter file.");
+            Assert(!File.Exists(starterPath), "The dual-runtime starter should not create facade declarations until `init` opts in.");
             Assert(File.Exists(localPropsExamplePath), "s1interop new should create a local build props example.");
             Assert(File.Exists(gitignorePath), "s1interop new should create a gitignore for local machine paths and build output.");
             Assert(File.Exists(readmePath), "s1interop new should create beginner-facing local setup guidance.");
@@ -2195,7 +2208,6 @@ internal sealed partial class S1InteropFixtureTests
             string solutionSource = File.ReadAllText(solutionPath);
             string projectSource = File.ReadAllText(projectPath);
             string coreSource = File.ReadAllText(corePath);
-            string starterSource = File.ReadAllText(starterPath);
             string localPropsExampleSource = File.ReadAllText(localPropsExamplePath);
             string gitignoreSource = File.ReadAllText(gitignorePath);
             string readmeSource = File.ReadAllText(readmePath);
@@ -2222,27 +2234,23 @@ internal sealed partial class S1InteropFixtureTests
                 projectSource.Contains("<BaseOutputPath>bin\\Il2Cpp\\</BaseOutputPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<IntermediateOutputPath>obj\\Mono\\$(Configuration)\\</IntermediateOutputPath>", StringComparison.Ordinal) &&
                 projectSource.Contains("<IntermediateOutputPath>obj\\Il2Cpp\\$(Configuration)\\</IntermediateOutputPath>", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"MelonLoader\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"0Harmony\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"UnityEngine.CoreModule\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"Assembly-CSharp\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"ScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'!='Il2Cpp'\">", StringComparison.Ordinal) &&
-                projectSource.Contains("<Reference Include=\"Il2CppScheduleOne.Core\" Condition=\"'$(S1InteropReferenceRuntime)'=='Il2Cpp'\">", StringComparison.Ordinal),
-                "Generated project should target netstandard2.1, install diagnostics privately, and keep Mono/IL2CPP outputs explicit.");
+                projectSource.Contains("<S1InteropGameReferences>true</S1InteropGameReferences>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropDeployToGame>true</S1InteropDeployToGame>", StringComparison.Ordinal) &&
+                projectSource.Contains("<S1InteropUsing Include=\"ScheduleOne.NPCs\" />", StringComparison.Ordinal) &&
+                projectSource.Contains("<Using Include=\"S1Interop\" />", StringComparison.Ordinal) &&
+                !projectSource.Contains("<Reference ", StringComparison.Ordinal) &&
+                !projectSource.Contains("<Target ", StringComparison.Ordinal),
+                "Generated project should keep Mono/IL2CPP outputs explicit and leave references, validation, and deployment to the generator package.");
             Assert(
                 coreSource.Contains("namespace FreshNeutralMod;", StringComparison.Ordinal) &&
                 coreSource.Contains("[assembly: MelonInfo(typeof(FreshNeutralMod.ModCore), \"FreshNeutralMod\", \"0.1.0\", \"YourName\")]", StringComparison.Ordinal) &&
                 coreSource.Contains("public sealed class ModCore : MelonMod", StringComparison.Ordinal) &&
                 coreSource.Contains("public override void OnInitializeMelon()", StringComparison.Ordinal) &&
                 coreSource.Contains("public const string ModName = \"FreshNeutralMod\";", StringComparison.Ordinal) &&
-                coreSource.Contains("loaded on {S1Interop.Generated.S1InteropRuntime.Backend}", StringComparison.Ordinal),
-                "Generated core source should be a real MelonLoader entry point that reports the selected runtime.");
-            Assert(
-                starterSource.Contains("// [assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
-                !starterSource.Contains($"{Environment.NewLine}[assembly: S1Interop.S1InteropGenerateUnityEventBridge]", StringComparison.Ordinal) &&
-                starterSource.Contains("S1InteropType", StringComparison.Ordinal) &&
-                starterSource.Contains("S1InteropMember", StringComparison.Ordinal),
-                "Generated starter should seed backend-neutral type/member examples and leave bridge generation opt-in.");
+                coreSource.Contains("loaded on {S1Interop.Generated.S1InteropRuntime.Backend}", StringComparison.Ordinal) &&
+                coreSource.Contains("NPCManager.NPCRegistry.Count", StringComparison.Ordinal) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(coreSource, @"^\s*#if", System.Text.RegularExpressions.RegexOptions.Multiline),
+                "Generated core source should be a real MelonLoader entry point that touches game code without runtime conditionals.");
             Assert(
                 localPropsExampleSource.Contains("<MonoGamePath>", StringComparison.Ordinal) &&
                 localPropsExampleSource.Contains("<Il2CppGamePath>", StringComparison.Ordinal) &&
@@ -2252,66 +2260,73 @@ internal sealed partial class S1InteropFixtureTests
             Assert(
                 readmeSource.Contains("## First local setup", StringComparison.Ordinal) &&
                 readmeSource.Contains("s1interop doctor .", StringComparison.Ordinal) &&
-                readmeSource.Contains("## Build and success check", StringComparison.Ordinal) &&
+                readmeSource.Contains("## Build, deploy, and run", StringComparison.Ordinal) &&
+                readmeSource.Contains("## Writing code for both runtimes", StringComparison.Ordinal) &&
                 readmeSource.Contains("Debug Mono", StringComparison.Ordinal) &&
                 readmeSource.Contains("Debug Il2Cpp", StringComparison.Ordinal) &&
                 readmeSource.Contains("backend-neutral facades are opt-in and still fragile", StringComparison.OrdinalIgnoreCase),
                 "Generated README should guide first-time modders through safe setup, explicit runtime builds, and the experimental facade boundary.");
 
             string packageSource = CreateLocalGeneratorPackageSource(tempRoot);
+            // A fresh package folder keeps an older cached build of the same alpha version from masking the candidate.
+            string restorePackagesPath = $"-p:RestorePackagesPath={Path.Combine(tempRoot, "packages")}";
+            S1Interop.Core.Setup.DeveloperSetupReport localInstalls = new S1Interop.Core.Setup.DeveloperSetupService().Inspect(targetDirectory, null, null);
             File.WriteAllText(localPropsPath, localPropsExampleSource);
             ProcessResult restore = RunDotNet(
                 "restore",
                 solutionPath,
                 "--nologo",
                 "-v:minimal",
+                restorePackagesPath,
                 $"-p:RestoreAdditionalProjectSources={packageSource}");
             Assert(
                 restore.ExitCode == 0,
                 $"Generated project should restore from an explicit test-only package source. Output: {restore.Output}");
 
-            string monoGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_alternate";
-            string il2CppGamePath = @"D:\SteamLibrary\steamapps\common\Schedule I_public";
-            string monoMelonLoader = Path.Combine(monoGamePath, "MelonLoader", "net35", "MelonLoader.dll");
-            string il2CppMelonLoader = Path.Combine(il2CppGamePath, "MelonLoader", "net6", "MelonLoader.dll");
-            if (File.Exists(monoMelonLoader) || File.Exists(il2CppMelonLoader))
+            // Debug builds deploy; point that at a temp folder so tests never write into a real game install.
+            string modsPath = Path.Combine(tempRoot, "Mods");
+            string? monoGamePath = IsReady(localInstalls, "mono") ? localInstalls.MonoGamePath : null;
+            string? il2CppGamePath = IsReady(localInstalls, "il2cpp") ? localInstalls.Il2CppGamePath : null;
+            foreach ((string configuration, string property, string? gamePath) in new[]
             {
-                if (File.Exists(monoMelonLoader))
+                ("Debug Mono", "MonoGamePath", monoGamePath),
+                ("Debug Il2Cpp", "Il2CppGamePath", il2CppGamePath)
+            })
+            {
+                if (gamePath is null)
                 {
-                    ProcessResult monoScaffoldBuild = RunDotNet(
-                        "build",
-                        projectPath,
-                        "-c",
-                        "Debug Mono",
-                        "--nologo",
-                        "-v:minimal",
-                        $"-p:MonoGamePath={monoGamePath}",
-                        $"-p:RestoreAdditionalProjectSources={packageSource}");
-                    Assert(monoScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local Mono game path. Output: {monoScaffoldBuild.Output}");
+                    continue;
                 }
 
-                if (File.Exists(il2CppMelonLoader))
-                {
-                    ProcessResult il2CppScaffoldBuild = RunDotNet(
-                        "build",
-                        projectPath,
-                        "-c",
-                        "Debug Il2Cpp",
-                        "--nologo",
-                        "-v:minimal",
-                        $"-p:Il2CppGamePath={il2CppGamePath}",
-                        $"-p:RestoreAdditionalProjectSources={packageSource}");
-                    Assert(il2CppScaffoldBuild.ExitCode == 0, $"Generated backend-neutral MelonLoader scaffold should build against the local IL2CPP game path without changing source. Output: {il2CppScaffoldBuild.Output}");
-                }
+                ProcessResult scaffoldBuild = RunDotNet(
+                    "build",
+                    projectPath,
+                    "-c",
+                    configuration,
+                    "--nologo",
+                    "-v:minimal",
+                    $"-p:{property}={gamePath}",
+                    $"-p:S1InteropModsPath={modsPath}",
+                    restorePackagesPath,
+                    $"-p:RestoreAdditionalProjectSources={packageSource}");
+                Assert(
+                    scaffoldBuild.ExitCode == 0 &&
+                    !scaffoldBuild.Output.Contains(": warning ", StringComparison.OrdinalIgnoreCase) &&
+                    File.Exists(Path.Combine(modsPath, $"{projectName}.dll")),
+                    $"The generated {configuration} scaffold should build warning-free against local references and deploy. Output: {scaffoldBuild.Output}");
+                File.Delete(Path.Combine(modsPath, $"{projectName}.dll"));
             }
 
-            ProcessResult secondApply = RunCli("new", targetDirectory, "--apply");
+            ProcessResult secondApply = RunCli("new", "--legacy-generator", targetDirectory, "--apply");
             Assert(secondApply.ExitCode == 2, $"s1interop new should refuse to overwrite a non-empty target. Output: {secondApply.Output}");
         }
         finally
         {
             DeleteDirectoryIfExists(tempRoot);
         }
+
+        static bool IsReady(S1Interop.Core.Setup.DeveloperSetupReport report, string checkId) =>
+            report.Checks.Any(check => check.Id == checkId && check.Status == "ready");
     }
 
     private void NewCommandProjectCanSeedFullBackendNeutralSdkFromReferenceMetadata()

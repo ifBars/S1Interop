@@ -1,75 +1,46 @@
 ---
 title: What S1Interop does
-description: Understand the problem S1Interop solves, when to use it, and what it leaves to other modding libraries.
+description: Compile ordinary Schedule One C# for Mono and IL2CPP using local game metadata.
 uid: s1interop.introduction
 ---
 
 # What S1Interop does
 
-Schedule I has two game backends that matter to modders:
+S1Interop's source compiler lets you write ordinary C# against the Mono game's `ScheduleOne.*` API and build separate Mono and IL2CPP mod assemblies. It reads local game metadata and adapts supported operations during the build. You do not select game types from a maintained wrapper catalog or write facade declarations for this workflow.
 
-- the public `none` and `beta` Steam branches use IL2CPP;
-- the `alternate` and `alternate-beta` branches use Mono.
+The compiler is experimental. Use the locally built candidate described in [Install S1Interop](getting-started.md); the earlier published package does not have this default workflow. The candidate provides one command, `s1interop`, with compiler operations under `s1interop compiler`.
 
-The same game class has a different C# shape on each backend. A Mono mod might use `ScheduleOne.PlayerScripts.PlayerCamera`; an IL2CPP mod sees an Il2CppInterop wrapper such as `Il2CppScheduleOne.PlayerScripts.PlayerCamera`. Casts, delegates, reflection, and Harmony targets can differ too.
+## What authoring looks like
 
-S1Interop's stable early job is to help you see and validate that difference: project analysis, compile-time diagnostics, safe migration plans, rollbackable transformations, and explicit builds for both runtimes.
-
-Generated backend-neutral facades can put selected differences behind generated code, but that path is experimental and fragile. It is opt-in, not the default scaffold or the primary promise.
-
-## When to use it
-
-S1Interop is useful when you want to:
-
-- start a MelonLoader mod with explicit Mono and IL2CPP builds;
-- inspect an existing mod before adding IL2CPP support;
-- keep separate Mono and IL2CPP builds but catch unsafe code earlier;
-- experiment with generated type and member bindings after both explicit runtime builds are stable;
-- resolve a Harmony target on either backend;
-- try a migration in a temporary copy before touching the real project.
-
-You can adopt one part. An existing mod can use only `analyze` and `lint`; it does not have to switch to generated facades.
-
-## What it does not do
-
-S1Interop does not create items, NPCs, quests, phone apps, buildings, multiplayer rules, or save systems. Use a higher-level library when one already owns that job:
-
-- S1API for gameplay and content workflows;
-- MAPI for buildings, procedural meshes, and models;
-- SteamNetworkLib for higher-level multiplayer messaging and synchronization;
-- DedicatedServerMod APIs for server and client addon lifecycles.
-
-S1Interop can sit beside those libraries when a mod still needs one direct game call or patch.
-
-It also does not convert every mod automatically. Unsafe or ambiguous changes are reported for review. The tool does not redistribute game assemblies, generated IL2CPP wrappers, decompiled code, or game assets.
-
-## The CLI and the generator
-
-S1Interop has two packages because they run at different times.
-
-| Package | What it does | When it runs |
-| --- | --- | --- |
-| `S1Interop` | Provides the `s1interop` command. It analyzes projects, creates scaffolds, plans and applies migrations, writes declarations, and verifies temporary copies. | When you run a terminal command. |
-| `S1Interop.Generators` | Reads declarations and generates facades, runtime helpers, patch bindings, and compiler diagnostics inside the mod assembly. | While the mod project builds. |
-
-The generator is a build dependency. Players do not install a separate S1Interop runtime DLL for a generated mod.
-
-## A small example
-
-This declaration asks for a facade around one game type:
+The generated starter uses ordinary game and Unity namespaces:
 
 ```csharp
-[assembly: S1Interop.S1InteropType("ScheduleOne.PlayerScripts.PlayerCamera")]
+using ScheduleOne.NPCs;
+using UnityEngine;
+
+// Inside the mod's OnUpdate callback:
+if (Input.GetKeyDown(KeyCode.F8))
+    MelonLoader.MelonLogger.Msg($"NPCs: {NPCManager.NPCRegistry.Count}");
 ```
 
-After a build, mod code can use the generated facade:
+Build the same source for either backend. The compiler selects compatible type references and lowers supported casts, collections, callbacks, and other runtime differences. Mono metadata is required for both builds; IL2CPP builds additionally need the matching native installation's generated interop assemblies.
 
-```csharp
-using S1Interop.ScheduleOne.PlayerScripts;
+Follow [Build your first mod](first-mod.md) or [Adopt the compiler in an existing mod](compiler-adoption.md).
 
-string runtimeTypeName = PlayerCamera.TypeName;
-```
+## What you ship
 
-The facade keeps the mod source the same. Its runtime type name changes to match Mono or IL2CPP.
+Ship a separate mod DLL for each supported runtime. The IL2CPP output also requires its generated `S1Interop.Runtime.dll` in `UserLibs`. Compiler-built mods must use compatible support generations. Players do not install the CLI or generator package.
 
-New modders should continue to [Install S1Interop](getting-started.md), then [Build your first mod](first-mod.md). Existing mod authors can go directly to [Start here](adoption-guide.md). Use the backend-neutral pages only after reading their experimental limitations.
+[Distribution](distributing-mods.md) explains the output paths, dependencies, and runtime checks.
+
+## Current limits
+
+Automatic metadata discovery does not establish unlimited compatibility. Some language constructs, reflection operations, native storage flows, content workflows, and third-party dependencies still need implementation or validation. The compiler cannot restore native code removed from the game build. Compiler and loader behavior still require maintenance when runtime contracts change.
+
+Read the [support and evidence guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) before relying on an operation. Successful compilation, initialization, gameplay, and multiplayer tests prove different things.
+
+S1Interop does not provide its own item, quest, save, or building framework. You may use higher-level libraries alongside it, with compatible dependencies for each runtime. It does not distribute proprietary game files.
+
+## Existing tools remain available
+
+`analyze`, `lint`, reversible migrations, and the generator package remain useful for projects retaining their existing build architecture. The earlier scaffold is selected explicitly with `new --legacy-generator`; generated facades use `new --backend-neutral`. Those are separate workflows, documented under **Legacy generator workflows**, and are not prerequisites for the source compiler.

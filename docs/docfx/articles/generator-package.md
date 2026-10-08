@@ -24,10 +24,25 @@ The generator is compile-time only. It reads declarations already in the compila
 | Write declaration files (`S1InteropType`, `S1InteropNamespace`, `S1InteropMember`) | CLI (`sdkgen`, `init`, `migrate`) or you, if you author declarations by hand. |
 | Rewrite call sites to generated facades | CLI (`migrate`) before compilation. |
 | Emit `S1Interop.Generated` registry, facades, and bridge helpers | Generator package, during compilation. |
-| Report `S1I001`-`S1I008` diagnostics | Generator package, during compilation. |
+| Emit cross-runtime helpers, injected-type constructors, and `MelonPlatformDomain` | Generator package, during compilation, when the build's runtime is known. |
+| Report `S1I001`-`S1I010` diagnostics | Generator package, during compilation. |
+| Reference the game, map `S1InteropUsing` imports, deploy to `Mods`, configure `dotnet run` | Generator package's MSBuild targets, when the project opts in. |
 | Resolve Mono/IL2CPP type names at runtime | Generated `S1Interop.Generated.S1InteropRuntime` and `S1InteropTypeRegistry`. |
 
 If your mod references only the generator package, you can author declarations by hand. You can also reference it just for diagnostics and generated runtime helpers. The CLI is helpful, but not required at runtime.
+
+## Build integration
+
+The package also ships MSBuild targets. Every feature is off until the project opts in, so adding the package for diagnostics alone changes no references or output. `s1interop new` enables all of them:
+
+```xml
+<S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>   <!-- per configuration -->
+<S1InteropGameReferences>true</S1InteropGameReferences>
+<S1InteropDeployToGame>true</S1InteropDeployToGame>
+<S1InteropUsing Include="ScheduleOne.NPCs" />
+```
+
+[Write code for both runtimes](dual-runtime-code.md#enable-in-an-existing-project) lists every property.
 
 ## Generated source files
 
@@ -40,6 +55,11 @@ The generator emits stable file names under "Dependencies" / "Analyzers" / "Sour
 | `S1Interop.HarmonyPatcher.g.cs` | Only when at least one `[S1InteropPatch]` class is present. | Internal Harmony patch registrar with a module initializer. It resolves patch targets through `S1InteropMemberRegistry` and applies generated patch declarations once. |
 | `S1Interop.UnityEventBridge.g.cs` | Only when `[assembly: S1InteropGenerateUnityEventBridge]` is present. | `S1Interop.Generated.S1InteropUnityEventBridge` with `Add`/`Remove` overloads for parameterless and one-argument UnityEvents. |
 | `S1Interop.DelegateEventBridge.g.cs` | Only when `[assembly: S1InteropGenerateDelegateEventBridge]` is present. | `S1Interop.Generated.S1InteropDelegateEventBridge` with `Combine`/`Remove` helpers for delegate event fields. |
+| `S1Interop.RuntimeHelpers.g.cs` | When the build targets Mono or IL2CPP (through `S1InteropTargetRuntime` or a `MONO`/`IL2CPP` define), unless `S1InteropEmitRuntimeHelpers` is `false`. | Internal extension methods in the `S1Interop` namespace: `TryCast`, `Cast`, `Is`, `AsEnumerable`, `ToManagedList`, `ToNativeList`, `ToManagedDictionary`, UnityEvent `AddListener` and `Subscribe`. Each is direct code for the build's runtime and is emitted only when the APIs it needs are referenced. |
+| `S1Interop.PlatformDomain.g.cs` | When `S1InteropEmitPlatformDomain` is `true` (the default when `S1InteropTargetRuntime` is set), the assembly has `MelonInfo`, and it declares no `MelonPlatformDomain`. | `[assembly: MelonPlatformDomain(...)]` for the build's runtime. |
+| `S1Interop.Il2CppInjected.<Type>.g.cs` | In IL2CPP builds, for each partial `[RegisterTypeInIl2Cpp]` class without an `IntPtr` constructor. | The `IntPtr` constructor, plus a parameterless constructor for injected classes that are not Unity components. |
+
+Everything except `S1InteropTypeAttribute.g.cs` requires C# 9 or later; older projects get `S1I010` instead.
 
 Type facades under `S1Interop.ScheduleOne.*` are emitted as part of `S1Interop.TypeRegistry.g.cs` (one file) rather than one file per facade, so the generated file count stays small even for broad SDK generation.
 

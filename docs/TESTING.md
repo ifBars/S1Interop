@@ -2,7 +2,31 @@
 
 S1Interop uses an executable fixture harness instead of a framework-specific test runner.
 
-## Test Modes
+## Compiler workflow
+
+Run compiler contracts independently of the older migration/generator fixtures:
+
+```powershell
+dotnet run --project tests/S1Interop.Compiler.Tests -c Release -- --filter Reflection
+dotnet run --project tests/S1Interop.Compiler.Tests -c Release --no-build
+```
+
+Use `--list` to discover compiler cases. See [Release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md) for isolated package installation and the optional real-reference build lane. The [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) documents controlled real-mod source evaluation and dedicated live probes. Keep compiler contracts, reference builds, menu probes and gameplay evidence distinct.
+
+## Migration and generator test modes
+
+### Focused fixtures
+
+The repository pins the .NET 8 SDK family in `global.json`. Build hooks execute the built CLI rather than starting a nested source build. Install a .NET 8 SDK even when newer SDKs are available.
+
+After building, list fixtures or select a case-insensitive name fragment:
+
+```powershell
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Release --no-build -- --list-tests
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Release --no-build -- --filter SetupSupportsEitherRuntime
+```
+
+An unmatched filter fails instead of reporting success with zero tests. Filters can select local integration fixtures too; choose a portable fixture when game references are unavailable. Use focused runs while iterating, then run the complete portable lane once the affected tests pass.
 
 ### Quick
 
@@ -74,7 +98,7 @@ powershell -NoProfile -File .\tests\Run-BackendNeutralBuildValidation.ps1 ^
 
 The script checks expected MelonLoader and Unity reference files before building. It does not launch the game or copy files into `Mods/`.
 
-For manual IDE validation of a project created with `s1interop new`, run `s1interop doctor` and preview `s1interop setup`. The default generated project builds with `"Debug Mono"` and `"Debug Il2Cpp"` configurations. `setup --apply` may create only an ignored `local.build.props` containing `MonoGamePath` and `Il2CppGamePath`. Published generator packages restore through NuGet.org.
+For manual IDE validation of a project created with `s1interop new`, run `s1interop doctor` and preview `s1interop setup`. The default generated project builds with `"Debug Mono"` and `"Debug Il2Cpp"` configurations. `setup --apply` may create only an ignored `local.build.props` containing `MonoGamePath` and `Il2CppGamePath`. Compiler projects restore the pinned local tool; use the candidate feed for unpublished versions.
 
 The backend-neutral build validator above and runtime smoke runner below are specifically for projects created with `s1interop new --backend-neutral`. That one-DLL facade path is experimental and should retain the default dual-runtime shape as its fallback.
 
@@ -108,12 +132,12 @@ dotnet build .\S1Interop.sln --no-restore --configuration Release
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
 dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj --no-build --configuration Release --output .\artifacts\packages
 dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output .\artifacts\packages
-dotnet tool install S1Interop --tool-path .\.tools --add-source .\artifacts\packages --version 0.1.0-alpha.1
-.\.tools\s1interop --help
-.\.tools\s1interop --version
+powershell -NoProfile -File .\tests\Test-Packages.ps1
 ```
 
 Run the Release build and portable test steps locally before pushing changes that affect CLI packaging, source generators, build verification, or public command behavior.
+
+The package check uses a .NET 8 consumer compiler, a fresh package cache, and only the just-packed feed. It checks CLI installation, dry-run behavior, generated starter compilation, and the first-mod documentation sample. Its synthetic loader contract does not prove live game loading. See Release readiness in the Contributors section for the additional pre-stable gates.
 
 ## Fixture Organization
 
@@ -124,6 +148,7 @@ Test files are split by concern:
 - `S1InteropFixtureTests.MigrationTests.cs`: migration planning/application and real-mod migration fixtures.
 - `S1InteropFixtureTests.VerificationTests.cs`: sandbox build verification and build-hook fixtures.
 - `S1InteropFixtureTests.GeneratorTests.cs`: Roslyn generator and backend-neutral runtime helper fixtures.
+- `S1InteropFixtureTests.DualRuntimeAuthoringTests.cs`: explicit-runtime authoring support. Runtime helpers run the same source against Mono-shaped and Il2CppInterop-shaped stand-ins, injected-type constructors, build-property switches, the C# 9 gate, and the package's MSBuild targets (evaluated with `dotnet msbuild -getItem`, plus a deploy build that uses a temporary `Mods` folder).
 - `S1InteropFixtureTests.TestSupport.cs`: shared assertions, process helpers, fixture copying, reducers, and cleanup.
 
 ## Writing Tests
@@ -138,6 +163,8 @@ Test files are split by concern:
 ## Temp Files and Real Projects
 
 Tests must not mutate real sibling mod projects. Copy fixture directories into `%TEMP%\S1Interop.Tests\<guid>` or another temp folder, run the migration or verifier there, then delete the copy.
+
+Ordinary build tests must not write into game installs. The default compiler scaffold does not deploy. Dedicated opt-in runtime runners manage their own audited test-install deployments and cleanup. Debug builds of the legacy generator scaffold deploy into `<install>\Mods`, so any test that builds one against local game references passes `-p:S1InteropModsPath=<temp folder>`. Builds that restore a locally packed `S1Interop.Generators` should also pass `-p:RestorePackagesPath=<temp folder>`: the global NuGet cache may hold an older build of the same alpha version.
 
 When manually debugging verifier sandboxes, clean these folders after use:
 

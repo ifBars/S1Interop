@@ -39,7 +39,7 @@ internal static class InstallationVerificationTests
             {
                 Console.SetOut(output);
                 Console.SetError(output);
-                exit = CompilerCommand.Run(["verify-installations", "--mono-game-path", mono, "--il2cpp-game-path", native,
+                exit = S1InteropCli.Run(["compiler", "verify-installations", "--mono-game-path", mono, "--il2cpp-game-path", native,
                     "--report", Path.Combine(root, "versions.json")]);
             }
             finally { Console.SetOut(previousOut); Console.SetError(previousError); }

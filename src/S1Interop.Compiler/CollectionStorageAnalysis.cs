@@ -35,6 +35,23 @@ internal sealed partial class CollectionStorageAnalysis
                     seeds.Add(Expression(expression, model));
                 switch (node)
                 {
+                    case InvocationExpressionSyntax reflection when NativeReflectionVerifier.ReturnsNativeCollectionDescriptor(reflection, model, map):
+                        seeds.Add(Expression(reflection, model));
+                        break;
+                    case InvocationExpressionSyntax reflectionAccess when model.GetOperation(reflectionAccess) is IInvocationOperation call &&
+                        call.TargetMethod.ContainingType.ToDisplayString() == "System.Reflection.FieldInfo":
+                        ExpressionSyntax? receiver = reflectionAccess.Expression is MemberAccessExpressionSyntax member ? member.Expression
+                            : reflectionAccess.Parent is ConditionalAccessExpressionSyntax conditionalAccess ? conditionalAccess.Expression : null;
+                        if (receiver is null) break;
+                        if (call.TargetMethod.Name == "GetValue")
+                        {
+                            Join(Expression(reflectionAccess, model), Expression(receiver, model));
+                            if (reflectionAccess.Parent is ConditionalAccessExpressionSyntax conditionalRead)
+                                Join(Expression(conditionalRead, model), Expression(reflectionAccess, model));
+                        }
+                        else if (call.TargetMethod.Name == "SetValue" && call.Arguments.FirstOrDefault(argument => argument.Parameter?.Ordinal == 1)?.Syntax is ArgumentSyntax valueArgument)
+                            Join(Expression(valueArgument.Expression, model), Expression(receiver, model));
+                        break;
                     case VariableDeclaratorSyntax { Initializer.Value: { } value } variable:
                         if (model.GetDeclaredSymbol(variable) is { } symbol) Join(Symbol(symbol), Expression(value, model));
                         break;
@@ -73,7 +90,8 @@ internal sealed partial class CollectionStorageAnalysis
                     case BinaryExpressionSyntax binary when binary.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsExpression):
                         Join(Expression(binary, model), Expression(binary.Left, model));
                         break;
-                    case IsPatternExpressionSyntax { Pattern: DeclarationPatternSyntax { Designation: SingleVariableDesignationSyntax designation } } test:
+                    case DeclarationPatternSyntax { Designation: SingleVariableDesignationSyntax designation } declarationPattern
+                        when declarationPattern.Ancestors().OfType<IsPatternExpressionSyntax>().FirstOrDefault() is { } test:
                         if (model.GetDeclaredSymbol(designation) is { } patternVariable)
                             Join(Symbol(patternVariable), Expression(test.Expression, model));
                         break;
@@ -85,6 +103,9 @@ internal sealed partial class CollectionStorageAnalysis
                         break;
                     case ParenthesizedExpressionSyntax parentheses:
                         Join(Expression(parentheses, model), Expression(parentheses.Expression, model));
+                        break;
+                    case PostfixUnaryExpressionSyntax suppression when suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                        Join(Expression(suppression, model), Expression(suppression.Operand, model));
                         break;
                     case CastExpressionSyntax cast:
                         Join(Expression(cast, model), Expression(cast.Expression, model));
@@ -268,15 +289,23 @@ internal sealed partial class CollectionStorageAnalysis
         "Il2CppSystem.Collections.Generic.Dictionary<TKey, TValue>" or "S1Interop.Compiler.Generated.S1InteropDictionary<TKey, TValue>";
 
     // Abstract native array slots retain the concrete reference representation for supported mapped class elements.
-    private bool NativeSlot(INamedTypeSymbol? slot, ITypeSymbol authored) => NativeCollection(slot) ||
-        authored is IArrayTypeSymbol array && slot is { Arity: 1 } && DelegateConversions.IsNativeArray(slot) &&
-        (slot.Name == "Il2CppStructArray" && slot.TypeArguments[0].SpecialType == array.ElementType.SpecialType ||
+    private bool NativeSlot(INamedTypeSymbol? slot, ITypeSymbol authored) => NativeCollection(slot) || SupportsNativeArraySlot(map, slot, authored);
+
+    internal static bool SupportsNativeArraySlot(MetadataSymbolMap map, INamedTypeSymbol? slot, ITypeSymbol authored) =>
+        authored is IArrayTypeSymbol array &&
+        (map.SupportsNativeArrays && NativeArraySource.IsSupportedArray(map, array) ||
+         map.SupportsNativeReferenceArrays && NativeReferenceArraySource.IsMappedReferenceArray(map, array)) &&
+        slot is { Arity: 1 } && DelegateConversions.IsNativeArray(slot) &&
+        (slot.Name == "Il2CppStructArray" &&
+         (array.ElementType.SpecialType != SpecialType.None && slot.TypeArguments[0].SpecialType == array.ElementType.SpecialType ||
+          array.ElementType is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumeration &&
+          map.Resolve(enumeration).Target is { } nativeEnum && SymbolEqualityComparer.Default.Equals(slot.TypeArguments[0], nativeEnum)) ||
          // The slot's element must be the mapped class itself: a covariant slot would need a reinterpreted view at the boundary.
-         slot.Name is "Il2CppReferenceArray" or "Il2CppArrayBase" && array.ElementType is INamedTypeSymbol element &&
+         slot.Name is "Il2CppReferenceArray" or "Il2CppArrayBase" && array.ElementType is INamedTypeSymbol { TypeKind: TypeKind.Class } element &&
          map.Resolve(element).Target is { } mapped && SymbolEqualityComparer.Default.Equals(slot.TypeArguments[0], mapped));
 
     private bool Eligible(ITypeSymbol? type) => type is IArrayTypeSymbol array
-        ? map.SupportsNativeArrays && NativeArraySource.IsSupportedArray(array) ||
+        ? map.SupportsNativeArrays && NativeArraySource.IsSupportedArray(map, array) ||
           map.SupportsNativeReferenceArrays && NativeReferenceArraySource.IsMappedReferenceArray(map, array)
         : type is INamedTypeSymbol named &&
         (named.ContainingType is { } owner ? Eligible(owner) :
@@ -284,7 +313,9 @@ internal sealed partial class CollectionStorageAnalysis
          named.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.Dictionary<TKey, TValue>" &&
          named.TypeArguments.All(Representable));
 
-    private bool Representable(ITypeSymbol type) => Scalar(type) || map.IsNative(type) ||
+    private bool Representable(ITypeSymbol type) => IsRepresentable(map, type);
+
+    internal static bool IsRepresentable(MetadataSymbolMap map, ITypeSymbol type) => Scalar(type) || map.IsNative(type) ||
         type is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumeration && map.Resolve(enumeration).Status == TypeMappingStatus.Mapped;
 
     private static bool Scalar(ITypeSymbol type) => type.SpecialType is SpecialType.System_String or SpecialType.System_Boolean or

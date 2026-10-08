@@ -37,7 +37,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
     private static readonly DiagnosticDescriptor Il2CppObjectCastBoundaryDiagnostic = new(
         "S1I007",
         "Plain C# cast crosses an IL2CPP object boundary",
-        "Expression '{0}' casts or pattern-matches an object/proxy value to '{1}' directly; use S1Interop.Generated.S1InteropObjectCast for backend-neutral IL2CPP proxy unwrapping",
+        "Expression '{0}' casts or pattern-matches an object/proxy value to '{1}' directly; IL2CPP proxies need value.TryCast<{1}>() (with 'using S1Interop;' in dual-runtime builds) or S1Interop.Generated.S1InteropObjectCast in backend-neutral builds",
         "S1Interop",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);

@@ -5,7 +5,7 @@ _layout: landing
 <section class="s1interop-hero">
   <p class="s1interop-eyebrow">Schedule I modding</p>
   <h1>Build and validate Schedule I mods across Mono and IL2CPP.</h1>
-  <p class="s1interop-lead">S1Interop guides local setup, adds compile-time diagnostics, analyzes existing mods, previews safe migrations, and validates both runtime reference surfaces. Backend-neutral facades are an opt-in experiment.</p>
+  <p class="s1interop-lead">Write ordinary ScheduleOne C# and let the source compiler adapt supported operations into Mono and IL2CPP builds. Start with the locally built candidate, matching game installations, and the compiler-first walkthrough.</p>
   <div class="s1interop-actions">
     <a class="s1interop-action s1interop-action-primary" href="articles/adoption-guide.md">Start here</a>
     <a class="s1interop-action" href="articles/introduction.md">What S1Interop does</a>
@@ -27,7 +27,7 @@ _layout: landing
     </a>
     <a class="s1interop-card" href="articles/adoption-guide.md#already-maintaining-a-mod">
       <h3>Already maintaining a mod</h3>
-      <p>Analyze the project without changing it, then add only the compatibility path you need.</p>
+      <p>Evaluate unchanged mod sources in a compiler project, keeping existing deployment scripts separate.</p>
     </a>
     <a class="s1interop-card" href="articles/adoption-guide.md#already-know-what-you-need">
       <h3>Looking for one feature</h3>

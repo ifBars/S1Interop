@@ -10,6 +10,440 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("ReflectionCollectionsKeepLiveStorageAndReplacement", () => Verify("""
+        using System.Collections.Generic;
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public sealed class Cache {
+            private readonly FieldInfo field = typeof(Actor).GetField("ReflectionScores");
+            public Dictionary<string,int> Read() {
+                if (field?.GetValue(null) is not Dictionary<string,int> values) return null;
+                return values;
+            }
+            public void Write(Dictionary<string,int> values) => field.SetValue(null, values);
+        }
+        public static class Probe {
+            public static int Run() {
+                var cache = new Cache();
+                var first = cache.Read();
+                first["one"] = 7;
+                if (Actor.ReflectionScores["one"] != 7) return -1;
+                Actor.ReflectionScores["two"] = 3;
+                if (first["two"] != 3 || !object.ReferenceEquals(first, cache.Read())) return -2;
+                var replacement = new Dictionary<string,int> { ["new"] = 11 };
+                cache.Write(replacement);
+                Actor.ReflectionScores["new"] = 13;
+                if (replacement["new"] != 13 || !object.ReferenceEquals(replacement, cache.Read())) return -3;
+                cache.Write(null);
+                if (cache.Read() != null || Actor.ReflectionScores != null) return -4;
+                return first["one"] + first["two"] + replacement["new"];
+            }
+        }
+        """, 23)),
+    ("ReflectionListsKeepLiveStorageAndReplacement", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe { public static int Run() {
+            var field = typeof(Actor).GetField("ReflectionNumbers");
+            var replacement = new List<int> { 5 };
+            field.SetValue(null, replacement);
+            var read = (List<int>)field!.GetValue(null);
+            read.Add(8);
+            if (!object.ReferenceEquals(read, replacement) || Actor.ReflectionNumbers.Count != 2) return -1;
+            Actor.ReflectionNumbers[0] = 9;
+            return read[0] + replacement[1];
+        } }
+        """, 17)),
+    ("ReflectionCaseAmbiguousCollectionLookupIsDiagnosed", () => {
+        var result = Lower("""
+            public static class Probe { public static object Run() {
+                var field = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionScores", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.IgnoreCase);
+                return field.GetValue(null);
+            } }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Case-ambiguous collection lookup was accepted.");
+    }),
+    ("ReflectionCollectionWrongValuesPreserveArgumentErrors", () => Verify("""
+        using ScheduleOne.Testing;
+        public static class Probe { public static int Run() {
+            var field = typeof(Actor).GetField("ReflectionScores");
+            try { field.SetValue(null, 17); return -1; }
+            catch (System.ArgumentException) { return 1; }
+        } }
+        """, 1)),
+    ("ReflectionCollectionMixedDescriptorCacheIsDiagnosed", () => {
+        var result = Lower("""
+            using System.Collections.Generic;
+            using System.Reflection;
+            using ScheduleOne.Testing;
+            public sealed class Cache {
+                public static List<int> Managed = new();
+                private readonly FieldInfo field;
+                public Cache(bool native) {
+                    if (native) field = typeof(Actor).GetField("ReflectionNumbers");
+                    else field = typeof(Cache).GetField("Managed");
+                }
+                public List<int> Read() => (List<int>)field!.GetValue(null);
+            }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Mixed managed and native collection descriptors were accepted.");
+    }),
+    ("ReflectionDerivedCollectionWriteIsDiagnosed", () => {
+        var result = Lower("""
+            public sealed class Derived : System.Collections.Generic.List<int> { }
+            public static class Probe { public static void Run() {
+                var field = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionNumbers");
+                field.SetValue(null, new Derived());
+            } }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Derived CLR collection write was accepted.");
+    }),
+    ("ReflectionPrivateReadonlyCacheWorksAcrossSourceFiles", () => {
+        var author = CompilationSupport.Create("Probe", """
+            using System.Reflection;
+            public sealed partial class Cache {
+                private readonly FieldInfo? field;
+                private static readonly FieldInfo? counter = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionCount");
+                public Cache() { field = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionPrivate", BindingFlags.NonPublic | BindingFlags.Static); }
+                public void Write(int value) { field?.SetValue(null, value); counter.SetValue(null, 9); }
+            }
+            """, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+        author = author.AddSyntaxTrees(CSharpSyntaxTree.ParseText("""
+            public sealed partial class Cache {
+                public int Read() => this.field is null ? -1 : (int)this.field.GetValue(null);
+                public static int ReadOther(Cache value) => (int)value.field?.GetValue(null);
+                public static int Count() => (int)counter.GetValue(null);
+            }
+            public static class Probe { public static int Run() { var cache = new Cache(); cache.Write(19); return cache.Read() + Cache.ReadOther(cache) + Cache.Count(); } }
+            """, (CSharpParseOptions)author.SyntaxTrees.First().Options, "Reader.cs"));
+        Assert(Execute(author, Contracts.MonoBytes) == 47, "Original cached reflection behavior differs.");
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+        Assert(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert(Execute(result.Compilation, Contracts.NativeBytes, result.RuntimeAssembly) == 47, "Cached native reflection lost reads or writes.");
+    }),
+    ("ReflectionCachedDescriptorsCannotEscapeInAnotherSourceFile", () => {
+        foreach (string reader in new[] {
+            "public object Escape() => this.field;",
+            "public string Metadata() => field.Name;",
+            "public object Alias() { var alias = field; return alias.GetValue(null); }",
+            "public void Pass() { Consume(field); } private static void Consume(object value) { }"
+        })
+        {
+            var author = CompilationSupport.Create("Probe", """
+                public sealed partial class Cache {
+                    private readonly System.Reflection.FieldInfo field = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionCount");
+                }
+                """, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+            author = author.AddSyntaxTrees(CSharpSyntaxTree.ParseText("public sealed partial class Cache { " + reader + " }",
+                (CSharpParseOptions)author.SyntaxTrees.First().Options, "Reader.cs"));
+            var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+            Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "A cached descriptor escaped through another source file: " + reader);
+        }
+        foreach (string visibility in new[] { "public readonly", "internal readonly", "private" })
+        {
+            var result = Lower("public sealed class Cache { " + visibility + " System.Reflection.FieldInfo field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\"); public object Read() => field.GetValue(null); }");
+            Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Untracked cached descriptor was adapted: " + visibility);
+        }
+    }),
+    ("ReflectionCachedAssignmentResultsCannotEscape", () => {
+        foreach (string statement in new[] {
+            "Leak = field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\");",
+            "Consume(field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\"));",
+            "object alias = (field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\"));",
+            "field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\"); Leak = field = null;"
+        })
+        {
+            var result = Lower("public sealed class Cache { private readonly System.Reflection.FieldInfo field; public object Leak; public Cache() { " + statement + " } private static void Consume(object value) {} }");
+            Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Cached assignment result escaped: " + statement);
+        }
+    }),
+    ("ReflectionGenericCacheEscapesAreTracked", () => {
+        foreach (string reader in new[] {
+            "public static object Escape(Cache<int> value) => value.field;",
+            "public static string Metadata(Cache<int> value) => value.field.Name;"
+        })
+        {
+            var result = Lower("public sealed class Cache<T> { private readonly System.Reflection.FieldInfo field = typeof(ScheduleOne.Testing.Actor).GetField(\"ReflectionCount\"); " + reader + " }");
+            Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Constructed generic cache escaped: " + reader);
+        }
+    }),
+    ("TraverseFieldReadsPreserveNullRootsValuesAndCasts", () => Verify(TraverseContracts.Library + """
+        public static class Probe {
+            static int calls;
+            static ScheduleOne.Testing.Actor Root() { calls++; return new ScheduleOne.Testing.Employee { ReflectionChild = new ScheduleOne.Testing.Employee() }; }
+            public static int Run() {
+                var child = HarmonyLib.Traverse.Create(Root()).Field("ReflectionChild").GetValue<ScheduleOne.Testing.Employee>();
+                if (calls != 1 || child.Salary != 7) return -1;
+                var parent = HarmonyLib.Traverse.Create(Root()).Field("ReflectionChild").GetValue<ScheduleOne.Testing.Actor>();
+                if (parent.Name != "actor") return -2;
+                var absent = HarmonyLib.Traverse.Create((ScheduleOne.Testing.Actor)null).Field("ReflectionChild").GetValue<ScheduleOne.Testing.Employee>();
+                if (absent != null) return -3;
+                var instanceWithoutRoot = HarmonyLib.Traverse.Create(typeof(ScheduleOne.Testing.Employee)).Field("Salary").GetValue<int>();
+                if (instanceWithoutRoot != 0) return -4;
+                ScheduleOne.Testing.Actor.ReflectionCount = 23;
+                if (HarmonyLib.Traverse.Create(typeof(ScheduleOne.Testing.Actor)).Field("ReflectionCount").GetValue<int>() != 23) return -5;
+                if (HarmonyLib.Traverse.Create(Root()).Field("ReflectionCount").GetValue<int>() != 23) return -7;
+                var contract = HarmonyLib.Traverse.Create(Root()).Field("ReflectionChild").GetValue<ScheduleOne.Testing.IActor>();
+                if (contract.ReadValue() != 5) return -8;
+                try { HarmonyLib.Traverse.Create(Root()).Field("ReflectionChild").GetValue<int>(); return -6; }
+                catch (System.InvalidCastException) { }
+                return 1;
+            }
+        }
+        """, 1)),
+    ("TraverseUsesRuntimeFieldOwnerRatherThanShadowingProperty", () => Verify(TraverseContracts.Library + """
+        public static class Probe {
+            public static int Run() {
+                ScheduleOne.Testing.Actor propertyShadow = new ScheduleOne.Testing.PropertyShadowActor();
+                propertyShadow.ReflectionChild = new ScheduleOne.Testing.Employee();
+                var inherited = HarmonyLib.Traverse.Create(propertyShadow).Field("ReflectionChild").GetValue<ScheduleOne.Testing.Employee>();
+                if (inherited == null || inherited.Salary != 7) return -1;
+                ScheduleOne.Testing.Actor fieldShadow = new ScheduleOne.Testing.FieldShadowActor();
+                fieldShadow.ReflectionChild = new ScheduleOne.Testing.Employee();
+                var declared = HarmonyLib.Traverse.Create(fieldShadow).Field("ReflectionChild").GetValue<ScheduleOne.Testing.Employee>();
+                if (declared == null || declared.Salary != 21) return -2;
+                return 1;
+            }
+        }
+        """, 1)),
+    ("TraverseEscapingFieldDescriptorIsDiagnosed", () => {
+        var result = Lower(TraverseContracts.Library + """
+            public static class Probe { public static object Run() {
+                var traversal = HarmonyLib.Traverse.Create(new ScheduleOne.Testing.Actor()).Field("ReflectionChild");
+                return traversal.GetValue<ScheduleOne.Testing.Employee>();
+            } }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC041"),
+            "An unsupported native field traversal descriptor was silently accepted.");
+    }),
+    ("EventRepairProvenanceBindsOriginalAndReferenceImages", EventRepairPreparationTests.Run),
+    ("DelegateBridgeOwnershipRejectsIncompatibleRuntime", () => {
+        const string source = """
+            public static class Probe { public static int Run() {
+                try { UnityEngine.AudioClip.Read(values => values[0] = 1, new float[1]); }
+                catch (System.NotSupportedException) { return 71; }
+                catch (System.InvalidOperationException) { return 71; }
+                return -1;
+            } }
+            """;
+        string[] runtimes = {
+            RuntimeContracts.Il2Cpp.Replace("ReferencedDelegate", "ChangedCallbackField", StringComparison.Ordinal),
+            RuntimeContracts.Il2Cpp.Replace("ReferencedDelegate = callback;", "ReferencedDelegate = new System.Action(() => {});", StringComparison.Ordinal),
+            RuntimeContracts.Il2Cpp.Replace("Handles[++next] = obj; return next;", "return 0;", StringComparison.Ordinal),
+            RuntimeContracts.Il2Cpp.Replace("Handles[++next] = obj; return next;", "Handles[++next] = obj; return next == 2 ? 0 : next;", StringComparison.Ordinal)
+        };
+        foreach (string runtime in runtimes)
+        {
+            byte[] bytes = CompilationSupport.Emit("OwnershipContract", runtime);
+            var author = CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+            var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(bytes)));
+            Assert(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert(Execute(result.Compilation, bytes, result.RuntimeAssembly) == 71,
+                "An incompatible callback bridge or failed weak handle allocation was silently accepted.");
+        }
+    }),
+    ("UnstrippedMethodMetadataPreservesReconstructionEvidence", UnstrippedMethodAnalysisTests.Run),
+    ("MappedDelegateArrayReturnPreservesIdentity", () => Verify("""
+        using UnityEngine;
+        public static class Probe { public static int Run() {
+            float[] values = { 0.25f };
+            var returned = AudioClip.Provide(() => values);
+            returned[0] = 0.75f;
+            return object.ReferenceEquals(values, returned) && values[0] == 0.75f ? 94 : -1;
+        } }
+        """, 94)),
+    ("MappedDelegateMismatchedArrayIsDiagnosed", () => {
+        var author = CompilationSupport.Create("Probe", "public static class Probe { public static void Run() { UnityEngine.AudioClip.Read(values => values[0] = 1, new float[1]); } }",
+            CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+        byte[] mismatch = CompilationSupport.Emit("MismatchedNativeContract", RuntimeContracts.Il2Cpp.Replace("Il2CppStructArray<float>", "Il2CppStructArray<double>", StringComparison.Ordinal));
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(mismatch)));
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC030"), "Callback array layout mismatch was not diagnosed.");
+    }),
+    ("MappedDelegateArrayParametersPreserveWrites", () => Verify("""
+        using UnityEngine;
+        public static class Probe {
+            static void Fill(float[] values) { values[0] = 0.25f; }
+            public static int Run() {
+                float[] data = new float[2];
+                AudioClip.Read(Fill, data);
+                if (data[0] != 0.25f) return -1;
+                AudioClip.Read(values => values[1] = -0.5f, data);
+                if (data[1] != -0.5f) return -2;
+                AudioClip.PCMReaderCallback named = new AudioClip.PCMReaderCallback(Fill);
+                data[0] = 0;
+                named(data);
+                if (data[0] != 0.25f) return -3;
+                AudioClip.Read((float[] values) => values[1] = 0.75f, data);
+                System.Action<float[]> unrelated = values => values[0] = 9;
+                float[] managed = new float[1]; unrelated(managed);
+                return data[1] == 0.75f && managed[0] == 9 && managed.GetType() == typeof(float[]) ? 93 : -4;
+            }
+        }
+        """, 93)),
+    ("SerializedComponentEnumStorageWidths", () => {
+        foreach (var (keyword, padding) in new[] { ("byte", 3), ("sbyte", 3), ("short", 2), ("ushort", 2), ("int", 1), ("uint", 1), ("long", 0), ("ulong", 0) })
+        {
+            string declaration = "public enum Kind : " + keyword + " { Customer, Employee }";
+            var mono = MetadataReference.CreateFromImage(CompilationSupport.Emit("EnumMono" + keyword,
+                RuntimeContracts.Mono.Replace("public enum Kind { Customer, Employee }", declaration, StringComparison.Ordinal)));
+            var native = MetadataReference.CreateFromImage(CompilationSupport.Emit("EnumNative" + keyword,
+                RuntimeContracts.Il2Cpp.Replace("public enum Kind { Customer, Employee }", declaration, StringComparison.Ordinal)));
+            var author = CompilationSupport.Create("Probe", "public class Fields : UnityEngine.MonoBehaviour { public ScheduleOne.Testing.Actor.Kind Value; public int Neighbor = 7; }",
+                CompilationSupport.PlatformReferences.Add(mono));
+            var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(native));
+            Assert(result.Success, string.Join("\n", result.Diagnostics));
+            var fields = result.Compilation.GetTypeByMetadataName("Fields")!;
+            var field = fields.GetMembers("Value").OfType<IFieldSymbol>().Single();
+            Assert(field.Type is INamedTypeSymbol { Name: "Il2CppValueField", TypeArguments: [INamedTypeSymbol { TypeKind: TypeKind.Enum, Name: "Kind" }] }, "Wrong enum storage for " + keyword);
+            Assert(fields.GetMembers().OfType<IFieldSymbol>().Count(f => f.Name.StartsWith("__S1InteropPad_Value", StringComparison.Ordinal)) == padding, "Wrong enum padding for " + keyword);
+        }
+    }),
+    ("SerializedComponentEnumLayoutMismatchRejected", () => {
+        const string source = "public class Fields : UnityEngine.MonoBehaviour { [UnityEngine.SerializeField] private ScheduleOne.Testing.Actor.Kind saved; }";
+        var author = CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+        byte[] mismatched = CompilationSupport.Emit("MismatchedNativeContract", RuntimeContracts.Il2Cpp.Replace(
+            "public enum Kind { Customer, Employee }", "public enum Kind : long { Customer, Employee }", StringComparison.Ordinal));
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(mismatched)));
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC015"), "Different scalar enum layouts accepted.");
+        result = Lower("public enum Local { A } public class Fields : UnityEngine.MonoBehaviour { [UnityEngine.SerializeField] private Local saved; }");
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC015"), "Unregistered author enum accepted as native storage.");
+        result = Lower("public enum Local { A } public class Fields : UnityEngine.MonoBehaviour { public Local saved; }");
+        Assert(result.Diagnostics.Any(d => d.Id == "S1IC016"), "Unsupported public enum field lost its managed-state warning.");
+    }),
+    ("SerializedComponentMappedEnumFields", () => {
+        const string source = """
+            using UnityEngine;
+            using ScheduleOne.Testing;
+            public class Fields : MonoBehaviour {
+                public Actor.Kind Kind = Actor.Kind.Employee;
+                [SerializeField] private Actor.Kind saved = Actor.Kind.Customer;
+                public void Change() { saved = Kind; Kind--; }
+                public Actor.Kind Read() => saved;
+            }
+            public static class Probe { public static int Run() {
+                var fields = new Fields(); fields.Change();
+                return fields.Kind == Actor.Kind.Customer && fields.Read() == Actor.Kind.Employee ? 91 : -1;
+            } }
+            """;
+        Verify(source, 91);
+        var result = Lower(source);
+        Assert(result.Success, string.Join("\n", result.Diagnostics));
+        Assert(result.Compilation.GetTypeByMetadataName("Fields")!.GetMembers("Kind").OfType<IFieldSymbol>().Single().Type.Name == "Il2CppValueField",
+            "Mapped enum field remained managed instead of native value storage.");
+    }),
+    ("ArrayNativeWideEnumsAndCrossTypeCopies", () => {
+        Verify("""
+            using System;
+            using ScheduleOne.Testing;
+            public static class Probe { public static int Run() {
+                WideKind[] values = { WideKind.High, (WideKind)7 }; ArrayStore.WideKinds = values;
+                ArrayStore.WideKinds[1] = WideKind.High;
+                if ((ulong)values[1] != ulong.MaxValue) return -1;
+                var copy = (WideKind[])values.Clone();
+                Array.Clear(copy, 0, 1);
+                if ((ulong)copy[0] != 0 || (ulong)values[0] != ulong.MaxValue) return -2;
+                return 83;
+            } }
+            """, 83);
+        var result = Lower("""
+            using System;
+            using ScheduleOne.Testing;
+            public enum OtherKind { Customer, Employee }
+            public static class Probe { public static void Run() {
+                Actor.Kind[] values = { Actor.Kind.Employee }; ArrayStore.Kinds = values;
+                OtherKind[] destination = new OtherKind[1]; Array.Copy(values, destination, 1);
+            } }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC033"), "Distinct enum copy lost its specific diagnostic.");
+    }),
+    ("ArrayNativeEnumLayoutMismatchRemainsRejected", () => {
+        const string source = "using ScheduleOne.Testing; public static class Probe { public static void Run() { Actor.Kind[] values = { Actor.Kind.Employee }; ArrayStore.Kinds = values; } }";
+        var author = CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference));
+        byte[] mismatched = CompilationSupport.Emit("MismatchedNativeContract", RuntimeContracts.Il2Cpp.Replace(
+            "public enum Kind { Customer, Employee }", "public enum Kind : long { Customer, Employee }", StringComparison.Ordinal));
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(mismatched)));
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC032"), "Different native enum layouts accepted.");
+    }),
+    ("ArrayNativeMappedEnumsPreserveStorage", () => Verify("""
+        using System;
+        using ScheduleOne.Testing;
+        public static class Probe { public static int Run() {
+            Actor.Kind[] values = { Actor.Kind.Customer, Actor.Kind.Employee };
+            ArrayStore.Kinds = values;
+            var alias = values;
+            ArrayStore.Kinds[0] = Actor.Kind.Employee;
+            if (values[0] != Actor.Kind.Employee || !ReferenceEquals(alias, ArrayStore.Kinds)) return -1;
+            var copy = (Actor.Kind[])values.Clone();
+            copy[0] = Actor.Kind.Customer;
+            if (values[0] != Actor.Kind.Employee || ReferenceEquals(values, copy)) return -2;
+            Array.Clear(values, 1, 1);
+            if (ArrayStore.Kinds[1] != Actor.Kind.Customer) return -3;
+            Array.Resize(ref values, 3);
+            if (values.Length != 3 || alias.Length != 2 || values[0] != Actor.Kind.Employee) return -4;
+            Array.Copy(values, 0, alias, 0, 2);
+            try { Array.Copy(values, null, 1); return -5; }
+            catch (ArgumentNullException e) { if (e.ParamName != "destinationArray") return -6; }
+            return (int)ArrayStore.Kinds[0] + 80;
+        } }
+        """, 81)),
+    ("ArrayNativeBitConverterScalarRoundTrips", () => Verify("""
+        using System;
+        using ScheduleOne.Testing;
+        public static class Probe { public static int Run() {
+            ArrayStore.Bytes = BitConverter.GetBytes(true);
+            if (!BitConverter.ToBoolean(ArrayStore.Bytes, 0)) return -1;
+            ArrayStore.Bytes = BitConverter.GetBytes('\u2764');
+            if (BitConverter.ToChar(ArrayStore.Bytes, 0) != '\u2764') return -2;
+            ArrayStore.Bytes = BitConverter.GetBytes((short)-1234);
+            if (BitConverter.ToInt16(ArrayStore.Bytes, 0) != -1234) return -3;
+            ArrayStore.Bytes = BitConverter.GetBytes((ushort)65000);
+            if (BitConverter.ToUInt16(ArrayStore.Bytes, 0) != 65000) return -4;
+            ArrayStore.Bytes = BitConverter.GetBytes(-1234567);
+            if (BitConverter.ToInt32(ArrayStore.Bytes, 0) != -1234567) return -5;
+            ArrayStore.Bytes = BitConverter.GetBytes(uint.MaxValue);
+            if (BitConverter.ToUInt32(ArrayStore.Bytes, 0) != uint.MaxValue) return -6;
+            ArrayStore.Bytes = BitConverter.GetBytes(long.MinValue + 1);
+            if (BitConverter.ToInt64(ArrayStore.Bytes, 0) != long.MinValue + 1) return -7;
+            ArrayStore.Bytes = BitConverter.GetBytes(ulong.MaxValue);
+            if (BitConverter.ToUInt64(ArrayStore.Bytes, 0) != ulong.MaxValue) return -8;
+            ArrayStore.Bytes = BitConverter.GetBytes(1.25f);
+            if (BitConverter.ToSingle(ArrayStore.Bytes, 0) != 1.25f) return -9;
+            ArrayStore.Bytes = BitConverter.GetBytes(double.NaN);
+            if (!double.IsNaN(BitConverter.ToDouble(ArrayStore.Bytes, 0))) return -10;
+            byte[] first = BitConverter.GetBytes(3); ArrayStore.Bytes = first;
+            byte[] second = BitConverter.GetBytes(3); ArrayStore.Bytes = second;
+            if (ReferenceEquals(first, second)) return -11;
+            return 73;
+        } }
+        """, 73)),
+    ("ArrayNativeBitConverterPreservesValuesAndValidation", () => Verify("""
+        using System;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static int order;
+            private static byte[] Value() { order = order * 10 + 2; return ArrayStore.Bytes; }
+            private static int Index() { order = order * 10 + 1; return 0; }
+            private static int Read(byte[] value, int startIndex) {
+                ArrayStore.Bytes = value;
+                return BitConverter.ToInt32(value, startIndex);
+            }
+            public static int Run() {
+                byte[] bytes = BitConverter.GetBytes(0x12345678); ArrayStore.Bytes = bytes;
+                var alias = bytes;
+                if (BitConverter.ToInt32(startIndex: Index(), value: Value()) != 0x12345678 || order != 12) return -1;
+                bytes[0] ^= 1;
+                if (!ReferenceEquals(alias, ArrayStore.Bytes) || BitConverter.ToInt32(bytes, 0) != (0x12345678 ^ (BitConverter.IsLittleEndian ? 1 : 0x1000000))) return -2;
+                try { Read(null, -1); return -3; } catch (ArgumentNullException e) { if (e.ParamName != "value") return -4; }
+                try { Read(new byte[2], -1); return -5; } catch (ArgumentOutOfRangeException e) { if (e.ParamName != "startIndex") return -6; }
+                try { Read(new byte[2], 2); return -7; } catch (ArgumentOutOfRangeException e) { if (e.ParamName != "startIndex") return -8; }
+                try { Read(new byte[2], 0); return -9; } catch (ArgumentException e) { if (e.ParamName != "value") return -10; }
+                try { Read(new byte[0], 0); return -11; } catch (ArgumentOutOfRangeException e) { if (e.ParamName != "startIndex") return -12; }
+                return 71;
+            }
+        }
+        """, 71)),
+    ("CompilerAuthoringDefinesAreStableAcrossBackends", AuthoringDefineTests.Run),
+    ("DefaultCompilerScaffoldIsPinnedAndNonDestructive", ScaffoldingTests.Run),
     ("ArrayNativeDelegateFactoriesConstructorsAndExtensions", () => Verify("""
         using System;
         using ScheduleOne.Testing;
@@ -196,6 +630,239 @@ var tests = new (string Name, Action Test)[]
             }
         }
         """, 37)),
+    ("ReflectionPrivateFieldsAndEventStorageReadAndWrite", () => {
+        const string source = """
+            using System.Reflection;
+            using ScheduleOne.Testing;
+            public static class Probe {
+                public static object Private() {
+                    var field = typeof(Actor).GetField("ReflectionPrivate", BindingFlags.Static | BindingFlags.NonPublic)!;
+                    field.SetValue(null, 34);
+                    return field.GetValue(null);
+                }
+                public static object Event() {
+                    var field = typeof(Actor).GetField(nameof(Actor.ReflectionEvent), BindingFlags.Static | BindingFlags.NonPublic)!;
+                    int calls = 0;
+                    Actor.ReflectionEvent += () => calls++;
+                    ((System.Action)field.GetValue(null))();
+                    if (calls != 1) throw new System.Exception("Event field does not share storage");
+                    field.SetValue(null, null);
+                    return field.GetValue(null);
+                }
+                public static int Run() => (int)Private() == 34 && Event() == null ? 1 : 0;
+            }
+            """;
+        foreach (var reference in new MetadataReference[] { Contracts.MonoReference,
+            MetadataReference.CreateFromImage(GameReferencePublicizer.CreateReference(Contracts.MonoBytes)),
+            CompilationSupport.Create("MonoContract", RuntimeContracts.Mono, CompilationSupport.PlatformReferences).ToMetadataReference() })
+        {
+            var result = new InteropCompiler().Lower(
+                CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(reference)),
+                CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+            Assert(result.Success, "Private storage lookups were not adapted: " + string.Join(Environment.NewLine, result.Diagnostics));
+            Assert(Execute(result.Compilation, Contracts.NativeBytes, result.RuntimeAssembly) == 1, "Private native field/event values differ.");
+        }
+        Assert(Execute(CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference)),
+            Contracts.MonoBytes) == 1, "Original private field/event behavior differs.");
+    }),
+    ("ReflectionDirectFieldFlagsAndEvaluationArePreserved", () => Verify("""
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            static int calls;
+            static BindingFlags Flags() { calls++; return BindingFlags.Instance | BindingFlags.Public; }
+            public static int Run() {
+                var field = typeof(Employee).GetField(bindingAttr: Flags(), name: "Name")!;
+                var inherited = typeof(Employee).GetField("ReflectionCount", BindingFlags.Static | BindingFlags.Public);
+                var flattened = typeof(Employee).GetField("ReflectionCount", BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy);
+                var privateBase = typeof(Employee).GetField("ReflectionPrivate", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy);
+                var excluded = typeof(Employee).GetField("Name", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                var wrong = typeof(Actor).GetField("ReflectionPrivate", BindingFlags.Public | BindingFlags.Static);
+                var actor = new Employee();
+                var visitedFlags = typeof(Actor).GetField("Name", (BindingFlags)Actor.Next().Score(19));
+                field.SetValue(actor, "reflected");
+                flattened.SetValue(null, 12);
+                if (calls != 1 || (string)field.GetValue(actor) != "reflected" || Actor.ReflectionCount != 12) return -1;
+                if (inherited != null || privateBase != null || excluded != null || wrong != null) return -2;
+                if ((string)visitedFlags.GetValue(actor) != "reflected" || Actor.Calls != 1) return -3;
+                return 1;
+            }
+        }
+        """, 1)),
+    ("ReflectionInstanceGenericDelegateEventPreservesStorage", () => Verify("""
+        using System;
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public static class Probe { public static int Run() {
+            var actor = new Actor();
+            int calls = 0;
+            actor.ReflectionInstanceEvent += value => calls += value;
+            var field = typeof(Actor).GetField(nameof(Actor.ReflectionInstanceEvent), BindingFlags.Instance | BindingFlags.NonPublic)!;
+            ((Action<int>)field.GetValue(actor))(7);
+            field.SetValue(actor, null);
+            if (field.GetValue(actor) != null) return -1;
+            try { field.GetValue(null); return -2; } catch (TargetException) { }
+            return calls;
+        } }
+        """, 7)),
+    ("ReflectionRuntimeFlagMatrixMatchesClr", () => {
+        const string source = """
+            using System.Reflection;
+            using ScheduleOne.Testing;
+            public static class Probe { public static int Run() {
+                int hash = 17;
+                for (int bits = 0; bits < 256; bits++) {
+                    var flags = (BindingFlags)bits;
+                    var name = typeof(Employee).GetField("Name", flags);
+                    var count = typeof(Employee).GetField("ReflectionCount", flags);
+                    var hidden = typeof(Employee).GetField("ReflectionPrivate", flags);
+                    var family = typeof(Employee).GetField("ReflectionProtected", flags);
+                    var assembly = typeof(Employee).GetField("ReflectionInternal", flags);
+                    var declared = typeof(Actor).GetField("ReflectionPrivate", flags);
+                    int mask = (name != null ? 1 : 0) | (count != null ? 2 : 0) | (hidden != null ? 4 : 0) |
+                        (family != null ? 8 : 0) | (assembly != null ? 16 : 0) | (declared != null ? 32 : 0);
+                    hash = unchecked(hash * 31 + mask);
+                }
+                return hash;
+            } }
+            """;
+        int expected = Execute(CompilationSupport.Create("Probe", source, CompilationSupport.PlatformReferences.Add(Contracts.MonoReference)), Contracts.MonoBytes);
+        Verify(source, expected);
+    }),
+    ("ReflectionIgnoreCaseAndNullHandlingPreserveClrBehavior", () => Verify("""
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            static int flagsCalls;
+            static BindingFlags Flags(bool ignore) { flagsCalls++; return BindingFlags.NonPublic | BindingFlags.Static | (ignore ? BindingFlags.IgnoreCase : 0); }
+            public static int Run() {
+                var field = typeof(Actor).GetField("reflectionprivate", Flags(true));
+                var absent = typeof(Actor).GetField("reflectionprivate", Flags(false));
+                var constant = typeof(Actor).GetField("REFLECTIONPRIVATE", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.IgnoreCase);
+                if (field is null || absent is not null || constant is null) return -1;
+                field?.SetValue(null, 45);
+                absent?.SetValue(null, 999);
+                if (absent?.GetValue(null) is not null) return -2;
+                if ((int)field!.GetValue(null) != 45 || (int)constant?.GetValue(null) != 45 || flagsCalls != 2) return -3;
+                return 1;
+            }
+        }
+        """, 1)),
+    ("ReflectionEventTypeCannotStandInForDifferentFieldSignature", () => {
+        using var input = new MemoryStream(Contracts.MonoBytes);
+        using var assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(input);
+        assembly.MainModule.GetType("ScheduleOne.Testing.Actor").Fields.Single(field => field.Name == "ReflectionEvent").FieldType =
+            assembly.MainModule.TypeSystem.Int32;
+        using var output = new MemoryStream();
+        assembly.Write(output);
+        var author = CompilationSupport.Create("Probe", """
+            public static class Probe { public static object Run() {
+                var field = typeof(ScheduleOne.Testing.Actor).GetField("ReflectionEvent",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+                return field.GetValue(null);
+            } }
+            """, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(output.ToArray())));
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Mismatched backing storage was adapted using an event type.");
+    }),
+    ("ReflectionAnalysisPreservesAccessAndDoesNotInventEventFields", () => {
+        var inaccessible = Lower("public static class Probe { public static int Run() => ScheduleOne.Testing.Actor.ReflectionPrivate; }");
+        Assert(!inaccessible.Success && inaccessible.Diagnostics.Any(d => d.Id is "CS0122" or "CS0117"),
+            "Reflection analysis must not change C# accessibility.");
+        var result = Lower("""
+            using System.Reflection;
+            using ScheduleOne.Testing;
+            public static class Probe {
+                public static object Missing() => typeof(Actor).GetField(nameof(Actor.ReflectionWithoutStorage),
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                public static object InheritedPrivate() => typeof(Employee).GetField(nameof(Actor.ReflectionEvent),
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy);
+                public static object WrongVisibility() => typeof(Actor).GetField(nameof(Actor.ReflectionEvent),
+                    BindingFlags.Static | BindingFlags.Public);
+                public static object WrongStorage() => typeof(Actor).GetField(nameof(Actor.ReflectionEvent),
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            }
+            """);
+        Assert(result.Success, "A custom event without storage is not a field: " + string.Join(Environment.NewLine, result.Diagnostics));
+    }),
+    ("ReflectionPublicizedFieldsRetainOriginalBindingFlags", () => {
+        var reference = MetadataReference.CreateFromImage(GameReferencePublicizer.CreateReference(Contracts.MonoBytes));
+        var result = new InteropCompiler().Lower(CompilationSupport.Create("Probe", """
+            using System.Reflection;
+            using ScheduleOne.Testing;
+            public static class Probe {
+                public static object Public() => typeof(Actor).GetField("ReflectionPrivate", BindingFlags.Static | BindingFlags.Public);
+                public static object Private() => typeof(Actor).GetField("ReflectionPrivate", BindingFlags.Static | BindingFlags.NonPublic);
+            }
+            """, CompilationSupport.PlatformReferences.Add(reference)), CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+        Assert(!result.Success && result.Diagnostics.Count(d => d.Id == "S1IC034") == 1 &&
+            result.Diagnostics.Single(d => d.Id == "S1IC034").Location.GetLineSpan().StartLinePosition.Line == 4,
+            "Publicized visibility changed reflection selection: " + string.Join(Environment.NewLine, result.Diagnostics));
+    }),
+    ("ReflectionRejectsMalformedOriginalVisibility", () => {
+        string?[] invalid = { null, "{", "{}", "null", "[{\"Type\":\"Missing\",\"Name\":\"Missing\",\"Access\":1}]",
+            "[{\"Type\":\"ScheduleOne.Testing.Actor\",\"Name\":\"ReflectionPrivate\",\"Access\":7}]",
+            "[{\"Type\":\"ScheduleOne.Testing.Actor\",\"Name\":\"ReflectionPrivate\",\"Access\":1},{\"Type\":\"ScheduleOne.Testing.Actor\",\"Name\":\"ReflectionPrivate\",\"Access\":1}]" };
+        foreach (string? json in invalid)
+        {
+            using var input = new MemoryStream(GameReferencePublicizer.CreateReference(Contracts.MonoBytes));
+            using var assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(input);
+            var attribute = assembly.CustomAttributes.Single(a => a.AttributeType.FullName == "System.Reflection.AssemblyMetadataAttribute" &&
+                a.ConstructorArguments[0].Value as string == GameReferencePublicizer.OriginalFieldVisibilityMetadataKey);
+            var owner = assembly.MainModule.GetType("ScheduleOne.Testing.Actor");
+            int index = owner.Fields.IndexOf(owner.Fields.Single(field => field.Name == "ReflectionPrivate"));
+            if (json is null) assembly.CustomAttributes.Remove(attribute);
+            else attribute.ConstructorArguments[1] = new Mono.Cecil.CustomAttributeArgument(assembly.MainModule.TypeSystem.String,
+                json.Replace("\"Name\":\"ReflectionPrivate\",", "\"Name\":\"ReflectionPrivate\",\"Index\":" + index + ",", StringComparison.Ordinal));
+            using var output = new MemoryStream();
+            assembly.Write(output);
+            var author = CompilationSupport.Create("Probe", """
+                public static class Probe { public static object Read() => typeof(ScheduleOne.Testing.Actor).GetField("ReflectionPrivate",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic); }
+                """, CompilationSupport.PlatformReferences.Add(MetadataReference.CreateFromImage(output.ToArray())));
+            try { new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference)); }
+            catch (ArgumentException exception) when (exception.Message.Contains("original field visibility", StringComparison.Ordinal)) { continue; }
+            throw new InvalidOperationException("Malformed original field visibility was accepted: " + json);
+        }
+    }),
+    ("ReflectionDuplicateFieldNamesDoNotCorruptOtherMetadata", () => {
+        using var input = new MemoryStream(Contracts.MonoBytes);
+        using var assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(input);
+        assembly.MainModule.GetType("ScheduleOne.Testing.Actor").Fields.Add(
+            new Mono.Cecil.FieldDefinition("ReflectionPrivate", Mono.Cecil.FieldAttributes.Private | Mono.Cecil.FieldAttributes.Static,
+                assembly.MainModule.TypeSystem.Int64));
+        using var output = new MemoryStream();
+        assembly.Write(output);
+        var reference = MetadataReference.CreateFromImage(GameReferencePublicizer.CreateReference(output.ToArray()));
+        var ordinary = CompilationSupport.Create("Probe", """
+            public static class Probe { public static object Read() => typeof(ScheduleOne.Testing.Actor).GetField("Name"); }
+            """, CompilationSupport.PlatformReferences.Add(reference));
+        var result = new InteropCompiler().Lower(ordinary, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+        Assert(result.Diagnostics.Count(d => d.Id == "S1IC034") == 1, "An unrelated duplicate field corrupted metadata lookup.");
+        var ambiguous = CompilationSupport.Create("Probe", """
+            public static class Probe { public static object Read() => typeof(ScheduleOne.Testing.Actor).GetField("ReflectionPrivate",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic); }
+            """, CompilationSupport.PlatformReferences.Add(reference));
+        try { new InteropCompiler().Lower(ambiguous, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference)); }
+        catch (ArgumentException exception) when (exception.Message.Contains("multiple field signatures", StringComparison.Ordinal)) { return; }
+        throw new InvalidOperationException("Ambiguous field signatures were silently selected.");
+    }),
+    ("ReflectionHarmonyAdapterUsesOriginalVisibility", () => {
+        var reference = MetadataReference.CreateFromImage(GameReferencePublicizer.CreateReference(Contracts.MonoBytes));
+        var author = CompilationSupport.Create("Probe", """
+            namespace HarmonyLib { public static class AccessTools {
+                public static System.Reflection.FieldInfo Field(System.Type type, string name) => type.GetField(name);
+            } }
+            public static class Probe { public static object Run() {
+                var field = HarmonyLib.AccessTools.Field(typeof(ScheduleOne.Testing.Actor), "ReflectionPrivate");
+                return field.GetValue(null);
+            } }
+            """, CompilationSupport.PlatformReferences.Add(reference));
+        var result = new InteropCompiler().Lower(author, CompilationSupport.PlatformReferences.Add(Contracts.NativeReference));
+        Assert(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert(result.Compilation.SyntaxTrees.Any(tree => tree.ToString().Contains("(global::System.Reflection.FieldAttributes)17", StringComparison.Ordinal)),
+            "Generated reflection adapter lost the original private/static flags.");
+    }),
     ("ReflectionTrackedFieldReadsWritesAndErrors", () => Verify("""
         using System;
         using System.Reflection;
@@ -591,7 +1258,7 @@ var tests = new (string Name, Action Test)[]
     }),
     ("ArrayUnhandledClrBoundariesRejectSilentCopies", () => {
         foreach (string body in new[] {
-            "return System.BitConverter.ToInt32(ArrayStore.Bytes, 0);"
+            "return System.BitConverter.ToString(ArrayStore.Bytes).Length;"
         }) {
             var result = Lower("using ScheduleOne.Testing; public static class Probe { public static int Run() { " + body + " } }");
             Assert(!result.Success && result.Diagnostics.Any(diagnostic => diagnostic.Id == "S1IC032"),

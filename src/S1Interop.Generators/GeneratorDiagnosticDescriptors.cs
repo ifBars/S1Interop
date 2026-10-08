@@ -36,5 +36,21 @@ internal static class GeneratorDiagnosticDescriptors
         "S1Interop",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor InjectedTypeConstructorDiagnostic = new(
+        "S1I009",
+        "IL2CPP-injected type needs an IntPtr constructor",
+        "'{0}' is registered with RegisterTypeInIl2Cpp but has no IntPtr constructor, so Il2CppInterop cannot wrap its native instances; mark the class and any containing classes partial so S1Interop generates one for IL2CPP builds",
+        "S1Interop",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor LanguageVersionDiagnostic = new(
+        "S1I010",
+        "S1Interop generated code needs C# 9 or later",
+        "This project compiles as C# {0}, so S1Interop only reports diagnostics; set <LangVersion>latest</LangVersion> to enable generated helpers, registries, and facades",
+        "S1Interop",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 #pragma warning restore RS2008
 }

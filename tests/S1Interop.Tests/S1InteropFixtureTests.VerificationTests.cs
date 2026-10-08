@@ -148,6 +148,7 @@ internal sealed partial class S1InteropFixtureTests
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
+                    <LangVersion>latest</LangVersion>
                     <S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>
                   </PropertyGroup>
                   <ItemGroup>
@@ -1751,8 +1752,9 @@ internal sealed partial class S1InteropFixtureTests
                 File.ReadAllText(targetsPath).Contains("<S1InteropCommand Condition=\"'$(S1InteropCommand)' == ''\">s1interop</S1InteropCommand>", StringComparison.Ordinal),
                 "Build hook target should keep the committed command default portable.");
             Assert(
-                File.ReadAllText(localPropsPath).Contains("dotnet run --project", StringComparison.Ordinal),
-                "Local command props should point at the local S1Interop CLI project.");
+                File.ReadAllText(localPropsPath).Contains("S1Interop.Cli.dll", StringComparison.Ordinal) &&
+                !File.ReadAllText(localPropsPath).Contains("dotnet run", StringComparison.Ordinal),
+                "Local command props should execute the built CLI without recursively building it inside the mod build.");
             Assert(
                 File.ReadAllLines(gitIgnorePath).Any(line => string.Equals(line.Trim(), "S1Interop.Build.local.props", StringComparison.OrdinalIgnoreCase)),
                 "Build hook apply should ignore local command props.");

@@ -80,7 +80,7 @@ public sealed partial class S1InteropTypeRegistryGenerator
         builder.AppendLine();
         builder.AppendLine("    internal static class S1InteropMemberRegistry");
         builder.AppendLine("    {");
-        builder.AppendLine("        private const System.Reflection.BindingFlags AllBindings = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static;");
+        builder.AppendLine("        private const System.Reflection.BindingFlags AllBindings = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy;");
         builder.AppendLine("        private static readonly System.Collections.Generic.Dictionary<string, System.Reflection.MemberInfo?> Cache = new System.Collections.Generic.Dictionary<string, System.Reflection.MemberInfo?>(System.StringComparer.Ordinal);");
         builder.AppendLine("        private static readonly System.Collections.Generic.List<S1InteropMemberResolutionReport> MutableReports = new System.Collections.Generic.List<S1InteropMemberResolutionReport>();");
         builder.AppendLine();

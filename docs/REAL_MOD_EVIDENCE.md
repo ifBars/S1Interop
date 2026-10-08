@@ -4,6 +4,12 @@ S1Interop is still alpha. This page tracks what the current test harness is mean
 
 The real-mod lanes run against sibling checkouts in the broader local ScheduleOne workspace. They copy projects into temporary folders before applying migrations or build-gate checks, then delete the copies. They should not mutate the original mod repositories.
 
+## Compiler source coverage
+
+On the verified Mono/IL2CPP 0.4.7f9 pair, the compiler harness passes 31 runtime checks per backend against an audited copy of 50 unchanged SteamNetworkLib files, including its streaming-buffer example. Automatic source-recognized event repair enables native clip creation; callback sample writes, silence padding and reset pass. Source hashes and owned deployment cleanup are recorded by `tests/Test-CompilerSteamNetwork.ps1`.
+
+This is local transport-override and buffer coverage. Steam networking, voice playback, audio-thread behavior and multiplayer remain unverified. See [the source compiler evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md#existing-mod-corpus) for scope and remaining gaps. The earlier facade/migration lanes below are separate workflows.
+
 ## Evidence Lanes
 
 ```batch
@@ -23,6 +29,16 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 ```
 
 ## Last Local Verifications
+
+On August 12, 2026, the focused backend-neutral lane completed against the current checkout:
+
+```batch
+dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug --no-build -- --integration-backend-neutral
+```
+
+Result: `S1Interop fixture tests passed (9 executed).`
+
+The local Hoverboard checkout was unavailable, so its migration-convergence, SDK-generation, and duplicate-`LangVersion` checks skipped explicitly. The remaining registered backend-neutral fixtures completed. This run therefore refreshes the broader lane without replacing the earlier Hoverboard-specific evidence below.
 
 On July 5, 2026, the focused backend-neutral real-mod lane passed locally against the current checkout:
 

@@ -4,6 +4,9 @@ internal static class S1InteropCli
 {
     public static int Run(string[] args)
     {
+        if (args.Length > 0 && args[0].Equals("compiler", StringComparison.OrdinalIgnoreCase))
+            return CompilerCommand.Run(args[1..]);
+
         if (IsVersionRequest(args))
         {
             Console.WriteLine(GetVersionText());

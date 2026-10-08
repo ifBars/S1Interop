@@ -36,6 +36,8 @@ internal static class RuntimeSupportBuilder
             trees = [.. trees, NativeReferenceArraySource.CreateTree(parse, token)];
         if (map.FindTargetType(CoroutineSupportSource.AdapterType) is not null)
             trees = [.. trees, CoroutineSupportSource.CreateTree(parse, map, token)];
+        if (map.FindTargetType("HarmonyLib.Harmony") is not null)
+            trees = [.. trees, NativeEventRepairSource.CreateTree(parse, token)];
         string contract = string.Join("\n", trees.Select(tree => tree.ToString())) + "\n" +
             map.NativeObjectBase!.ContainingAssembly.Identity + "\n" +
             map.FindTargetType("Il2CppSystem.Collections.Generic.List`1")?.ContainingAssembly.Identity + "\n" +

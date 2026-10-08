@@ -12,9 +12,10 @@ public sealed class BackendNeutralProjectScaffolder
     /// Builds a file plan for a new Schedule One mod project.
     /// </summary>
     /// <param name="targetDirectory">The directory that should contain the generated project.</param>
+    /// <param name="experimentalBackendNeutral">Whether to plan the experimental one-DLL facade project instead of the default dual-runtime project.</param>
     /// <returns>The planned project paths and generated project name.</returns>
     /// <exception cref="ArgumentException">Thrown when a valid project name cannot be inferred from <paramref name="targetDirectory"/>.</exception>
-    public NewProjectPlan CreatePlan(string targetDirectory)
+    public NewProjectPlan CreatePlan(string targetDirectory, bool experimentalBackendNeutral = false)
     {
         string fullTargetDirectory = Path.GetFullPath(targetDirectory);
         string projectName = SanitizeIdentifier(new DirectoryInfo(fullTargetDirectory).Name);
@@ -23,9 +24,13 @@ public sealed class BackendNeutralProjectScaffolder
             throw new ArgumentException("Could not infer a valid project name from the target path.", nameof(targetDirectory));
         }
 
-        string starterPath = Path.Combine(fullTargetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName);
+        // Dual-runtime projects only need a declaration file once they opt into facades; `s1interop init` adds it then.
+        string? starterPath = experimentalBackendNeutral
+            ? Path.Combine(fullTargetDirectory, "S1Interop.Generated", BackendNeutralStarterGenerator.SourceFileName)
+            : null;
         return new NewProjectPlan(
             projectName,
+            experimentalBackendNeutral,
             fullTargetDirectory,
             Path.Combine(fullTargetDirectory, $"{projectName}.sln"),
             Path.Combine(fullTargetDirectory, $"{projectName}.csproj"),
@@ -37,26 +42,16 @@ public sealed class BackendNeutralProjectScaffolder
     }
 
     /// <summary>
-    /// Writes the files described by a project plan using the legacy experimental backend-neutral shape.
+    /// Writes the files described by a project plan.
     /// </summary>
     /// <param name="plan">The project plan to write to disk.</param>
     /// <remarks>
-    /// Existing files at the planned paths are overwritten. Call <see cref="CreatePlan(string)"/> first when callers need to review paths before writing.
+    /// Existing files at the planned paths are overwritten. Call <see cref="CreatePlan(string, bool)"/> first when callers need to review paths before writing.
     /// </remarks>
     public void Apply(NewProjectPlan plan)
     {
-        Apply(plan, experimentalBackendNeutral: true);
-    }
-
-    /// <summary>
-    /// Writes either the default dual-runtime starter or the explicitly requested experimental backend-neutral starter.
-    /// </summary>
-    /// <param name="plan">The project plan to write.</param>
-    /// <param name="experimentalBackendNeutral">Whether to create the experimental one-DLL facade-oriented project instead of the default dual-runtime project.</param>
-    public void Apply(NewProjectPlan plan, bool experimentalBackendNeutral)
-    {
+        bool experimentalBackendNeutral = plan.ExperimentalBackendNeutral;
         Directory.CreateDirectory(plan.TargetDirectory);
-        Directory.CreateDirectory(Path.GetDirectoryName(plan.StarterPath)!);
         File.WriteAllText(plan.SolutionPath, GenerateSolution(plan.ProjectName, experimentalBackendNeutral), Encoding.UTF8);
         File.WriteAllText(
             plan.ProjectPath,
@@ -64,8 +59,18 @@ public sealed class BackendNeutralProjectScaffolder
                 ? GenerateBackendNeutralProject(plan.ProjectName)
                 : GenerateDualRuntimeProject(plan.ProjectName),
             Encoding.UTF8);
-        File.WriteAllText(plan.CorePath, GenerateCore(plan.ProjectName), Encoding.UTF8);
-        File.WriteAllText(plan.StarterPath, new BackendNeutralStarterGenerator().GenerateSource(), Encoding.UTF8);
+        File.WriteAllText(
+            plan.CorePath,
+            experimentalBackendNeutral
+                ? GenerateBackendNeutralCore(plan.ProjectName)
+                : GenerateDualRuntimeCore(plan.ProjectName),
+            Encoding.UTF8);
+        if (plan.StarterPath is not null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(plan.StarterPath)!);
+            File.WriteAllText(plan.StarterPath, new BackendNeutralStarterGenerator().GenerateSource(), Encoding.UTF8);
+        }
+
         File.WriteAllText(plan.LocalPropsExamplePath, GenerateLocalPropsExample(), Encoding.UTF8);
         File.WriteAllText(plan.GitignorePath, GenerateGitignore(), Encoding.UTF8);
         File.WriteAllText(
@@ -163,16 +168,14 @@ public sealed class BackendNeutralProjectScaffolder
             <RootNamespace>{projectName}</RootNamespace>
             <AssemblyName>{projectName}</AssemblyName>
             <Version>0.1.0</Version>
+            <!-- S1Interop.Generators references MelonLoader plus the game and Unity assemblies of the selected runtime. -->
+            <S1InteropGameReferences>true</S1InteropGameReferences>
           </PropertyGroup>
 
           <PropertyGroup Condition="'$(Configuration)'=='Debug Mono' Or '$(Configuration)'=='Release Mono'">
             <TargetFramework>netstandard2.1</TargetFramework>
             <S1InteropTargetRuntime>Mono</S1InteropTargetRuntime>
-            <S1InteropReferenceRuntime>Mono</S1InteropReferenceRuntime>
             <DefineConstants>$(DefineConstants);MONO</DefineConstants>
-            <GamePath>$(MonoGamePath)</GamePath>
-            <ManagedPath>$(GamePath)\Schedule I_Data\Managed</ManagedPath>
-            <MelonLoaderPath>$(GamePath)\MelonLoader\net35</MelonLoaderPath>
             <BaseOutputPath>bin\Mono\</BaseOutputPath>
             <IntermediateOutputPath>obj\Mono\$(Configuration)\</IntermediateOutputPath>
           </PropertyGroup>
@@ -180,13 +183,14 @@ public sealed class BackendNeutralProjectScaffolder
           <PropertyGroup Condition="'$(Configuration)'=='Debug Il2Cpp' Or '$(Configuration)'=='Release Il2Cpp'">
             <TargetFramework>net6.0</TargetFramework>
             <S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>
-            <S1InteropReferenceRuntime>Il2Cpp</S1InteropReferenceRuntime>
             <DefineConstants>$(DefineConstants);IL2CPP</DefineConstants>
-            <GamePath>$(Il2CppGamePath)</GamePath>
-            <ManagedPath>$(GamePath)\MelonLoader\Il2CppAssemblies</ManagedPath>
-            <MelonLoaderPath>$(GamePath)\MelonLoader\net6</MelonLoaderPath>
             <BaseOutputPath>bin\Il2Cpp\</BaseOutputPath>
             <IntermediateOutputPath>obj\Il2Cpp\$(Configuration)\</IntermediateOutputPath>
+          </PropertyGroup>
+
+          <PropertyGroup Condition="'$(Configuration)'=='Debug Mono' Or '$(Configuration)'=='Debug Il2Cpp'">
+            <!-- Debug builds copy the DLL into the matching install's Mods folder. Close the game before building. -->
+            <S1InteropDeployToGame>true</S1InteropDeployToGame>
           </PropertyGroup>
 
           <ItemGroup>
@@ -194,39 +198,12 @@ public sealed class BackendNeutralProjectScaffolder
           </ItemGroup>
 
           <ItemGroup>
-            <Reference Include="MelonLoader">
-              <HintPath>$(MelonLoaderPath)\MelonLoader.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
-            <Reference Include="0Harmony">
-              <HintPath>$(MelonLoaderPath)\0Harmony.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
-            <Reference Include="UnityEngine.CoreModule">
-              <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
-            <Reference Include="Assembly-CSharp">
-              <HintPath>$(ManagedPath)\Assembly-CSharp.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
-            <Reference Include="ScheduleOne.Core" Condition="'$(S1InteropReferenceRuntime)'!='Il2Cpp'">
-              <HintPath>$(ManagedPath)\ScheduleOne.Core.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
-            <Reference Include="Il2CppScheduleOne.Core" Condition="'$(S1InteropReferenceRuntime)'=='Il2Cpp'">
-              <HintPath>$(ManagedPath)\Il2CppScheduleOne.Core.dll</HintPath>
-              <Private>false</Private>
-            </Reference>
+            <!-- Imported in every file. IL2CPP builds import the Il2Cpp-prefixed namespace, so source needs no #if blocks. -->
+            <S1InteropUsing Include="ScheduleOne.NPCs" />
+            <S1InteropUsing Include="ScheduleOne.PlayerScripts" />
+            <!-- Cross-runtime helpers: TryCast, AsEnumerable, ToManagedList, UnityEvent AddListener/Subscribe. -->
+            <Using Include="S1Interop" />
           </ItemGroup>
-
-          <Target Name="ValidateS1InteropLocalPaths" BeforeTargets="ResolveReferences">
-            <Error Text="Choose one of the supported configurations: Debug Mono, Release Mono, Debug Il2Cpp, or Release Il2Cpp." Condition="'$(S1InteropTargetRuntime)'==''" />
-            <Error Text="Missing MelonLoader at $(MelonLoaderPath). Run s1interop doctor, then s1interop setup . --apply." Condition="'$(MelonLoaderPath)'=='' or !Exists('$(MelonLoaderPath)\MelonLoader.dll')" />
-            <Error Text="Missing game references at $(ManagedPath). Run s1interop doctor and verify the selected branch has completed MelonLoader setup." Condition="'$(ManagedPath)'=='' or !Exists('$(ManagedPath)\Assembly-CSharp.dll')" />
-            <Error Text="Missing ScheduleOne.Core at $(ManagedPath)." Condition="'$(S1InteropTargetRuntime)'=='Mono' and !Exists('$(ManagedPath)\ScheduleOne.Core.dll')" />
-            <Error Text="Missing Il2CppScheduleOne.Core at $(ManagedPath)." Condition="'$(S1InteropTargetRuntime)'=='Il2Cpp' and !Exists('$(ManagedPath)\Il2CppScheduleOne.Core.dll')" />
-          </Target>
         </Project>
         """;
 
@@ -264,7 +241,38 @@ public sealed class BackendNeutralProjectScaffolder
         return builder.ToString();
     }
 
-    private static string GenerateCore(string projectName) =>
+    private static string GenerateDualRuntimeCore(string projectName) =>
+        $$"""
+        using MelonLoader;
+        using UnityEngine;
+
+        [assembly: MelonInfo(typeof({{projectName}}.ModCore), "{{projectName}}", "0.1.0", "YourName")]
+        [assembly: MelonGame("TVGS", "Schedule I")]
+
+        namespace {{projectName}};
+
+        public sealed class ModCore : MelonMod
+        {
+            public const string ModName = "{{projectName}}";
+
+            public override void OnInitializeMelon()
+            {
+                LoggerInstance.Msg($"{ModName} loaded on {S1Interop.Generated.S1InteropRuntime.Backend}.");
+            }
+
+            public override void OnUpdate()
+            {
+                // NPCManager is ScheduleOne.NPCs.NPCManager on Mono and Il2CppScheduleOne.NPCs.NPCManager on IL2CPP.
+                // The S1InteropUsing items in the .csproj import the right namespace, so this file needs no #if blocks.
+                if (Input.GetKeyDown(KeyCode.F8))
+                {
+                    LoggerInstance.Msg($"{NPCManager.NPCRegistry.Count} NPCs are registered.");
+                }
+            }
+        }
+        """;
+
+    private static string GenerateBackendNeutralCore(string projectName) =>
         $$"""
         using MelonLoader;
 
@@ -380,52 +388,56 @@ public sealed class BackendNeutralProjectScaffolder
 
         Schedule One MelonLoader mod scaffold created by S1Interop.
 
-        This default starter keeps Mono and IL2CPP builds explicit. S1Interop supplies compile-time diagnostics and runtime reporting without requiring the experimental backend-neutral facade path.
+        One source tree builds a separate Mono DLL and IL2CPP DLL. S1Interop references the game for whichever runtime you build, imports the right game namespaces, and copies Debug builds into that install's `Mods` folder.
 
         ## First local setup
 
-        Preview the detected inputs:
+        Preview the detected inputs, then write only the ignored local configuration:
 
         ```powershell
         s1interop doctor .
-        s1interop setup .
-        ```
-
-        When every required check is ready, write only the ignored local configuration:
-
-        ```powershell
         s1interop setup . --apply
         ```
 
         `setup` does not install software, change your project, or overwrite an existing `local.build.props`.
 
-        ## Build and success check
+        ## Build, deploy, and run
 
-        Build the branch you have installed:
+        Use the configuration matching the install you want to test. The default and `beta` Steam branches are IL2CPP; `alternate` and `alternate-beta` are Mono.
 
         ```powershell
-        dotnet build .\{{projectName}}.sln -c "Debug Mono"
-        dotnet build .\{{projectName}}.sln -c "Debug Il2Cpp"
+        dotnet build -c "Debug Il2Cpp"   # builds and copies the DLL into <Il2CppGamePath>\Mods
+        dotnet run -c "Debug Il2Cpp"     # also starts that install
+        dotnet build -c "Debug Mono"
+        dotnet run -c "Debug Mono"
         ```
 
-        The DLLs are written under:
+        Close the game before building; a running game locks the DLL in `Mods`. Release configurations build without deploying:
 
         ```text
-        bin\Mono\Debug Mono\netstandard2.1\{{projectName}}.dll
-        bin\Il2Cpp\Debug Il2Cpp\net6.0\{{projectName}}.dll
+        bin\Mono\Release Mono\netstandard2.1\{{projectName}}.dll
+        bin\Il2Cpp\Release Il2Cpp\net6.0\{{projectName}}.dll
         ```
 
-        Copy only the DLL matching the active game branch into that install's `Mods` folder. After launch, expect:
+        After launch, the MelonLoader console shows `{{projectName}} loaded on Mono.` or `{{projectName}} loaded on Il2Cpp.`. Load a save and press F8 to log the NPC count.
 
-        ```text
-        {{projectName}} loaded on Mono.
+        ## Writing code for both runtimes
+
+        Game namespaces are `ScheduleOne.*` on Mono and `Il2CppScheduleOne.*` on IL2CPP. Instead of `#if` blocks around `using` directives, list the namespaces once in the `.csproj`:
+
+        ```xml
+        <S1InteropUsing Include="ScheduleOne.Employees" />
         ```
 
-        or:
+        The `S1Interop` namespace adds calls that compile the same way on both runtimes:
 
-        ```text
-        {{projectName}} loaded on Il2Cpp.
+        ```csharp
+        Employee? employee = npc.TryCast<Employee>();     // instead of `npc as Employee`
+        var names = NPCManager.NPCRegistry.AsEnumerable().Select(n => n.FirstName);
+        button.onClick.AddListener(() => LoggerInstance.Msg("Clicked"));
         ```
+
+        Keep `#if MONO` / `#if IL2CPP` for the few places where the runtimes really differ.
 
         ## Common tasks
 

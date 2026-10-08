@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="local.build.props" Condition="Exists('local.build.props')" />
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>S1Interop.Compiler.NativeAtomicEventSmoke</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <RuntimeLibraryPath Condition="'$(RuntimeLibraryPath)'==''">$(MSBuildThisFileDirectory)..\S1Interop.Compiler.RuntimeLibrary\bin\Il2Cpp\Il2Cpp\net6.0</RuntimeLibraryPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\Il2CppAssemblies\*.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\MelonLoader.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\0Harmony.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(Il2CppGamePath)\MelonLoader\net6\Il2CppInterop.Common.dll" Private="false" />
+    <!-- Optional generated-ownership lane exercises the actual compiler support assembly. -->
+    <Reference Include="S1Interop.Runtime" HintPath="$(RuntimeLibraryPath)\S1Interop.Runtime.dll" Private="true" />
+    <None Include="$(RuntimeLibraryPath)\S1Interop.Compiler.RuntimeLibrary.dll" Link="S1Interop.Compiler.RuntimeLibrary.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="ValidateNativeProbeInputs" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(Il2CppGamePath)\MelonLoader\Il2CppAssemblies\UnityEngine.AudioModule.dll')" Text="Set Il2CppGamePath to a dedicated generated IL2CPP test install." />
+  </Target>
+</Project>

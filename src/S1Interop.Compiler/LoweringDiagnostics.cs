@@ -9,7 +9,7 @@ internal static class LoweringDiagnostics
     public static readonly DiagnosticDescriptor UnsupportedNativeArray = Error(
         "S1IC032",
         "Native array storage is not lowered",
-        "Array boundary '{0}' requires shared native storage; implicit CLR/IL2CPP array conversions copy elements and do not preserve aliases. This array shape is not lowered to native storage (only rank-1 primitive scalar arrays connected to an Il2CppStructArray slot, and rank-1 arrays of mapped native reference classes connected to an Il2CppReferenceArray slot, are)");
+        "Array boundary '{0}' requires shared native storage; implicit CLR/IL2CPP array conversions copy elements and do not preserve aliases. Supported shapes are rank-1 primitive scalar or mapped enum arrays with matching underlying types connected to an Il2CppStructArray slot, and rank-1 mapped native reference class arrays connected to an Il2CppReferenceArray slot");
 
     public static readonly DiagnosticDescriptor UnsupportedNativeArrayOperation = Error(
         "S1IC033",

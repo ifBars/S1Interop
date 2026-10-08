@@ -1,149 +1,49 @@
 # FAQ
 
-Common questions about migration paths, packages, safety, and scope.
+## Which workflow should I start with?
 
-## Which migration path should I choose: backend-neutral or dual-runtime?
+Use the locally built candidate's source compiler: [install it](getting-started.md), then follow [the first-mod guide](first-mod.md) or [existing-mod adoption](compiler-adoption.md). It builds ordinary game source for both runtimes without facade declarations. The earlier published package has different defaults.
 
-Choose based on how much runtime-specific code your mod has:
-
-- **Backend-neutral**: one assembly uses generated `S1Interop.ScheduleOne.*` facades on Mono or IL2CPP.
-- **Dual-runtime**: two assemblies, one for Mono and one for IL2CPP, keep runtime-specific code paths intact.
-
-> [!TIP]
-> Start with dual-runtime if your mod relies on Harmony transpilers, managed collection callbacks at IL2CPP boundaries, or other patterns that are hard to abstract away. Move toward backend-neutral as those surfaces are covered and the tool matures.
-
-Both paths produce a rollback manifest so you can undo the migration if you change your mind.
-
-## Do I need the whole S1Interop workflow?
-
-No. Pick the parts that solve your current problem.
-
-- Use `analyze`, `lint`, and `build-hook` if you want guardrails while keeping manual Mono/IL2CPP code.
-- Use `migrate --dual-runtime` if you want separate Mono and IL2CPP outputs from one source tree.
-- Use declarations and `S1Interop.Generators` if you want generated helpers, diagnostics, patch targets, or facades.
-- Use `sdkgen` when you want S1Interop to write facade declarations from source usage or local metadata.
-
-See [Use cases](use-cases.md).
+Use `--legacy-generator` or `--backend-neutral` only when you deliberately want the older helper or facade project. The `migrate` commands still target those older workflows; they do not enable the compiler.
 
 ## Do I need both the CLI and the generator package?
 
-Many mods use both, but they do different jobs:
+The default compiler project needs the pinned `s1interop` local tool and its matching build imports. Those imports call `s1interop compiler` during builds. It does not need `S1Interop.Generators`.
 
-- The **CLI** (`S1Interop`) writes declaration files, migrates source, updates project files, and verifies results in sandboxes. It runs on demand from a terminal and never runs during compilation.
-- The **generator package** (`S1Interop.Generators`) reads those declarations and emits facades, runtime helpers, and diagnostics during every build and IDE design-time compilation of your mod project.
+The generator package is for the older declaration, helper, and diagnostics workflow. You can continue using that package without adopting the compiler.
 
-If your project already has declarations and only needs generated output or diagnostics, reference just `S1Interop.Generators` and author declarations by hand.
+## Do players install S1Interop?
 
-> [!NOTE]
-> The `S1Interop.Generators` package ships only a Roslyn analyzer DLL under `analyzers/dotnet/cs`. It does not add a runtime assembly to your mod's output.
+Players do not install the CLI or generator. Compiler-built IL2CPP mods require the matching `S1Interop.Runtime.dll` in `UserLibs`; Mono outputs do not. Use compatible support generations across installed compiler-built mods. See [distribution](distributing-mods.md).
+
+## Do I need a Mono installation to build an IL2CPP mod?
+
+Yes. The compiler binds author source against Mono metadata, then adapts it to the matching IL2CPP reference surface. The native installation must have generated MelonLoader interop assemblies. The build verifies the game versions and interop generation provenance.
+
+## Do I have to use the generated SDK or runtime conditionals?
+
+No. New compiler projects use ordinary `ScheduleOne.*` source. Existing `MONO` branches are selected for both outputs; the compiler adapts supported differences. Framework-specific conditionals remain framework-specific. No manual facade catalog is required.
 
 ## Will S1Interop convert my entire mod automatically?
 
-No. If S1Interop cannot prove a rewrite is safe, it produces a source-risk report instead of guessing.
-
-- Advanced mods that use Harmony transpilers, reflection, or tightly coupled IL2CPP patterns may still need explicit `S1InteropMember` declarations or small manual source edits.
-- Unsupported patterns surface as diagnostics (`S1I004`-`S1I008`) or source-risk entries.
-
-## Do I have to use the generated SDK?
-
-No. The generated SDK is one use case. You can keep hand-written backend branches and still use S1Interop diagnostics, build hooks, patch target attributes, object/delegate bridges, Steam P2P helpers, or selected member bindings.
-
-Use generated facades when they remove real duplicated backend code. Skip them where your manual runtime split is clearer.
+That is not established. The compiler has known unsupported operations and unverified runtime behavior. Missing dependencies and source written for a different game API must also be distinguished from lowering failures. Read the [support and evidence guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md). Build success alone does not prove gameplay or multiplayer compatibility.
 
 ## Does S1Interop redistribute Schedule One game files?
 
-Never. S1Interop generates facades from local reference metadata on disk. It does not:
-
-- commit game assemblies to version control,
-- include game files in generated NuGet packages,
-- redistribute IL2CPP wrappers, decompiled source, or game assets.
-
-The `local.build.props` file that holds your install paths is gitignored precisely to keep those machine-specific paths out of source control.
+No. Keep game assemblies, reference-only copies, generated IL2CPP proxies, decompiled source, and game assets local. Do not commit machine-specific `local.build.props`. Distribute only your mod and its permitted runtime dependencies.
 
 ## Does S1Interop replace S1API or other helper libraries?
 
-No. S1Interop is a generated interop layer, not a gameplay API.
-
-Use S1API when you want item, NPC, shop, saveable, or UI workflows. Use MAPI when you want building/model construction. Use SteamNetworkLib when you want a higher-level networking client, sync vars, DTOs, chunking, or a message protocol. Use DedicatedServerMod APIs for headless server/client extension points.
-
-S1Interop can still help networking mods at the low level. Its generated runtime helpers cover backend-neutral Steamworks packet buffers, relay/session calls, callback pumping, reliable send-mode lookup, Steam IDs, and Schedule One lobby member lookup. Your mod should not need separate Mono and IL2CPP reflection paths for those seams.
-
-Use S1Interop when your mod or helper library still needs direct access to `ScheduleOne.*` or `Il2CppScheduleOne.*` types and you do not want every consumer to hand-maintain Mono and IL2CPP conditionals.
-
-See [S1API and S1Interop](s1api-and-s1interop.md).
-
-## Why are my declaration diagnostics (S1I001-S1I003) silent?
-
-Declaration diagnostics only fire when Mono or IL2CPP reference assemblies are present in the compilation. When `MonoGamePath` and `Il2CppGamePath` are not configured, the generator has no game assembly surface to validate against and stays quiet so package-restore and docs-only builds do not fail.
-
-**Fix:** Copy `local.build.props.example` to `local.build.props` and fill in the path for each reference build you plan to run:
-
-```xml
-<Project>
-  <PropertyGroup>
-    <MonoGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I</MonoGamePath>
-    <Il2CppGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I IL2CPP</Il2CppGamePath>
-  </PropertyGroup>
-</Project>
-```
-
-Once the selected build resolves a real game reference surface, `S1I001`-`S1I003` can report declarations whose types or members are missing from that surface. Run both the normal Mono-reference build and the optional IL2CPP-reference build when you want validation against both.
-
-## Can I use sdkgen without running the CLI first?
-
-Yes. If your project already references `S1Interop.Generators`, you can author declarations by hand in `S1Interop.Generated/S1Interop.BackendNeutral.cs` without ever running `sdkgen`. The generator will pick them up on the next build.
-
-`sdkgen` is still the best starting point because it inspects real source usage, aliases, namespace imports, string-held game type names, and local metadata. Hand-authoring is mainly for `S1InteropMember` bindings that automatic discovery cannot infer.
+It adapts direct game access, rather than defining gameplay systems. Higher-level libraries may remain useful, but their dependency surfaces must be compatible with the chosen compiler build. See [S1API and S1Interop](s1api-and-s1interop.md).
 
 ## What does --dry-run do vs --apply?
 
-- **`--dry-run`** shows operations without writing files: source rewrites, project edits, solution updates, and generated declarations.
-- **`--apply`** writes the changes: modifies source files, updates `.csproj` and `.sln` files, writes declaration files, creates backups, and records a rollback manifest under `s1interop-runs/<run-id>/`.
+Project-changing commands preview their plan until `--apply` is supplied; `--dry-run` requests an explicit preview. Applied legacy migrations record backups and rollback manifests. Compiler builds generate intermediate files and output assemblies normally; they are not migration previews and do not deploy the default scaffold.
 
-> [!WARNING]
-> Always review `--dry-run` output before running `--apply`. Once `--apply` runs you can roll back, but it is faster and less error-prone to catch surprises in the dry run first.
+## Why are my declaration diagnostics silent?
 
-## How do I undo a migration?
+This concerns the older generator workflow. Declaration diagnostics require actual game reference metadata. See [generator diagnostics](diagnostics.md) and [local paths](local-paths.md). Silence is not proof of compatibility.
 
-Every applied migration writes backups of changed files and a rollback manifest under `s1interop-runs/<run-id>/`. To restore everything to its pre-migration state, run:
+## When do generated facades update?
 
-```batch
-s1interop migrate rollback .\s1interop-runs\<run-id>\manifest.json
-```
-
-Replace `<run-id>` with the directory name created by the `--apply` run you want to undo. The rollback restores all backed-up files and removes any files that were newly created by the migration.
-
-## What is local.build.props and why is it gitignored?
-
-`local.build.props` is a machine-specific MSBuild props file that holds your Schedule One install paths:
-
-```xml
-<Project>
-  <PropertyGroup>
-    <MonoGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I</MonoGamePath>
-    <Il2CppGamePath>C:\Program Files (x86)\Steam\steamapps\common\Schedule I IL2CPP</Il2CppGamePath>
-  </PropertyGroup>
-</Project>
-```
-
-It is gitignored because install paths differ by machine. Committing it would break other developers and expose local file-system layout.
-
-**To set it up:** copy `local.build.props.example` (which is committed) to `local.build.props` and fill in your own paths. The example file is the template; your filled-in copy stays local.
-
-## When do generated symbols appear in IntelliSense?
-
-Generated symbols appear after a design-time build (triggered automatically by your IDE) or a full build (`dotnet build`). The timeline is:
-
-1. You edit or add a declaration in `S1Interop.BackendNeutral.cs`.
-2. You save the file.
-3. Your IDE runs a design-time build in the background, or you run `dotnet build` manually.
-4. The new facade classes, `Handle` types, and member accessors appear in IntelliSense and are compiled into your assembly.
-
-If symbols are missing immediately after editing declarations, build once. Generated symbols require a compilation pass; restore is not enough.
-
-## Related pages
-
-- [Troubleshooting](troubleshooting.md)
-- [Core concepts](core-concepts.md)
-- [Generated output](generator-package.md)
-- [Declarations](backend-neutral-declarations.md)
+This also concerns the older generator workflow. An IDE design-time build or normal compilation runs the generator after declarations change. Restore alone does not generate those symbols. See [generated output](generator-package.md).

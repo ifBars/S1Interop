@@ -79,7 +79,7 @@ public static class BuildValidationHook
           """;
 
     /// <summary>
-    /// Generates local validation props using a repository CLI project when one can be found, or the installed <c>s1interop</c> command otherwise.
+    /// Generates local validation props using the built repository CLI when available, or the installed <c>s1interop</c> command otherwise.
     /// </summary>
     /// <returns>The complete local props XML.</returns>
     public static string GenerateLocalProps() =>
@@ -104,10 +104,12 @@ public static class BuildValidationHook
 
     private static string ResolveDefaultCommand()
     {
-        string? cliProject = FindCliProjectPath();
-        return cliProject is null
-            ? "s1interop"
-            : $"dotnet run --project \"{cliProject}\" --";
+        string cliAssembly = Path.Combine(AppContext.BaseDirectory, "S1Interop.Cli.dll");
+        string runtimeConfig = Path.ChangeExtension(cliAssembly, ".runtimeconfig.json");
+        // A build hook must not recursively build the CLI under the mod's SDK/environment.
+        return FindCliProjectPath() is not null && File.Exists(cliAssembly) && File.Exists(runtimeConfig)
+            ? $"dotnet \"{cliAssembly}\""
+            : "s1interop";
     }
 
     private static string? FindCliProjectPath()

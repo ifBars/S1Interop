@@ -302,7 +302,7 @@ internal sealed class ComponentFieldLowering(SemanticModel model, MetadataSymbol
 
                     reserved.UnionWith(names);
                     builder.Add(new FieldPlan(field, keyword, field.Type.SpecialType == SpecialType.System_String,
-                        Scalar(field.Type) is null, property, staged, ready, pads));
+                        ScalarShape(field.Type) is null, property, staged, ready, pads));
                     break;
                 }
             }
@@ -435,8 +435,8 @@ internal sealed class ComponentFieldLowering(SemanticModel model, MetadataSymbol
     // decimal is deliberately absent: Unity does not serialize it.
     private (string Keyword, int Size)? FieldShape(ITypeSymbol type)
     {
-        if (Scalar(type) is { } scalar) return scalar;
-        if (map.SupportsNativeArrays && NativeArraySource.IsSupportedArray(type) && map.FindTargetType(ReferenceFieldName) is not null)
+        if (ScalarShape(type) is { } scalar) return scalar;
+        if (map.SupportsNativeArrays && NativeArraySource.IsSupportedArray(map, type) && map.FindTargetType(ReferenceFieldName) is not null)
             return (NativeArrayLowering.Display(map, (IArrayTypeSymbol)type), 8);
         if (map.SupportsNativeReferenceArrays && NativeReferenceArraySource.IsMappedReferenceArray(map, type) &&
             type is IArrayTypeSymbol references && FieldShape(references.ElementType) is not null)
@@ -451,6 +451,17 @@ internal sealed class ComponentFieldLowering(SemanticModel model, MetadataSymbol
         for (var current = target; current is not null; current = current.BaseType)
             if (SymbolEqualityComparer.Default.Equals(current, nativeUnityObject))
                 return (map.TargetDisplay(type), 8);
+        return null;
+    }
+
+    private (string Keyword, int Size)? ScalarShape(ITypeSymbol type)
+    {
+        if (Scalar(type) is { } scalar) return scalar;
+        if (type is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlying } named &&
+            !map.IsAuthorType(named) &&
+            map.Resolve(named).Target is { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } targetUnderlying } &&
+            underlying.SpecialType == targetUnderlying.SpecialType && Scalar(underlying) is { } storage)
+            return (map.TargetDisplay(type), storage.Size);
         return null;
     }
 

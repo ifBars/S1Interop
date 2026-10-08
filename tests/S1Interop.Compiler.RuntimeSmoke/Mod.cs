@@ -41,6 +41,29 @@ public sealed class Mod : MelonMod
                 "MoreXP reflection reads and writes native Unity object field");
             Require(((LayerMask)maskField.GetValue(recycler)!).value == 257 && recycler.DetectionMask.value == 257,
                 "MoreXP reflection round-trips boxed LayerMask field");
+            var lobby = ScheduleOne.DevUtilities.Singleton<ScheduleOne.Networking.Lobby>.Instance;
+            if (lobby == null) throw new InvalidOperationException("BiggerLobbies reflection probe requires the initialized menu lobby");
+            var lobbyService = BiggerLobbiesReflectionProbe.GetLobbyService(lobby);
+            Require(lobbyService != null && lobbyService == lobby._lobbyService,
+                "BiggerLobbies Traverse read preserves native lobby service identity");
+            Require(BiggerLobbiesReflectionProbe.GetLobbyService(null) == null,
+                "BiggerLobbies Traverse read preserves null root behavior");
+            var consoleReflection = new ConsoleReflectionProbe();
+            var originalCommands = consoleReflection.Read();
+            Require(originalCommands != null && ReferenceEquals(originalCommands, ScheduleOne.Console.commands),
+                "ConsoleForAll cached dictionary reflection preserves the game table identity");
+            try
+            {
+                var replacementCommands = new Dictionary<string, ScheduleOne.Console.ConsoleCommand>();
+                consoleReflection.Write(replacementCommands);
+                var reflectedCommands = consoleReflection.Read()!;
+                reflectedCommands.Add("__s1interop_probe__", null!);
+                Require(ReferenceEquals(replacementCommands, reflectedCommands) && ScheduleOne.Console.commands.ContainsKey("__s1interop_probe__"),
+                    "reflected dictionary replacement and mutation share native game storage");
+            }
+            finally { consoleReflection.Write(originalCommands!); }
+            Require(ReferenceEquals(originalCommands, consoleReflection.Read()) && ReferenceEquals(originalCommands, ScheduleOne.Console.commands),
+                "reflected game command table is restored with its original identity");
             var serializedOwner = new GameObject("S1Interop serialized field probe");
             serializedOwner.transform.SetParent(created.transform, false);
             var serialized = serializedOwner.AddComponent<LibrarySerializedComponent>();
@@ -58,7 +81,95 @@ public sealed class Mod : MelonMod
             serialized.DecodePayload("");
             Require(!object.ReferenceEquals(firstEmptyPayload, serialized.Payload) && serialized.ReadPayload(0, 0) == "",
                 "Base64 empty buffers retain fresh identity and support empty UTF8 slices");
+            serialized.SetBinaryPayload(0x12345678);
+            var binaryAlias = serialized.Payload;
+            Require(serialized.ReadBinaryPayload() == 0x12345678 && BitConverter.ToUInt32(binaryAlias, 0) == 0x12345678,
+                "binary conversions read native component storage across compiler library boundary");
+            binaryAlias[0] ^= 1;
+            GC.Collect();
+            Require(serialized.ReadBinaryPayload() == (0x12345678 ^ (BitConverter.IsLittleEndian ? 1 : 0x1000000)) &&
+                object.ReferenceEquals(binaryAlias, serialized.Payload), "binary reads preserve mutated alias after collection");
+            bool shortBinaryRejected = false;
+            try { BitConverter.ToDouble(binaryAlias, 0); }
+            catch (ArgumentException e) { shortBinaryRejected = e.ParamName == "value"; }
+            Require(shortBinaryRejected, "binary read preserves insufficient-buffer exception parameter");
             Require(serialized.Number == 7 && serialized.Label == "before", "serialized component constructor initializers");
+            var qualityAlias = serialized.Qualities;
+            int pcmCalls = 0;
+            AudioClip.PCMReaderCallback pcm = samples => { pcmCalls++; samples[0] = 0.25f; samples[1] = -0.5f; };
+            float[] pcmSamples = new float[2];
+            pcm(pcmSamples);
+            Require(pcmCalls == 1 && pcmSamples[0] == 0.25f && pcmSamples[1] == -0.5f, "native PCM delegate writes through array storage");
+            GC.Collect(); GC.WaitForPendingFinalizers();
+            pcm(pcmSamples);
+            Require(pcmCalls == 2 && pcmSamples[1] == -0.5f, "retained PCM callback survives managed collection");
+            AudioClip.PCMReaderCallback explicitPcm = new AudioClip.PCMReaderCallback((float[] samples) => samples[0] = 0.75f);
+            explicitPcm(pcmSamples);
+            Require(pcmSamples[0] == 0.75f, "explicit PCM delegate construction preserves shared writes");
+            int audioCalls = 0;
+            AudioSettings.AudioConfigurationChangeHandler audioChanged = changed => audioCalls++;
+            var audioField = typeof(AudioSettings).GetField(nameof(AudioSettings.OnAudioConfigurationChanged),
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+            var publicAudioField = typeof(AudioSettings).GetField(nameof(AudioSettings.OnAudioConfigurationChanged),
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+            Require(publicAudioField == null, "reflection retains original private event visibility");
+            var originalAudioCallbacks = audioField.GetValue(null);
+            try
+            {
+                AudioSettings.OnAudioConfigurationChanged += audioChanged;
+                AudioSettings.OnAudioConfigurationChanged += audioChanged;
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioCalls == 2, "static native event dispatch preserves duplicate subscriptions");
+                AudioSettings.OnAudioConfigurationChanged -= audioChanged;
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioCalls == 3, "static native event removes one matching subscription");
+                AudioSettings.OnAudioConfigurationChanged -= audioChanged;
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioCalls == 3, "static native event no longer dispatches removed callback");
+                AudioSettings.OnAudioConfigurationChanged -= audioChanged;
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioCalls == 3, "static event removal of absent callback is harmless");
+                audioField.SetValue(null, audioChanged);
+                ((AudioSettings.AudioConfigurationChangeHandler)audioField.GetValue(null)!)(false);
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioCalls == 5, "private event reflection writes callback storage used by native dispatch");
+                audioField.SetValue(null, null);
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(audioField.GetValue(null) == null && audioCalls == 5, "private event reflection clears native callback storage");
+                var cachedAudio = new CachedAudioReflectionProbe();
+                cachedAudio.Write(audioChanged);
+                AudioSettings.InvokeOnAudioConfigurationChanged(false);
+                Require(cachedAudio.Read() != null && audioCalls == 6, "cached private FieldInfo writes storage used by native dispatch");
+                audioField.SetValue(null, null);
+                Require(cachedAudio.Read() == null, "cached private FieldInfo observes external storage changes");
+            }
+            finally
+            {
+                AudioSettings.OnAudioConfigurationChanged -= audioChanged;
+                AudioSettings.OnAudioConfigurationChanged -= audioChanged;
+                audioField.SetValue(null, originalAudioCallbacks);
+            }
+            Require((int)serialized.Quality == 2 && (int)serialized.SavedQuality == 1, "scalar enum field initializers");
+            serialized.Quality = (ScheduleOne.ItemFramework.EQuality)3;
+            serialized.SaveQuality();
+            Require((int)serialized.SavedQuality == 3, "scalar enum fields cross assembly access");
+            string scalarEnumJson = JsonUtility.ToJson(serialized);
+            Require(scalarEnumJson.Contains("\"Quality\":3") && scalarEnumJson.Contains("\"savedQuality\":3"), "Unity serializes public and private enum fields");
+            JsonUtility.FromJsonOverwrite("{\"Quality\":1,\"savedQuality\":2}", serialized);
+            Require((int)serialized.Quality == 1 && (int)serialized.SavedQuality == 2, "Unity overwrites scalar enum native storage");
+            serialized.SetQuality(0, 3);
+            GC.Collect();
+            Require((int)qualityAlias[0] == 3 && object.ReferenceEquals(qualityAlias, serialized.Qualities),
+                "mapped enum arrays share component storage across library and managed collection");
+            var qualityCopy = (ScheduleOne.ItemFramework.EQuality[])qualityAlias.Clone();
+            qualityCopy[0] = (ScheduleOne.ItemFramework.EQuality)1;
+            Require((int)qualityAlias[0] == 3 && (int)qualityCopy[0] == 1 && !object.ReferenceEquals(qualityCopy, qualityAlias),
+                "mapped enum array clone has independent storage");
+            string enumJson = JsonUtility.ToJson(serialized);
+            Require(enumJson.Contains("\"Qualities\":[3,2]"), "Unity serializes mapped enum array values");
+            JsonUtility.FromJsonOverwrite("{\"Qualities\":[1,0,2]}", serialized);
+            Require(serialized.Qualities.Length == 3 && (int)serialized.Qualities[0] == 1 && qualityAlias.Length == 2 && (int)qualityAlias[0] == 3,
+                "enum array JSON replacement preserves retained old storage");
             int[] serializedArrayAlias = serialized.Numbers;
             serializedArrayAlias[1] = 11;
             Require(serialized.Numbers.Length == 2 && serialized.Numbers[0] == 3 && serialized.Numbers[1] == 11 && serialized.FirstFlag,

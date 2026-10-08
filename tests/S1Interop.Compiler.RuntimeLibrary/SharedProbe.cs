@@ -44,8 +44,16 @@ public abstract class LibrarySerializedBase : UnityEngine.MonoBehaviour
     public void SetResources(UnityEngine.Object[] values) { Resources = values; }
     public void SetResourceElement(UnityEngine.Object value) { Resources[0] = value; }
     public int[] Numbers = [3, 7];
+    public ScheduleOne.ItemFramework.EQuality Quality = (ScheduleOne.ItemFramework.EQuality)2;
+    [UnityEngine.SerializeField] private ScheduleOne.ItemFramework.EQuality savedQuality = (ScheduleOne.ItemFramework.EQuality)1;
+    public ScheduleOne.ItemFramework.EQuality SavedQuality => savedQuality;
+    public void SaveQuality() { savedQuality = Quality; }
+    public ScheduleOne.ItemFramework.EQuality[] Qualities = [(ScheduleOne.ItemFramework.EQuality)1, (ScheduleOne.ItemFramework.EQuality)2];
+    public void SetQuality(int index, int value) { Qualities[index] = (ScheduleOne.ItemFramework.EQuality)value; }
     public byte[] Payload = [65, 66, 67];
     public void DecodePayload(string value) { Payload = Convert.FromBase64String(value); }
+    public void SetBinaryPayload(int value) { Payload = BitConverter.GetBytes(value); }
+    public int ReadBinaryPayload() => BitConverter.ToInt32(Payload, 0);
     public string ReadPayload(int index, int count) => System.Text.Encoding.UTF8.GetString(Payload, index, count);
     public string UsePayload(Func<byte[], string> callback) => callback(Payload);
     public float[] Weights = [0.125f];

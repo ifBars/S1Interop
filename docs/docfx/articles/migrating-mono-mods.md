@@ -1,5 +1,7 @@
 # Migration overview
 
+For the current compiler workflow, start with [Adopt the compiler in an existing mod](compiler-adoption.md). It keeps ordinary game source and produces both runtime outputs. The `migrate` commands below belong to the earlier generator/helper workflows; they do not install or enable the source compiler.
+
 Use migration when an existing mod still carries direct game-wrapper code. S1Interop can move that access toward one of two shapes:
 
 - backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
