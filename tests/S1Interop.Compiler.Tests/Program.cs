@@ -10,6 +10,101 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("GenericContainerCopiesRetainNestedCallRewrites", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Fill<T>(List<T> values, T value) { values.Add(value); return values; }
+            private static int Outer<T>(List<T> values, T value) {
+                var managed = Fill<int>(new List<int>(), 1);
+                Fill<int>(Actor.ReflectionNumbers, 2);
+                return managed.GetType() == typeof(List<int>) ? 1 : -1;
+            }
+            public static int Run() {
+                Actor.ReflectionNumbers = new List<int>();
+                return Outer(Actor.ReflectionNumbers, 5);
+            }
+        }
+        """, 1)),
+    ("GenericContainerDictionaryPreservesIndependentCalls", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static Dictionary<K, V> Add<K, V>(Dictionary<K, V> values, K key, V value) where K : notnull {
+                values.Add(key, value);
+                return values;
+            }
+            public static int Run() {
+                var values = new Dictionary<string, int>();
+                Actor.ReflectionScores = Add(values, "one", 17);
+                Actor.ReflectionScores["one"] = 43;
+                var managed = Add(new Dictionary<string, int>(), "one", 11);
+                return managed.GetType() == typeof(Dictionary<string, int>) ? values["one"] + managed["one"] : -1;
+            }
+        }
+        """, 54)),
+    ("GenericContainerBodyKeepsGenericOverloadBinding", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static int Select(object value) => 7;
+            private static int Select(int value) => 99;
+            private static List<T> Fill<T>(List<T> values, T value) where T : struct {
+                if (Select(value) != 7) throw new System.Exception("Generic overload binding changed");
+                values.Add(value);
+                return values;
+            }
+            public static int Run() {
+                var values = new List<int>();
+                Actor.ReflectionNumbers = Fill(values, 17);
+                Actor.ReflectionNumbers[0] = 23;
+                return values[0];
+            }
+        }
+        """, 23)),
+    ("GenericContainerRecursiveHelperPreservesAliases", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Identity<T>(List<T> value, int count) => count == 0 ? value : Identity<T>(value, count - 1);
+            public static int Run() {
+                var values = new List<int> { 13 };
+                Actor.ReflectionNumbers = Identity(values, 3);
+                Actor.ReflectionNumbers[0] = 29;
+                var managed = Identity(new List<int> { 11 }, 2);
+                return managed.GetType() == typeof(List<int>) ? values[0] + managed[0] : -1;
+            }
+        }
+        """, 40)),
+    ("GenericContainerVoidHelperMutatesNativeArgument", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static void Append<T>(List<T> values, T value) => values.Add(value);
+            public static int Run() {
+                Actor.ReflectionNumbers = new List<int>();
+                Append(Actor.ReflectionNumbers, 37);
+                var managed = new List<int>();
+                Append(managed, 11);
+                return managed.GetType() == typeof(List<int>) ? Actor.ReflectionNumbers[0] + managed[0] : -1;
+            }
+        }
+        """, 48)),
+    ("GenericContainerIdentityPreservesNativeAndClrStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Identity<T>(List<T> value) => value;
+            public static int Run() {
+                var values = new List<int> { 17 };
+                Actor.ReflectionNumbers = Identity<int>(values);
+                Actor.ReflectionNumbers[0] = 23;
+                var managed = Identity<int>(new List<int> { 31 });
+                if (managed.GetType() != typeof(List<int>)) return -1;
+                return values[0] + managed[0];
+            }
+        }
+        """, 54)),
     ("GenericValueDelegateAliasesFollowGenericFixedPoint", () => Verify("""
         using System;
         using System.Collections.Generic;

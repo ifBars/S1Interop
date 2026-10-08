@@ -278,6 +278,8 @@ internal sealed partial class CollectionStorageAnalysis
             _ => null
         };
         var definition = symbol.OriginalDefinition;
+        var owner = symbol is IMethodSymbol method ? method : symbol.ContainingSymbol as IMethodSymbol;
+        if (owner is not null && GenericCollectionSpecialization.IsSpecialized(owner)) return definition;
         return StorageType(symbol) is { } type && SymbolEqualityComparer.Default.Equals(type, StorageType(definition))
             ? definition : symbol;
     }
@@ -326,7 +328,8 @@ internal sealed partial class CollectionStorageAnalysis
          named.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.Dictionary<TKey, TValue>" &&
          named.TypeArguments.All(Representable));
 
-    private bool Representable(ITypeSymbol type) => IsRepresentable(map, type);
+    private bool Representable(ITypeSymbol type) => IsRepresentable(map, type) ||
+        type is ITypeParameterSymbol { ContainingSymbol: IMethodSymbol method } && GenericCollectionSpecialization.IsSpecialized(method);
 
     internal static bool IsRepresentable(MetadataSymbolMap map, ITypeSymbol type) => Scalar(type) || map.IsNative(type) ||
         type is INamedTypeSymbol { TypeKind: TypeKind.Enum } enumeration && map.Resolve(enumeration).Status == TypeMappingStatus.Mapped;

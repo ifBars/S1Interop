@@ -45,6 +45,19 @@ public sealed class InteropCompiler
         target = target.RemoveReferences(target.References.Where(reference =>
             target.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol { Name: RuntimeSupportBuilder.AssemblyName }).ToArray());
         var map = new MetadataSymbolMap(authorCompilation, target);
+        int specializedCalls = 0;
+        if (map.NativeObjectBase is not null)
+        {
+            authorCompilation = GenericCollectionSpecialization.Apply(authorCompilation, map, cancellationToken, out specializedCalls);
+            if (specializedCalls != 0)
+            {
+                diagnostics.AddRange(authorCompilation.GetDiagnostics(cancellationToken)
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+                if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                    return new LoweringResult(target.AddSyntaxTrees(authorCompilation.SyntaxTrees), diagnostics.ToImmutable(), specializedCalls);
+                map = new MetadataSymbolMap(authorCompilation, target);
+            }
+        }
         ImmutableArray<byte> runtimeAssembly = [];
         string runtimeSignature = string.Empty;
         if (map.NativeObjectBase is not null)
@@ -70,7 +83,7 @@ public sealed class InteropCompiler
         var collectionStorage = new CollectionStorageAnalysis(authorCompilation, map, cancellationToken);
 
         var trees = new List<SyntaxTree>();
-        int rewrittenNodes = 0;
+        int rewrittenNodes = specializedCalls;
         foreach (SyntaxTree tree in authorCompilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();

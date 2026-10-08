@@ -16,6 +16,8 @@ public sealed class Mod : MelonMod
 {
     private bool completed;
 
+    private static Dictionary<string, T> PreserveDictionary<T>(Dictionary<string, T> values) => values;
+
     public override void OnSceneWasInitialized(int buildIndex, string sceneName)
     {
         if (completed || sceneName != "Menu") return;
@@ -73,7 +75,7 @@ public sealed class Mod : MelonMod
                 consoleReflection.Write(replacementCommands);
                 Func<Dictionary<string, ScheduleOne.Console.ConsoleCommand>> retainCommands =
                     replacementCommands.Identity<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>;
-                ScheduleOne.Console.commands = retainCommands();
+                ScheduleOne.Console.commands = PreserveDictionary(retainCommands());
                 Func<List<int>> makeManagedNumbers = GenericValueProbe.Make<List<int>>;
                 var managedNumbers = makeManagedNumbers();
                 Require(managedNumbers.GetType() == typeof(List<int>),
