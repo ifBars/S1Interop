@@ -12,7 +12,7 @@ All terminal examples on this page use **PowerShell on Windows**. Run each comma
 
 ## Before you start
 
-1. Install the [candidate](getting-started.md) or keep [published alpha.1](advanced.md#maintain-published-alpha1) for an existing project. Check `s1interop --version`.
+1. Install [S1Interop](getting-started.md) or keep [published alpha.1](advanced.md#maintain-published-alpha1) for an existing project. Check `s1interop --version`.
 2. Install Schedule I and launch it once normally. Close the game.
 3. Locate the game folder in Steam: right-click Schedule I and open **Manage > Browse local files**. Keep the folder path containing `Schedule I.exe`.
 4. Install MelonLoader using its [official installer instructions](https://github.com/LavaGang/MelonLoader#how-to-use-the-installer). Select this game's executable and follow the loader's runtime prerequisites.
@@ -33,7 +33,7 @@ Use your current branch for the first result. Steam replaces files when switchin
 
 ## 1. Create your project outside the game folder
 
-Open PowerShell in a folder for your own projects, such as `Documents\Mods`. If using the candidate source installation, keep that terminal open and change folders with `Set-Location`.
+Open PowerShell in a folder for your own projects, such as `Documents\Mods`.
 
 Preview the files, then create them:
 
@@ -67,7 +67,7 @@ s1interop setup . --il2cpp-game-path "D:\Games\Schedule I" --apply
 
 For Mono, use `--mono-game-path` in all three commands instead. Repeat the path on each command: `doctor` is read-only and does not save its arguments. Automatic detection is available by omitting the flag.
 
-The candidate requires at least one ready runtime for the legacy generator scaffold. **Published alpha.1 requires Mono for automatic setup**, even for an IL2CPP build. For alpha.1 with only IL2CPP, copy `local.build.props.example` to `local.build.props` and set `Il2CppGamePath` to the game root.
+Alpha.2 requires at least one ready runtime for the legacy generator scaffold. **Published alpha.1 requires Mono for automatic setup**, even for an IL2CPP build. For alpha.1 with only IL2CPP, copy `local.build.props.example` to `local.build.props` and set `Il2CppGamePath` to the game root.
 
 Expect a `[ready]` check for your runtime. Fix missing game/loader references before continuing. `setup --apply` writes only the ignored `local.build.props`; it does not install software or overwrite existing configuration. Edit that file directly when a path changes.
 
@@ -85,7 +85,7 @@ or:
 dotnet build -c "Debug Mono"
 ```
 
-The first build restores packages from NuGet (or your candidate feed). Wait for `Build succeeded`. The build compiles `MyFirstMod.dll`, the file MelonLoader loads, and copies it into the matching install's `Mods` folder. The last output line shows where it went:
+The first build restores packages from NuGet. Wait for `Build succeeded`. The build compiles `MyFirstMod.dll`, the file MelonLoader loads, and copies it into the matching install's `Mods` folder. The last output line shows where it went:
 
 ```text
 MyFirstMod -> D:\Games\Schedule I\Mods\MyFirstMod.dll

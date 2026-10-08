@@ -33,13 +33,7 @@ To add the older generator diagnostics to normal builds, reference its package:
 <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.2" PrivateAssets="all" />
 ```
 
-For this unpublished package, run the following from the S1Interop checkout after the [contributor source build](../contributors/source-builds.md):
-
-```powershell
-dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release --no-build -o .\artifacts\packages
-```
-
-In the mod project, run `dotnet restore --add-source $candidateFeed` from the same terminal. Keep package versions pinned. The package can emit runtime helpers when it recognizes the target runtime. It does not enable source compiler adaptation.
+In the mod project, run `dotnet restore`. Keep package versions pinned. The package can emit runtime helpers when it recognizes the target runtime. It does not enable source compiler adaptation.
 
 Read [Generator diagnostics](diagnostics.md) for requirements. Declaration checks need game reference metadata; no warnings without those references is not proof of compatibility.
 
@@ -49,7 +43,7 @@ The legacy generator provides explicit runtime helpers and declaration-based bin
 
 Use [Legacy project setup](legacy-generator-first-mod.md), [Runtime helpers](dual-runtime-code.md), and [Generated output](generator-package.md) for projects that depend on it. Their fixes and configuration properties apply to that workflow.
 
-The candidate can create this project explicitly:
+Create this project explicitly:
 
 ```powershell
 s1interop new .\GeneratorMod --legacy-generator --apply
@@ -75,6 +69,6 @@ Published alpha.1 contains the earlier generator workflow. Its generator require
 dotnet tool install --global S1Interop --version 0.1.0-alpha.1
 ```
 
-Use `dotnet tool update` with the same arguments if already installed. Pin generator references to `0.1.0-alpha.1` too. Alpha.1's plain `new` creates the legacy project; `--legacy-generator` selects that project in the alpha.2 candidate.
+Use `dotnet tool update` with the same arguments if already installed. Pin generator references to `0.1.0-alpha.1` too. Alpha.1's plain `new` creates the legacy project; `--legacy-generator` selects that project in alpha.2.
 
 [Legacy troubleshooting](legacy-troubleshooting.md) covers generator, migration, and alpha.1 failures.

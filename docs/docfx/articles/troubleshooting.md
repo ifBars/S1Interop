@@ -6,7 +6,7 @@ Start with the first failing diagnostic. These fixes apply to compiler projects 
 
 From the project directory, run `dotnet tool restore`, then `dotnet tool run s1interop -- compiler --help`. The project uses its pinned compiler, even if you have a different version installed globally.
 
-If NuGet cannot find that version, check the [installation page](getting-started.md) for publication status. Keep the tool manifest and `.s1interop` build imports from the same scaffold generation. Contributors testing local packages should follow [Test a source build](../contributors/source-builds.md).
+If NuGet cannot find that version, check that the manifest uses a [published version](https://www.nuget.org/packages/S1Interop). Keep the tool manifest and `.s1interop` build imports from the same scaffold generation. Contributors testing local packages should follow [Test a source build](../contributors/source-builds.md).
 
 ## Rejected game references or versions
 

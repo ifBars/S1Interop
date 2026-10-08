@@ -12,7 +12,7 @@ This page covers generator projects, facade projects, and migration tools under 
 dotnet tool list --global
 ```
 
-If `s1interop` is listed, close and reopen Command Prompt. If it is not listed, repeat [Published alpha.1 installation](advanced.md#maintain-published-alpha1).
+If `s1interop` is listed, close and reopen Command Prompt. If it is not listed, follow [Install S1Interop](getting-started.md). For projects pinned to alpha.1, use the [alpha.1 installation instructions](advanced.md#maintain-published-alpha1).
 
 ## S1I102-S1I105, or "Missing MelonLoader at ..."
 
@@ -76,17 +76,17 @@ Use the short type name in code. See [Write code for both runtimes](dual-runtime
 
 After adding the reference, run a full build so the generator emits the declaration attributes and your project can recognise them.
 
-Alpha.2 is an unpublished candidate; pack and restore the generator through the [candidate feed](advanced.md#inspect-a-project-without-changing-its-build), or select published alpha.1 with its required .NET 9 SDK.
+Alpha.2 supports the .NET 8 SDK. Reference `S1Interop.Generators` version `0.1.0-alpha.2` and run `dotnet restore`. Projects pinned to alpha.1 require the .NET 9 SDK.
 
 ## CS9057: generator references a newer compiler
 
 **Cause:** The compiler cannot load the generator's Roslyn dependency. Published alpha.1 references Roslyn 4.13, which is newer than the compiler supplied by .NET 8.
 
-**Fix:** Use a .NET 9 SDK (9.0.200 or newer) for alpha.1, or build the alpha.2 candidate, which targets Roslyn 4.8. Check `dotnet --version` from the mod folder because a `global.json` in a parent folder can select an older SDK. An IDE can use a different compiler from the terminal; check the first build warning before changing your source.
+**Fix:** Use a .NET 9 SDK (9.0.200 or newer) for alpha.1, or update to alpha.2, which targets Roslyn 4.8. Check `dotnet --version` from the mod folder because a `global.json` in a parent folder can select an older SDK. An IDE can use a different compiler from the terminal; check the first build warning before changing your source.
 
 ## setup rejects an IL2CPP-only install
 
-Published alpha.1 requires Mono for automatic setup. Copy `local.build.props.example` to `local.build.props` and configure the installed runtime manually, or use the alpha.2 candidate. The compiler scaffold needs Mono metadata even when building IL2CPP, and matching native references for an IL2CPP build. Only the earlier `--legacy-generator` scaffold can start with either runtime alone.
+Published alpha.1 requires Mono for automatic setup. Copy `local.build.props.example` to `local.build.props` and configure the installed runtime manually, or update to alpha.2. The compiler scaffold needs Mono metadata even when building IL2CPP, and matching native references for an IL2CPP build. Only the earlier `--legacy-generator` scaffold can start with either runtime alone.
 
 > [!NOTE]
 > Published releases restore `S1Interop.Generators` from NuGet.org. Contributors validating an unpublished package should pass a temporary restore source on the command line rather than adding it to `local.build.props`.

@@ -1,6 +1,6 @@
 # Release readiness
 
-The next candidate is **0.1.0-alpha.2**. It is not a stable release and is not yet published. The last published package is **0.1.0-alpha.1**. Do not reuse a published version for changed package contents.
+The current published version is **0.1.0-alpha.2**. It is experimental, not a stable release. Do not reuse a published version for changed package contents.
 
 ## Primary workflow
 
@@ -10,7 +10,7 @@ Compiler projects use Mono game metadata for authoring. IL2CPP builds also requi
 
 The compiler starter does not depend on `S1Interop.Generators` or automatically deploy into a game. IL2CPP compiler outputs include the matching shared `S1Interop.Runtime.dll`. Follow the [distribution guide](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/distributing-mods.md) for files and placement.
 
-## Candidate changes
+## Alpha.2 changes
 
 - Compiler dispatch, reference preparation and lowering are consolidated into the tool package. The former compiler executable project is removed.
 - The default scaffold uses the compiler, pins local tooling and preserves ordinary game source. Setup records local paths in an ignored file; builds verify the game pair and native generation provenance.
@@ -21,7 +21,7 @@ The compiler starter does not depend on `S1Interop.Generators` or automatically 
 
 ### Retained legacy compatibility
 
-`new --legacy-generator`, `new --backend-neutral`, declarations and generator migration remain available. The separate `S1Interop.Generators` package supplies their Roslyn 4.8 generator and opt-in build integration. Its game-reference, deployment, runtime-import, typed-helper and injected-constructor features belong to that workflow; they are not requirements for the compiler starter. The candidate also fixes UnityEvent listener removal and runtime detection in this legacy surface. Keep its package version aligned and validate it independently while it remains supported.
+`new --legacy-generator`, `new --backend-neutral`, declarations and generator migration remain available. The separate `S1Interop.Generators` package supplies their Roslyn 4.8 generator and opt-in build integration. Its game-reference, deployment, runtime-import, typed-helper and injected-constructor features belong to that workflow; they are not requirements for the compiler starter. Alpha.2 also fixes UnityEvent listener removal and runtime detection in this legacy surface. Keep its package version aligned and validate it independently while it remains supported.
 
 ## Automated gate for every candidate
 

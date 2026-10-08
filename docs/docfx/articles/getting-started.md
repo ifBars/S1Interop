@@ -6,9 +6,6 @@ uid: s1interop.install
 
 # Install S1Interop
 
-> [!IMPORTANT]
-> The compiler package is awaiting publication. The command below requires **0.1.0-alpha.2**, which is not on NuGet yet. The currently published alpha.1 package cannot follow this compiler walkthrough.
-
 ## Install .NET
 
 Install the Windows x64 **.NET 8 SDK** from the [.NET download page](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). The SDK includes the runtime needed by S1Interop.

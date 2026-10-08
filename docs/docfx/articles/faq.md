@@ -32,9 +32,9 @@ Yes, when its dependency APIs are compatible with your compiler build. Adding co
 
 [Existing-mod adoption](compiler-adoption.md) covers dependencies. [S1API and S1Interop](s1api-and-s1interop.md) explains their different responsibilities.
 
-## Why does installation build from source?
+## Do I need to build S1Interop from source?
 
-The alpha.2 compiler candidate is not published yet. Published alpha.1 contains the older generator workflow. Follow [Install S1Interop](getting-started.md) for the version these docs use.
+No. [Install S1Interop](getting-started.md) from NuGet with `dotnet tool install`. You only need a source checkout to work on S1Interop itself.
 
 ## Where are the generator and migration guides?
 

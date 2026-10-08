@@ -1,6 +1,6 @@
 # Commands
 
-The `S1Interop` tool provides one `s1interop` command for project creation, setup, and compilation. Compiler projects pin it in a local tool manifest, and MSBuild invokes its `compiler` command group during builds. See [Build your first mod](first-mod.md) for the primary workflow. See [installation](getting-started.md) for package availability.
+The `S1Interop` tool provides one `s1interop` command for project creation, setup, and compilation. Compiler projects pin it in a local tool manifest, and MSBuild invokes its `compiler` command group during builds. See [Build your first mod](first-mod.md) for the primary workflow.
 
 Most commands default to the current directory when a path is optional.
 Unknown options, missing option values, and invalid option values fail before command dispatch so migration typos do not silently fall back to defaults.
@@ -50,7 +50,7 @@ The source checkout uses the same `s1interop` executable for automatic compiler 
 s1interop compiler --help
 ```
 
-MSBuild invokes `compiler prepare-references`, `compiler verify-installations`, and `compiler lower` using explicit file manifests and output paths. These are build operations, not migration previews: preparation and lowering write their designated generated outputs. The published alpha.1 package does not contain these commands. See the [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for compiler behavior and compatibility limits.
+MSBuild invokes `compiler prepare-references`, `compiler verify-installations`, and `compiler lower` using explicit file manifests and output paths. These are build operations, not migration previews: preparation and lowering write their designated generated outputs. See the [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for compiler behavior and compatibility limits.
 
 ## Dry-run and apply
 
