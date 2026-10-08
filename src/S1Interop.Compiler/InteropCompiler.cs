@@ -48,9 +48,17 @@ public sealed class InteropCompiler
         int specializedCalls = 0;
         if (map.NativeObjectBase is not null)
         {
-            authorCompilation = GenericCollectionSpecialization.Apply(authorCompilation, map, cancellationToken, out specializedCalls);
-            if (specializedCalls != 0)
+            while (true)
             {
+                authorCompilation = GenericCollectionSpecialization.Apply(authorCompilation, map, cancellationToken,
+                    GenericCollectionSpecialization.MaximumCopies - specializedCalls, out int added, out Diagnostic? specializationFailure);
+                if (specializationFailure is not null)
+                {
+                    diagnostics.Add(specializationFailure);
+                    return new LoweringResult(target.AddSyntaxTrees(authorCompilation.SyntaxTrees), diagnostics.ToImmutable(), specializedCalls);
+                }
+                if (added == 0) break;
+                specializedCalls += added;
                 diagnostics.AddRange(authorCompilation.GetDiagnostics(cancellationToken)
                     .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
                 if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))

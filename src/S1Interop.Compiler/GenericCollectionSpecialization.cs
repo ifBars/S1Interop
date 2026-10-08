@@ -7,15 +7,21 @@ namespace S1Interop.Compiler;
 /// <summary>Separates native collection calls without replacing generic type parameters or changing overload binding.</summary>
 internal static class GenericCollectionSpecialization
 {
+    internal const int MaximumCopies = 1024;
+    internal static readonly DiagnosticDescriptor ExpansionLimit = new("S1IC035", "Generic collection specialization is too large",
+        "Generic collection specialization exceeded {0} generated methods while expanding '{1}'; compilation stopped before further expansion",
+        "S1Interop.Compiler", DiagnosticSeverity.Error, true);
+    private const string OwnerAnnotationKind = "S1Interop.GenericCollectionOwner";
     private const string AnnotationKind = "S1Interop.GenericCollectionSpecialization";
 
     internal static bool IsSpecialized(IMethodSymbol method) => method.OriginalDefinition.DeclaringSyntaxReferences
         .Any(reference => reference.GetSyntax().HasAnnotations(AnnotationKind));
 
     internal static CSharpCompilation Apply(CSharpCompilation author, MetadataSymbolMap map,
-        CancellationToken cancellationToken, out int rewritten)
+        CancellationToken cancellationToken, int remainingCopies, out int rewritten, out Diagnostic? failure)
     {
         rewritten = 0;
+        failure = null;
         if (!author.SyntaxTrees.Any(tree => tree.GetRoot(cancellationToken).DescendantNodes()
             .OfType<MethodDeclarationSyntax>().Any(method => method.TypeParameterList is not null && method.Modifiers.Any(SyntaxKind.StaticKeyword))))
             return author;
@@ -32,18 +38,23 @@ internal static class GenericCollectionSpecialization
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (model.GetSymbolInfo(call, cancellationToken).Symbol is not IMethodSymbol method ||
-                    !method.IsGenericMethod || !method.IsStatic || method.IsExtensionMethod ||
+                    !method.IsGenericMethod || !method.IsStatic || method.IsExtensionMethod || IsSpecialized(method) ||
                     method.DeclaredAccessibility != Accessibility.Private || method.ContainingType.IsGenericType ||
-                    method.TypeArguments.Any(type => !CollectionStorageAnalysis.IsRepresentable(map, type)) ||
+                    method.TypeArguments.Any(type => !RepresentableArgument(map, type)) ||
                     !HasCollectionParameter(method.OriginalDefinition) ||
                     !(storage.IsBridged(call, model) || call.ArgumentList.Arguments.Any(argument => storage.IsBridged(argument.Expression, model))) ||
                     method.OriginalDefinition.DeclaringSyntaxReferences.Length != 1 ||
                     method.OriginalDefinition.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration ||
-                    declaration.Parent is not TypeDeclarationSyntax owner || owner is InterfaceDeclarationSyntax || owner.ContainsDirectives ||
+                    declaration.Parent is not TypeDeclarationSyntax owner || owner is InterfaceDeclarationSyntax ||
+                    owner.ContainsDirectives && !owner.HasAnnotations(OwnerAnnotationKind) ||
                     declaration.AttributeLists.Count != 0 || declaration.Modifiers.Any(SyntaxKind.PartialKeyword) || declaration.Modifiers.Any(SyntaxKind.AsyncKeyword) ||
                     declaration.DescendantNodes().OfType<YieldStatementSyntax>().Any() ||
                     declaration.Body is null && declaration.ExpressionBody is null) continue;
 
+                var lineage = EnclosingLineage(model.GetEnclosingSymbol(call.SpanStart, cancellationToken));
+                string identity = method.OriginalDefinition.GetDocumentationCommentId() ?? method.OriginalDefinition.ToDisplayString();
+                // Mutual or polymorphic recursion needs a representation-aware recursive signature solver.
+                if (lineage.Contains(identity)) continue;
                 var definitionModel = author.GetSemanticModel(declaration.SyntaxTree);
                 // Caller-info arguments describe the original method, including constructors and indexers.
                 if (declaration.DescendantNodes().OfType<ExpressionSyntax>().Any(candidate =>
@@ -64,10 +75,15 @@ internal static class GenericCollectionSpecialization
                 if (selfCalls.Any(candidate => definitionModel.GetSymbolInfo(candidate).Symbol is not IMethodSymbol self ||
                     self.TypeArguments.Where((type, index) => !SymbolEqualityComparer.Default.Equals(type, method.OriginalDefinition.TypeParameters[index])).Any())) continue;
 
+                if (replacements.Count >= remainingCopies)
+                {
+                    failure = Diagnostic.Create(ExpansionLimit, call.GetLocation(), MaximumCopies, method.OriginalDefinition.ToDisplayString());
+                    return author;
+                }
                 string name;
                 do { name = "__S1InteropCollection_" + ordinal++; } while (!usedNames.Add(name));
                 if (!additions.TryGetValue(owner, out var methods)) additions.Add(owner, methods = new());
-                methods.Add(new Specialization(declaration, name, selfCalls));
+                methods.Add(new Specialization(declaration, name, selfCalls, string.Join("|", lineage.Append(identity))));
                 replacements.Add(call, name);
             }
         }
@@ -79,6 +95,20 @@ internal static class GenericCollectionSpecialization
             author = author.ReplaceSyntaxTree(tree, tree.WithRootAndOptions(root, tree.Options));
         }
         return author;
+    }
+
+    private static bool RepresentableArgument(MetadataSymbolMap map, ITypeSymbol type) =>
+        CollectionStorageAnalysis.IsRepresentable(map, type) ||
+        type is ITypeParameterSymbol { ContainingSymbol: IMethodSymbol owner } && IsSpecialized(owner);
+
+    private static string[] EnclosingLineage(ISymbol? symbol)
+    {
+        for (; symbol is not null; symbol = symbol.ContainingSymbol)
+            if (symbol is IMethodSymbol method)
+                foreach (var reference in method.OriginalDefinition.DeclaringSyntaxReferences)
+                    if (reference.GetSyntax().GetAnnotations(AnnotationKind).FirstOrDefault()?.Data is { } lineage)
+                        return lineage.Split('|');
+        return [];
     }
 
     private static bool HasCollectionParameter(IMethodSymbol method) =>
@@ -103,7 +133,7 @@ internal static class GenericCollectionSpecialization
         };
     }
 
-    private sealed record Specialization(MethodDeclarationSyntax Declaration, string Name, InvocationExpressionSyntax[] SelfCalls);
+    private sealed record Specialization(MethodDeclarationSyntax Declaration, string Name, InvocationExpressionSyntax[] SelfCalls, string Lineage);
 
     private static SyntaxTriviaList SourceLine(Location location)
     {
@@ -127,7 +157,9 @@ internal static class GenericCollectionSpecialization
 
         private T Add<T>(T original, T visited) where T : TypeDeclarationSyntax
         {
-            if (!additions.TryGetValue(original, out var methods)) return visited;
+            if (!additions.TryGetValue(original, out var methods))
+                return !original.ContainsDirectives && visited.ContainsDirectives
+                    ? (T)visited.WithAdditionalAnnotations(new SyntaxAnnotation(OwnerAnnotationKind)) : visited;
             var clones = methods.Select(specialization =>
             {
                 var calls = new Dictionary<InvocationExpressionSyntax, string>(replacements);
@@ -136,9 +168,9 @@ internal static class GenericCollectionSpecialization
                 var clone = (MethodDeclarationSyntax)new Rewriter(calls, new()).Visit(specialization.Declaration)!;
                 return clone.WithIdentifier(SyntaxFactory.Identifier(specialization.Name).WithTriviaFrom(clone.Identifier))
                     .WithLeadingTrivia(SourceLine(specialization.Declaration.GetLocation()))
-                    .WithAdditionalAnnotations(new SyntaxAnnotation(AnnotationKind));
+                    .WithAdditionalAnnotations(new SyntaxAnnotation(AnnotationKind, specialization.Lineage));
             }).ToArray();
-            return (T)visited.AddMembers(clones).WithCloseBraceToken(visited.CloseBraceToken.WithLeadingTrivia(
+            return (T)visited.AddMembers(clones).WithAdditionalAnnotations(new SyntaxAnnotation(OwnerAnnotationKind)).WithCloseBraceToken(visited.CloseBraceToken.WithLeadingTrivia(
                 visited.CloseBraceToken.LeadingTrivia.AddRange(SourceLine(original.CloseBraceToken.GetLocation()))));
         }
     }

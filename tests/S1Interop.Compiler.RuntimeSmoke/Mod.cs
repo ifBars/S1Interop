@@ -16,7 +16,9 @@ public sealed class Mod : MelonMod
 {
     private bool completed;
 
-    private static Dictionary<string, T> PreserveDictionary<T>(Dictionary<string, T> values) => values;
+    private static Dictionary<string, T> PreserveDictionary<T>(Dictionary<string, T> values) => InnerDictionary(values);
+
+    private static Dictionary<string, T> InnerDictionary<T>(Dictionary<string, T> values) => values;
 
     public override void OnSceneWasInitialized(int buildIndex, string sceneName)
     {

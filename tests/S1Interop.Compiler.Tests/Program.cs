@@ -10,6 +10,92 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("GenericContainerChainCrossesNestedTypeOwner", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Inner<T>(List<T> values) => values;
+            private static class Nested {
+                private static List<T> Outer<T>(List<T> values) => Inner(values);
+                public static int Run() {
+                    var values = new List<int> { 17 };
+                    Actor.ReflectionNumbers = Outer(values);
+                    Actor.ReflectionNumbers[0] = 43;
+                    return values[0];
+                }
+            }
+            public static int Run() => Nested.Run();
+        }
+        """, 43)),
+    ("GenericContainerChainKeepsIndependentParameterStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Outer<T>(List<T> target, List<T> managed) => Inner(target, managed);
+            private static List<T> Inner<T>(List<T> target, List<T> managed) {
+                if (managed.GetType() != typeof(List<T>)) throw new System.Exception("CLR parameter changed");
+                target.Add(managed[0]);
+                return target;
+            }
+            public static int Run() {
+                var values = new List<int>();
+                var managed = new List<int> { 31 };
+                Actor.ReflectionNumbers = Outer(values, managed);
+                Actor.ReflectionNumbers[0] = 43;
+                return values[0] + managed[0];
+            }
+        }
+        """, 74)),
+    ("GenericContainerMutualRecursionStopsWithoutExpansionLoop", () => {
+        var result = Lower("""
+            using System.Collections.Generic;
+            using ScheduleOne.Testing;
+            public static class Probe {
+                private static List<T> A<T>(List<T> value, int depth) => depth == 0 ? value : B(value, depth - 1);
+                private static List<T> B<T>(List<T> value, int depth) => depth == 0 ? value : A(value, depth - 1);
+                public static int Run() {
+                    Actor.ReflectionNumbers = A(new List<int> { 17 }, 3);
+                    return Actor.ReflectionNumbers[0];
+                }
+            }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(diagnostic => diagnostic.Id == "CS0411" && diagnostic.GetMessage().Contains("Probe.A<T>")) &&
+            result.Diagnostics.All(diagnostic => diagnostic.Id != "S1IC035"),
+            "Unsupported mutual recursion must terminate before exhausting the expansion budget. " + string.Join("; ", result.Diagnostics));
+    }),
+    ("GenericContainerExpansionLimitCountsMultiplePasses", () => {
+        string calls = string.Join("\n", Enumerable.Repeat("Actor.ReflectionNumbers = Outer(new List<int>());", 513));
+        var result = Lower("using System.Collections.Generic; using ScheduleOne.Testing; public static class Probe { " +
+            "private static List<T> Outer<T>(List<T> value) => Inner(value); " +
+            "private static List<T> Inner<T>(List<T> value) => value; " +
+            "public static int Run() { " + calls + " return 0; } }");
+        Assert(!result.Success && result.Diagnostics.Any(diagnostic => diagnostic.Id == "S1IC035" &&
+            diagnostic.Location.IsInSource && diagnostic.GetMessage().Contains("Inner")),
+            "Cumulative expansion must identify the helper call that exceeds the budget.");
+    }),
+    ("GenericContainerExpansionLimitReportsDiagnostic", () => {
+        string calls = string.Join("\n", Enumerable.Repeat("Actor.ReflectionNumbers = Identity(new List<int>());", 1025));
+        var result = Lower("using System.Collections.Generic; using ScheduleOne.Testing; public static class Probe { " +
+            "private static List<T> Identity<T>(List<T> value) => value; public static int Run() { " + calls + " return 0; } }");
+        Assert(!result.Success && result.Diagnostics.Any(diagnostic => diagnostic.Id == "S1IC035"),
+            "Excessive specialization must produce a diagnostic rather than unbounded generated source.");
+    }),
+    ("GenericContainerOpenChainPreservesNativeAndClrCalls", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static List<T> Outer<T>(List<T> values) => Middle(values);
+            private static List<T> Middle<T>(List<T> values) => Inner(values);
+            private static List<T> Inner<T>(List<T> values) => values;
+            public static int Run() {
+                var values = new List<int> { 17 };
+                Actor.ReflectionNumbers = Outer(values);
+                Actor.ReflectionNumbers[0] = 43;
+                var managed = Outer(new List<int> { 11 });
+                return managed.GetType() == typeof(List<int>) ? values[0] + managed[0] : -1;
+            }
+        }
+        """, 54)),
     ("GenericContainerCopiesRetainNestedCallRewrites", () => Verify("""
         using System.Collections.Generic;
         using ScheduleOne.Testing;
