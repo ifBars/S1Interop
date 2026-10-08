@@ -8,6 +8,6 @@ It's still experimental. Check [what works and what's missing](https://ifbars.gi
 
 [Install S1Interop](docs/docfx/articles/getting-started.md), then [build your first mod](docs/docfx/articles/first-mod.md). Already have a mod? [Bring it over](docs/docfx/articles/compiler-adoption.md).
 
-[Documentation](https://ifbars.github.io/S1Interop/) · [Advanced](docs/docfx/articles/advanced.md) · [Contributing](docs/CONTRIBUTING.md)
+[Documentation](https://ifbars.github.io/S1Interop/) Â· [Advanced](docs/docfx/articles/advanced.md) Â· [Contributing](docs/CONTRIBUTING.md)
 
 [GPL-3.0-only](LICENSE)

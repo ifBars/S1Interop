@@ -2,6 +2,10 @@
 
 S1Interop is an experimental compiler for Schedule I mods. Keep changes focused and verify the behavior they claim to support.
 
+## Report a problem or suggest an improvement
+
+Use the [issue forms](https://github.com/ifBars/S1Interop/issues/new/choose). The [reporting guide](https://ifbars.github.io/S1Interop/articles/reporting-issues.html) explains which versions, logs, and source examples help. You do not need a source checkout to report an issue.
+
 ## Set up the checkout
 
 Install the .NET 8 SDK. Use Windows for CI-equivalent validation.

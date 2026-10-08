@@ -35,6 +35,6 @@ Unsupported cases may produce a compiler diagnostic, but some only fail at runti
 
 Build and test each runtime you intend to support. Exercise the actual feature, including save/load or multiplayer behavior when relevant. Our runtime probes use matching 0.4.7f9 installations; they don't establish compatibility for every mod or game version.
 
-Follow [Test and distribute](distributing-mods.md). If something fails, check [Troubleshooting](troubleshooting.md) and report the smallest source example that reproduces it.
+Follow [Test and distribute](distributing-mods.md). If something fails, check [Troubleshooting](troubleshooting.md) and [report the problem](reporting-issues.md). Include a small source example if you can.
 
 For implementation details and individual test results, see the [detailed compiler evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md).

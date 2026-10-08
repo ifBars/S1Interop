@@ -1,0 +1,83 @@
+name: Report a problem
+description: A build failure, unsupported code pattern, setup issue, or problem in-game.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us what you tried and what happened. You do not need to know whether the problem is in S1Interop.
+        [Reporting guide](https://ifbars.github.io/S1Interop/articles/reporting-issues.html) · [Known limits](https://ifbars.github.io/S1Interop/articles/compatibility.html)
+        Reports are public. Share your mod source and relevant text logs, not game DLLs, generated game references, decompiled game code, or whole game folders. Remove private paths and personal information from logs.
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where does it fail?
+      options:
+        - Installation, restore, or project setup
+        - Building the mod or a compiler diagnostic
+        - Loading the mod
+        - Using the mod in-game
+        - Documentation or instructions
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Which output is affected?
+      description: Select what you observed. You do not need to test the other runtime before reporting.
+      options:
+        - Mono
+        - IL2CPP
+        - Both
+        - Not applicable / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the first error or diagnostic code if there is one. For incorrect behavior without an error, describe what you see.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Include the exact command and configuration, or the in-game steps. Mention whether it happens on startup, in a save, or in multiplayer. If you cannot reproduce it reliably, say so.
+      placeholder: |
+        1. Create or open...
+        2. Run...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and project setup
+      description: Fill in what you know; unknown is fine. From the mod folder, run dotnet tool run s1interop -- --version and dotnet --version. If the local tool cannot run, include that error and the manifest version, or the global s1interop --version output.
+      placeholder: |
+        S1Interop version (local tool, global tool, or source commit):
+        .NET SDK version:
+        Windows / OS version:
+        Mono game version and Steam branch:
+        IL2CPP game version and Steam branch:
+        MelonLoader version:
+        Project: compiler starter / existing mod / legacy generator / not sure
+        Relevant dependencies and versions:
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Mod code or sample project
+      description: Paste the smallest relevant source example, link your repository and commit, or attach a small project containing only your own code. Include relevant project settings and dependencies. If you cannot share code, describe the operation that fails.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Build output or game log
+      description: Paste the failing command's output or the first relevant MelonLoader exception and stack trace. You can attach a reviewed text log here. Screenshots can help with visual issues, but text is easier to investigate for errors.
+  - type: textarea
+    id: comparison
+    attributes:
+      label: Anything else you tried?
+      description: Optional. Did the same source work on Mono, on an earlier S1Interop version, or without other mods? For IL2CPP loading issues, include where you put the mod DLL and S1Interop.Runtime.dll and which build supplied them. Distinguish a successful build from a successful in-game test.

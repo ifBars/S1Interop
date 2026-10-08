@@ -27,3 +27,7 @@ Deploy the output for that runtime. IL2CPP also requires the adjacent matching `
 ## Generator or migration errors
 
 For existing projects using the older S1I generator diagnostics or migration tools, see [Legacy troubleshooting](legacy-troubleshooting.md) under Advanced.
+
+## Still stuck?
+
+[Report a problem](reporting-issues.md) with the failing command or in-game steps, relevant versions, and the first error. A small source example helps, but is not required to open an issue.

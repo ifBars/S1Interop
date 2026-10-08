@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Reporting guide
+    url: https://ifbars.github.io/S1Interop/articles/reporting-issues.html
+    about: Find your tool version, collect useful output, and share a small reproducer.
+  - name: Compatibility and known limits
+    url: https://ifbars.github.io/S1Interop/articles/compatibility.html
+    about: Check supported behavior and gaps before adopting S1Interop.

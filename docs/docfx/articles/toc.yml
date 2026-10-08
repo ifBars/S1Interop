@@ -26,6 +26,8 @@
       href: compatibility.md
     - name: Troubleshooting
       href: troubleshooting.md
+    - name: Report a problem
+      href: reporting-issues.md
     - name: FAQ
       href: faq.md
 - name: Advanced

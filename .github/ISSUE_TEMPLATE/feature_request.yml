@@ -1,0 +1,22 @@
+name: Request an improvement
+description: Suggest compiler support, an easier workflow, or clearer documentation.
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: Describe the mod feature or development task and what gets in the way. For something that already fails, use Report a problem instead.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What would help?
+      description: Describe the behavior you would like. A code example or documentation change is welcome; you do not need to design the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Examples or workarounds
+      description: Optional. Include affected runtimes, relevant versions, and anything you currently do to work around the limitation. Share only code you can redistribute, not game assemblies or decompiled game code.
