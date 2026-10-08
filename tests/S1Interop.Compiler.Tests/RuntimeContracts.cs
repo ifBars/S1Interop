@@ -86,6 +86,11 @@ internal static class RuntimeContracts
             public class Employee : Actor { public int Salary = 7; }
             public class PropertyShadowActor : Actor { public new Employee ReflectionChild => null; }
             public class FieldShadowActor : Actor { public new Employee ReflectionChild = new Employee { Salary = 21 }; }
+            public class CollectionShadowActor : Actor {
+                public new System.Collections.Generic.List<int> ReflectionScores = new();
+                public new System.Collections.Generic.Dictionary<string, int> ReflectionNumbers = new();
+            }
+            public class ScalarCollectionShadowActor : Actor { public new int ReflectionScores = 31; }
             public class Customer : Actor { }
             public class KeyActor : Actor
             {
@@ -369,6 +374,11 @@ internal static class RuntimeContracts
                 [Il2CppInterop.Runtime.OriginalProperty] public new Employee ReflectionChild => null;
             }
             public class FieldShadowActor : Actor { public new Employee ReflectionChild { get; set; } = new Employee { Salary = 21 }; }
+            public class CollectionShadowActor : Actor {
+                public new Il2CppSystem.Collections.Generic.List<int> ReflectionScores { get; set; } = new();
+                public new Il2CppSystem.Collections.Generic.Dictionary<string, int> ReflectionNumbers { get; set; } = new();
+            }
+            public class ScalarCollectionShadowActor : Actor { public new int ReflectionScores { get; set; } = 31; }
             public class Customer : Actor { }
             public class KeyActor : Actor { public int Key { get; set; } }
         }

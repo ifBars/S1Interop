@@ -65,11 +65,7 @@ internal static class NativeTraverseLowering
             SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(read.TypeRoot ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression))
         };
         if (adapter is not null)
-        {
-            string nativeType = read.Property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            arguments.Add(SyntaxFactory.Argument(SyntaxFactory.ParseExpression(
-                $"static __value => {adapter}.FromNative(({nativeType})__value)")));
-        }
+            arguments.Add(SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression)));
         var convert = SyntaxFactory.ParseExpression(NativeFieldInfoSource.TypeName + ".ReadTraverse<" + resultType + ">");
         return SyntaxFactory.InvocationExpression(convert, SyntaxFactory.ArgumentList(
             SyntaxFactory.SeparatedList(arguments))).WithTriviaFrom(syntax);

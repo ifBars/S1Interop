@@ -167,6 +167,39 @@ var tests = new (string Name, Action Test)[]
             Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Constructed generic cache escaped: " + reader);
         }
     }),
+    ("TraverseCollectionAdapterFollowsRuntimeFieldType", () => Verify(TraverseContracts.Library + """
+        public static class Probe {
+            public static int Run() {
+                var derived = new ScheduleOne.Testing.CollectionShadowActor();
+                derived.ReflectionScores = new System.Collections.Generic.List<int> { 23 };
+                ScheduleOne.Testing.Actor root = derived;
+                object read = HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<object>();
+                if (read is not System.Collections.Generic.List<int> list || list[0] != 23) return -1;
+                list.Add(29);
+                if (derived.ReflectionScores.Count != 2) return -2;
+                var typed = HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<System.Collections.Generic.List<int>>();
+                if (!object.ReferenceEquals(list, typed)) return -3;
+                try {
+                    HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<System.Collections.Generic.Dictionary<string,int>>();
+                    return -4;
+                } catch (System.InvalidCastException) { }
+                derived.ReflectionScores = null;
+                if (HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<object>() != null) return -5;
+                derived.ReflectionNumbers = new System.Collections.Generic.Dictionary<string,int> { ["one"] = 37 };
+                var scores = HarmonyLib.Traverse.Create(root).Field("ReflectionNumbers").GetValue<System.Collections.Generic.Dictionary<string,int>>();
+                scores["two"] = 41;
+                if (derived.ReflectionNumbers["two"] != 41 || !object.ReferenceEquals(scores, derived.ReflectionNumbers)) return -6;
+                root = new ScheduleOne.Testing.ScalarCollectionShadowActor();
+                object scalar = HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<object>();
+                if (!(scalar is int number) || number != 31) return -7;
+                try {
+                    HarmonyLib.Traverse.Create(root).Field("ReflectionScores").GetValue<System.Collections.Generic.Dictionary<string,int>>();
+                    return -8;
+                } catch (System.InvalidCastException) { }
+                return 1;
+            }
+        }
+        """, 1)),
     ("TraverseWrongCollectionCastsPreserveRuntimeFailure", () => Verify(TraverseContracts.Library + """
         public static class Probe {
             private static System.Collections.Generic.List<int> ReadWrong() =>

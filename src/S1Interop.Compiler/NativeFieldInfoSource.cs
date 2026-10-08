@@ -12,6 +12,8 @@ internal static class NativeFieldInfoSource
             public sealed class S1InteropNativeFieldInfo : global::System.Reflection.FieldInfo {
                 private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<global::System.Type,
                     global::System.Func<object, global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase>> casters = new();
+                private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<global::System.Type,
+                    global::System.Func<object, object>> collectionReaders = new();
                 private readonly global::System.Reflection.PropertyInfo property;
                 private readonly global::System.Reflection.FieldAttributes attributes;
                 private global::System.Type reflectedType;
@@ -72,7 +74,32 @@ internal static class NativeFieldInfoSource
                             typeof(global::System.Func<object, global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase>)));
                     return cast(value) ?? value;
                 }
-                public static T ReadTraverse<T>(object root, string name, bool typeRoot, global::System.Func<object, object> readValue = null) {
+                private static object ReadCollection(object value, global::System.Type fieldType) {
+                    var reader = collectionReaders.GetOrAdd(fieldType, type => {
+                        if (!type.IsGenericType) return item => item;
+                        string adapterName = type.GetGenericTypeDefinition().FullName switch {
+                            "Il2CppSystem.Collections.Generic.List`1" => "S1Interop.Compiler.Generated.S1InteropList`1",
+                            "Il2CppSystem.Collections.Generic.Dictionary`2" => "S1Interop.Compiler.Generated.S1InteropDictionary`2",
+                            _ => null
+                        };
+                        if (adapterName == null) return item => item;
+                        // Dictionary support is optional in the target reference surface.
+                        var definition = typeof(S1InteropNativeFieldInfo).Assembly.GetType(adapterName);
+                        if (definition == null) throw new global::System.NotSupportedException("Native collection adapter is unavailable: " + type.FullName);
+                        var adapter = definition.MakeGenericType(type.GetGenericArguments());
+                        var factory = adapter.GetMethod("FromNative", new[] { type });
+                        if (factory == null) throw new global::System.NotSupportedException("Native collection factory is unavailable: " + type.FullName);
+                        return (global::System.Func<object, object>)typeof(S1InteropNativeFieldInfo)
+                            .GetMethod(nameof(CreateCollectionReader), global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Static)
+                            .MakeGenericMethod(type, adapter).Invoke(null, new object[] { factory });
+                    });
+                    return reader(value);
+                }
+                private static global::System.Func<object, object> CreateCollectionReader<TNative, TView>(global::System.Reflection.MethodInfo factory) {
+                    var read = (global::System.Func<TNative, TView>)factory.CreateDelegate(typeof(global::System.Func<TNative, TView>));
+                    return value => read((TNative)value);
+                }
+                public static T ReadTraverse<T>(object root, string name, bool typeRoot, bool adaptCollections = false) {
                     if (root == null) return default(T);
                     var wrapperType = typeRoot ? (global::System.Type)root : root.GetType();
                     var nativeRoot = root as global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
@@ -93,7 +120,8 @@ internal static class NativeFieldInfoSource
                             if (access == null) continue;
                             if (typeRoot && !access.IsStatic) return default(T);
                             object value = access.GetValue(typeRoot ? null : root);
-                            if (value != null && readValue != null) value = readValue(value);
+                            // The actual field can hide a statically known field with a different representation.
+                            if (value != null && adaptCollections) value = ReadCollection(value, access.FieldType);
                             return value == null ? default(T) : (T)Rewrap(value, typeof(T));
                         }
                         if (field == global::System.IntPtr.Zero) return default(T);
