@@ -6,19 +6,20 @@ uid: s1interop.first-mod
 
 # Build your first mod
 
-Write ordinary `ScheduleOne.*` C# and build separate Mono and IL2CPP assemblies. The compiler adapts supported runtime differences; you do not need facade declarations or conditional imports for this starter. This remains experimental and does not establish unrestricted game compatibility.
+Create a mod that logs a message at startup and reports the NPC count when you press F8. You will build and test the same source on Mono and IL2CPP.
 
 ## Prerequisites
 
-Use the [candidate installation](getting-started.md#build-and-install-the-candidate-from-source). The published alpha.1 package does not contain this compiler workflow. You need a .NET 8 SDK and matching Mono and IL2CPP Schedule I installations with MelonLoader. Launch each installation once; IL2CPP must finish generating `MelonLoader/Il2CppAssemblies`. Close the game before deploying mods.
+Complete [Install S1Interop](getting-started.md) and keep that PowerShell window open. Prepare matching Mono and IL2CPP Schedule I installations with [MelonLoader](https://github.com/LavaGang/MelonLoader#how-to-use-the-installer). Launch each installation once. Wait for IL2CPP to finish generating `MelonLoader/Il2CppAssemblies`, then close both games.
 
 The `alternate` branches are Mono; the default and `beta` branches are IL2CPP. Match exact game patch versions. The compiler checks version and native generation provenance, but those checks do not prove gameplay compatibility.
 
 ## Create and configure
 
-Run these PowerShell commands separately:
+Create the project in your Documents folder. Run these PowerShell commands separately:
 
 ```powershell
+Set-Location ([Environment]::GetFolderPath('MyDocuments'))
 s1interop new .\MyMod
 s1interop new .\MyMod --apply
 Set-Location .\MyMod
@@ -32,7 +33,7 @@ Restore the project's pinned compiler tool. For an unpublished candidate, use th
 dotnet tool restore --add-source $candidateFeed
 ```
 
-Once the pinned version is published, `dotnet tool restore` is sufficient. Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use the local tool rather than a globally installed version.
+Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use the local tool rather than a globally installed version.
 
 Configure the installations using the project's restored tool. Replace the example paths with your installations:
 
@@ -41,7 +42,7 @@ dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' 
 dotnet tool run s1interop -- doctor .
 ```
 
-`setup` writes an ignored `local.build.props` and refuses to overwrite an existing file. To configure it manually, copy `local.build.props.example` to `local.build.props` and edit both paths. `doctor` checks local reference availability; the build also checks matching game versions and native generation provenance.
+`setup` writes an ignored `local.build.props` and refuses to overwrite an existing file. See [Local game paths](local-paths.md) when updating an existing configuration. `doctor` checks local reference availability; the build also checks matching game versions and native generation provenance.
 
 ## Build both runtimes
 
@@ -65,4 +66,4 @@ Launch each installation separately and check MelonLoader for `MyMod loaded.`. A
 
 Change the log message in `Mod.cs`, rebuild the selected runtime, replace its deployed DLL with the game closed, and confirm the new message after launch. There is no Unity Editor project or generated wrapper catalog to edit.
 
-For existing mods and unsupported constructs, see the [compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md). Existing users of generator-based projects can still use the [earlier walkthrough](legacy-generator-first-mod.md) with `--legacy-generator`.
+Continue with [Everyday development](common-tasks.md). Before sharing your mod, follow [Test and distribute a mod](distributing-mods.md).

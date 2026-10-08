@@ -1,39 +1,38 @@
-# Core concepts
+# How the compiler works
 
 ## One source, two outputs
 
-The source compiler binds ordinary C# against Mono game metadata. For Mono, it builds that source with local game references. For IL2CPP, it maps types and lowers supported operations before compiling against the generated native proxy assemblies. Original source files remain unchanged; generated inputs stay under `obj`.
+S1Interop binds ordinary C# against Mono game metadata. For Mono, it compiles that source with local game references. For IL2CPP, it maps types and adapts supported operations before compiling against MelonLoader's generated interop assemblies.
 
-Both builds select the Mono authoring branch in existing conditional source. The generated MelonLoader domain attribute identifies the actual output runtime independently. Custom and framework symbols remain available, so framework-specific conditionals can still differ.
+Original source files remain unchanged. Generated inputs stay under `obj`. The build produces a mod DLL for the selected runtime.
 
-The result is two mod DLLs. This is the default candidate workflow; it does not aim to put both managed type systems into one shipping assembly.
+Both builds select the `MONO` authoring branch in existing conditional source. The generated MelonLoader domain attribute identifies the actual output runtime. Framework symbols still follow the selected framework.
 
-## One CLI and its build integration
+## Project files
 
-| Component | Role |
+| File | Purpose |
 | --- | --- |
-| `s1interop` | Project creation, setup, analysis, and compiler operations. The project imports invoke its `compiler` commands during builds. |
-| `.s1interop/S1Interop.Compiler.props` and `.targets` | Select references and outputs, verify installations, and invoke the compiler. New projects contain matching copies. |
-| `.config/dotnet-tools.json` | Pins the local CLI package version. Run `dotnet tool restore` before building. |
-| `S1Interop.Runtime.dll` | Shared support required by compiler-built IL2CPP mods. Deploy a compatible generation to `UserLibs`. |
-| `S1Interop.Generators` | Older declaration/helper workflow. Not required by the default compiler scaffold. |
+| `.config/dotnet-tools.json` | Pins the compiler tool version. |
+| `.s1interop/S1Interop.Compiler.props` and `.targets` | Configure references and outputs, check installations, and invoke the compiler during builds. |
+| `local.build.props` | Stores your game installation paths. Keep this file out of source control. |
+| `Mod.cs` | Contains the starter's ordinary game code. Replace or extend it for your mod. |
 
-The compiler implementation remains a library inside the toolchain. There is no second CLI to install.
+Keep the tool manifest and build imports from the same scaffold generation. Restore the local tool before building a fresh checkout. There is one CLI, `s1interop`; MSBuild calls its `compiler` commands.
 
-## Game metadata and authoring companions
+## Prepared game references
 
-The compiler needs matching Mono and IL2CPP game versions for native output. It prepares local reference-only copies that expose supported nonpublic access. Those copies are build inputs, not runtime dependencies, and must not be distributed.
+The compiler creates metadata-only reference copies that expose supported non-public members. It preserves original assembly hashes and field visibility for native repair validation and reflection adaptation.
 
-A compiler-built IL2CPP library also produces `.s1interop/authoring` metadata companions. They let a consuming compiler project bind original signatures and verify that they match the compiled library. Keep these companions with developer-facing library distributions; players do not need them.
+These copies do not modify the installed game. Use them only as compile inputs; keep them out of deployments and downloads. [Non-public member access](compiler-adoption.md#access-non-public-game-members) describes the remaining visibility exceptions.
 
-## Compatibility evidence
+## Runtime support and libraries
 
-A build proves that the selected source binds and emits. A loader initialization check proves that a specific artifact loads. A runtime probe tests only its exercised behavior. Gameplay, saves, networking, and arbitrary content creation need their own evidence on each supported backend.
+IL2CPP outputs include `S1Interop.Runtime.dll`. Deploy a compatible generation to `UserLibs`; Mono outputs do not need it. [Distribution](distributing-mods.md) lists the shipping files.
 
-Metadata discovery avoids a manually maintained game wrapper catalog. It does not remove compiler maintenance or restore code absent from the native game. See the [compiler support guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for current limits.
+Compiler-built IL2CPP libraries also produce `.s1interop/authoring` metadata companions. Consuming compiler projects use them to bind original signatures and verify the matching library. Include companions in developer-facing library packages, but leave them out of player downloads.
 
-## Older workflows
+## Compatibility limits
 
-Legacy dual-runtime migration retains explicit runtime-specific code and may add generator helpers. Backend-neutral facades expose selected types through generated `S1Interop.*` declarations. Neither is the default compiler route.
+Metadata discovery removes the need to maintain a wrapper catalog for every game type. The compiler itself still needs maintenance when runtime contracts change.
 
-Existing migration commands still preview changes and preserve rollback manifests. Their [migration guide](migrating-mono-mods.md), [declaration reference](backend-neutral-declarations.md), and [generated output reference](generator-package.md) remain available for those projects.
+The compiler cannot restore native code absent from the game. [Support and evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) records known gaps and distinguishes compile checks from runtime behavior.

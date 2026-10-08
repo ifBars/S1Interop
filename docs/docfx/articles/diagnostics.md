@@ -218,6 +218,6 @@ The `S1Interop.Generators` build targets report these before compilation when [b
 
 ## Related pages
 
-- [Troubleshooting](troubleshooting.md)
+- [Legacy troubleshooting](legacy-troubleshooting.md)
 - [Declarations](backend-neutral-declarations.md)
 - [Generated output](generator-package.md)

@@ -1,16 +1,10 @@
-# Migrate to dual-runtime
+# Legacy dual-runtime migration
 
-Use this path when an existing mod should build separate Mono and IL2CPP assemblies.
+This procedure adds or repairs runtime-specific build configurations and applies supported source rewrites to an existing mod. It retains the legacy generator/helper model, including manual runtime branches where needed.
 
-Dual-runtime keeps the familiar two-configuration model. Use it when a mod still needs runtime-specific code or when backend-neutral facades are too large a first step.
+For shared ordinary game source built by the compiler, use [Bring an existing mod](compiler-adoption.md). These migration commands do not install the compiler build imports.
 
-This path matches many existing Schedule One mods: one source tree, runtime-specific build configurations, local game paths, and release DLLs for the target Steam branch.
-
-Dual-runtime can be the final shape. S1Interop does not require you to collapse to one DLL later. If you prefer manual runtime differences, keep them and use S1Interop for analysis, linting, build hooks, or a few generated helpers where they save work.
-
-Keep S1API, MAPI, SteamNetworkLib, dedicated-server helpers, and other domain APIs where they own the workflow. Use S1Interop for direct Schedule One seams: runtime-specific `ScheduleOne.*` / `Il2CppScheduleOne.*` references, cached reflection bindings, Harmony method targets, and small field/property reads around patches.
-
-Dual-runtime is also the safer first stop for Harmony transpilers, server/client splits, Steam networking, injected IL2CPP components, or dependencies that already ship separate Mono and IL2CPP builds.
+Keep existing domain APIs and deployment scripts unless they directly depend on the runtime-specific game access being migrated.
 
 ## 1. Analyze the mod
 

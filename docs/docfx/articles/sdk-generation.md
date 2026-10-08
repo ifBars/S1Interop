@@ -1,11 +1,8 @@
 # SDK generation
 
-> [!WARNING]
-> `sdkgen` enables the experimental backend-neutral facade path. Preview first, generate narrowly, review skipped or ambiguous members, and keep an explicit Mono/IL2CPP fallback.
+`sdkgen` writes declarations for the experimental facade SDK. The legacy `S1Interop.Generators` package reads them during compilation and emits implementations. Default compiler projects do not need this command.
 
-`sdkgen` is the CLI command that writes the generated declarations powering the backend-neutral SDK. It produces declaration files on disk; the `S1Interop.Generators` Roslyn package then consumes those declarations at build time. See [Generated output](generator-package.md) for the compile-time side.
-
-Use `sdkgen` when you want generated facades or broad type registration. You do not need it for diagnostics-only adoption, manual Mono/IL2CPP branches, or `migrate --dual-runtime` unless you also want generated helpers for specific game access.
+Preview changes with `--dry-run`, review skipped or ambiguous members, and test the resulting facade calls on both runtimes. See [Generated output](generator-package.md) for the build-time output.
 
 For existing source, use the narrow mode:
 
@@ -25,10 +22,8 @@ This seeds a compact namespace declaration for discoverable Schedule One types f
 
 ## What gets generated
 
-Generated SDK source can include:
+`sdkgen` writes type, namespace, and member declarations. During compilation, the generator uses them to emit:
 
-- `S1InteropType` declarations;
-- `S1InteropNamespace` declarations;
 - root-preserving facades under `S1Interop.ScheduleOne.*`;
 - runtime type registry entries;
 - bridge helpers for Unity events or delegate conversion;

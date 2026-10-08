@@ -1,109 +1,73 @@
 # Contributing
 
-S1Interop is alpha software. Keep changes small, verifiable, and honest about current limitations.
+S1Interop is an experimental compiler for Schedule I mods. Keep changes focused and verify the behavior they claim to support.
 
-## Prerequisites
+## Set up the checkout
 
-- .NET 8 SDK.
-- Windows for CI-equivalent local validation.
-- Optional local Schedule One Mono and IL2CPP installs for integration tests.
-- Optional sibling open-source mod checkouts for real-mod migration fixtures.
+Install the .NET 8 SDK. Use Windows for CI-equivalent validation.
 
-## First-Time Setup
-
-```batch
+```powershell
 dotnet restore .\S1Interop.sln
-dotnet build .\S1Interop.sln -c Debug
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --quick
+dotnet build .\S1Interop.sln -c Release --no-restore
+dotnet run --project .\tests\S1Interop.Compiler.Tests -c Release --no-build
 ```
 
-## Development Loop
+Compiler contracts use authored fixtures and do not need game installations. Real-reference and live tests need matching Mono and IL2CPP installations. Some integration fixtures also need sibling mod checkouts.
 
-Use the fastest test lane that proves the change:
+## Develop and verify a change
 
-```batch
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --quick
+Use `--list` to find compiler cases, then run the relevant filter:
+
+```powershell
+dotnet run --project tests/S1Interop.Compiler.Tests -c Release -- --filter Reflection
 ```
 
-Run portable tests before opening or pushing a general change:
+For CLI, migration, and generator fixtures, use `tests/S1Interop.Tests` with `--list-tests` or `--filter <name>`.
 
-```batch
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --portable
+Before pushing changes to CLI behavior, packaging, build verification, or generators, run the Release gate:
+
+```powershell
+dotnet build .\S1Interop.sln -c Release --no-restore
+dotnet run --project .\tests\S1Interop.Tests -c Release --no-build -- --portable
 ```
 
-Run the Release CI-equivalent path before pushing changes that affect packaging, CLI behavior, build verification, or generators:
+Run the full compiler contracts after compiler changes. Packaging changes also need isolated package checks. [Testing](https://github.com/ifBars/S1Interop/blob/main/docs/TESTING.md) defines the available lanes; [Release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md) defines publication gates.
 
-```batch
-dotnet build .\S1Interop.sln --no-restore --configuration Release
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
-```
+Use the [checkout sample](https://github.com/ifBars/S1Interop/blob/main/samples/SourceCompiler/README.md) when testing local compiler builds. Keep compile evidence, live runtime checks, and gameplay or multiplayer evidence separate.
 
-Run integration tests when changing real-mod migration behavior:
+## Keep module responsibilities clear
 
-```batch
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
-```
+- `S1Interop.Cli` handles commands, input files, and reporting.
+- `S1Interop.Compiler` handles metadata mapping, source adaptation, and compiler diagnostics.
+- `S1Interop.Core` handles scaffolding, setup, analysis, migration, and verification.
+- `S1Interop.Generators` supports the legacy declaration and helper workflow.
 
-## Coding Guidelines
+Use metadata and reusable transformations rather than a catalog of game-specific wrappers. Preserve identity, aliasing, mutations, and lifetimes across runtime boundaries. Report unsupported operations rather than emitting a translation that silently changes behavior.
 
-- Keep `S1Interop.Cli` focused on command flow and reporting.
-- Put reusable behavior in `S1Interop.Core`.
-- Keep analysis, migration, rewriting, code emission, Roslyn generation, and verification concerns separate.
-- Prefer explicit models and small focused helpers over broad string manipulation.
-- Use XML APIs for project file edits when practical.
-- Make migrations reversible and idempotent.
-- Preserve user-authored project structure where possible.
-- Report ambiguous cases instead of guessing.
+Keep migrations reversible. Use structured C# and XML APIs for source and project changes. Keep CLI handlers thin.
 
-## Test Guidelines
+## Test real mods safely
 
-- Add tests with the smallest useful scope.
-- Put fast analyzer/rewriter/generator behavior in portable tests.
-- Put MSBuild, package, CLI, and build-gate behavior in portable tests only when it has no private local dependency.
-- Put real-mod and local game-path validation in integration tests.
-- Never mutate real sibling mod projects. Copy fixtures into temp folders.
-- Clean temporary folders after tests and diagnostics.
+Copy sibling mod sources into temporary evaluation projects. Never run their deployment scripts or edit the originals during compiler evaluation.
 
-## Documentation Guidelines
+Record source selection, exclusions, dependencies, and source hashes. Test unchanged source first so game API mismatches remain distinct from compiler failures. Remove temporary copies after validation.
 
-- Update public docs when commands, modes, package shape, migration behavior, or architecture boundaries change.
-- Keep public docs repeatable and generic.
-- Do not include private local game paths, unpublished investigation notes, or machine-specific state in public docs.
-- Use ignored internal docs for local notes.
+Keep proprietary binaries, local game paths, decompiled output, and investigation logs in ignored locations.
 
-## Commit Style
+## Update documentation
 
-Prefer concise conventional commits:
+Keep new-project and existing-mod guidance on the same compiler workflow. Put optional integrations and legacy tools under Advanced.
 
-```text
-feat(S1Interop): add backend-neutral member invokers
-fix(S1Interop): preserve generated member targets in verifier
-test(S1Interop): add quick fixture lane
-docs(S1Interop): document architecture boundaries
-```
+Update the page that owns a procedure rather than duplicating instructions. Keep public examples repeatable and use generic paths. Check links and build the docs after moving content.
 
-## Publishing a Release
+## Submit a change
 
-Releases are tag-driven. Keep the CLI project, generator project, and `S1InteropPackageInfo` on the same version, merge the release commit to `main`, then push a matching `v<version>` tag.
+Use a scoped conventional commit, such as `fix(compiler): preserve native array aliases`.
 
-The `Publish release` workflow:
+In the pull request, explain the behavior change and the relevant verification. Identify runtime checks you could not perform. Include documentation updates when commands, outputs, or supported behavior change.
 
-1. rejects a tag that does not match both package projects;
-2. runs the Release build and portable tests;
-3. packs both packages and tests installation and starter compilation in an isolated .NET 8 consumer;
-4. builds documentation with the pinned DocFX tool and treats warnings as errors;
-5. publishes `S1Interop` and `S1Interop.Generators` to NuGet.org;
-6. creates a GitHub release with both `.nupkg` files.
+## Publish a release
 
-Prerelease versions such as `0.1.0-alpha.1` produce a GitHub prerelease. Do not reuse a published NuGet version; bump every version source before creating the next tag.
+Publication requires an explicit release request. Follow [Release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md) for version alignment, validation, tagging, and verification of published packages.
 
-Follow the Release readiness page in the Contributors section (source: `docs/RELEASING.md`) for candidate validation, live-game gates, and post-publication checks.
-
-## Pull Request Checklist
-
-- The change is scoped to one behavior or documentation concern.
-- Public docs are updated if workflow or behavior changed.
-- `dotnet build` passes.
-- Relevant test lane passes.
-- CI-equivalent Release path passes for packaging, CLI, generator, or verifier changes.
-- Real-mod integration coverage was run or intentionally skipped with a clear reason.
+Do not reuse a published NuGet version. Keep release instructions in that guide so the workflow and its documentation have one source of truth.

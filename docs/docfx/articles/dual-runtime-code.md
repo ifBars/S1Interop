@@ -1,14 +1,14 @@
 ---
-title: Write code for both runtimes
-description: Write one source file that builds for Mono and IL2CPP without #if blocks around imports, casts, collections, events, or injected types.
+title: Write code with legacy runtime helpers
+description: Use the legacy generator helpers for imports, casts, collections, events, and injected types.
 uid: s1interop.dual-runtime-code
 ---
 
-# Write code for both runtimes
+# Write code with legacy runtime helpers
 
 A dual-runtime project builds the same source twice: once against Mono's `ScheduleOne.*` assemblies and once against MelonLoader's generated `Il2CppScheduleOne.*` wrappers. Most differences between the two are mechanical. S1Interop handles those at build time, so a typical file needs no `#if MONO` / `#if IL2CPP` blocks.
 
-Projects created with `s1interop new` have everything on this page enabled. To add it to an existing project, see [Enable in an existing project](#enable-in-an-existing-project).
+This page covers the legacy generator workflow created with `s1interop new --legacy-generator`. The default `s1interop new` creates a compiler project: write ordinary Mono source and let the compiler adapt it for IL2CPP. See [Build your first mod](first-mod.md) or [Adopt the compiler in an existing mod](compiler-adoption.md). To add the legacy helpers to an existing project, see [Enable in an existing project](#enable-in-an-existing-project).
 
 ## Import game namespaces once
 
@@ -155,14 +155,16 @@ A melon whose build sets `S1InteropTargetRuntime` gets a `MelonPlatformDomain` a
 
 ## When you still need #if
 
-Use `#if MONO` / `#if IL2CPP` where the two builds really differ:
+In the legacy generator workflow, use `#if MONO` / `#if IL2CPP` where the two builds really differ:
 
-- Members that are private on Mono but public on IL2CPP, or that exist on only one runtime.
+- Members that exist on only one runtime. A visibility difference alone can be addressed by publicizing Mono compile references and arranging runtime access; it does not inherently require conditional source.
 - Harmony transpilers, which cannot target IL2CPP methods (`S1I004`).
 - Game APIs that take IL2CPP collection interfaces or byte buffers (`S1I005`, `S1I006`).
 - Game API differences between the two Steam branches when they are on different game versions.
 
-Building both configurations is what catches these. A Mono build proves nothing about IL2CPP.
+The compiler workflow already prepares publicized references and runtime access support for supported non-public member access; do not add a second publicizer to its reference pipeline. See [Access non-public game members](compiler-adoption.md#access-non-public-game-members). Compiler projects select the `MONO` authoring branch for both outputs, so the legacy `#if IL2CPP` advice is not a compiler workaround for unsupported operations.
+
+Build and validate both runtime outputs. Compiling one does not establish compatibility or behavior on the other.
 
 ## Enable in an existing project
 

@@ -70,43 +70,60 @@ public sealed class CompilerProjectScaffolder
             ["README.md"] = $$"""
                 # {{name}}
 
-                Write ordinary ScheduleOne C# once and build it for Mono and IL2CPP. This experimental compiler does not yet support every language or runtime behavior.
+                Write ordinary ScheduleOne C# and build it for Mono and IL2CPP. The compiler is experimental; test your mod's behavior on each runtime.
 
-                ## Setup
+                ## Restore the compiler
 
-                Install a .NET 8 SDK and matching Mono and IL2CPP game versions with MelonLoader. Launch the IL2CPP installation once to generate its interop assemblies. Do not commit game paths or game assemblies.
+                Run commands from this project directory. Use the .NET 8 SDK and the package feed from [Install S1Interop](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/getting-started.md).
 
-                Restore the pinned S1Interop {{version}} tool:
+                Restore the pinned S1Interop {{version}} tool from the same PowerShell window used for installation:
 
                 ```powershell
-                dotnet tool restore
+                dotnet tool restore --add-source $candidateFeed
                 ```
 
-                If this version is an unpublished candidate, add its local package directory: `dotnet tool restore --add-source <candidate-feed>`. The manifest and `.s1interop` build files were generated together; commit both. The build uses this project's local tool, not a globally installed version or a checkout-specific DLL path.
+                In a new terminal, first set `$candidateFeed` to the absolute path of that installation's `artifacts/packages` directory. Once your pinned version is published on NuGet.org, plain `dotnet tool restore` is sufficient.
 
-                Configure both installations with the restored tool, replacing these example paths:
+                Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use this project's pinned tool.
+
+                ## Configure the game
+
+                Prepare matching Mono and IL2CPP game versions with MelonLoader. Launch each installation once. Wait for IL2CPP interop generation to finish, then close both games.
+
+                Replace the example paths with your game installation roots:
 
                 ```powershell
                 dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' --il2cpp-game-path 'C:\Games\ScheduleI-Il2Cpp' --apply
                 dotnet tool run s1interop -- doctor .
                 ```
 
-                Setup writes the ignored `local.build.props` and never overwrites an existing file. For manual configuration, copy `local.build.props.example` to `local.build.props` and edit its paths. Doctor checks reference availability; builds also verify matching game versions and native generation provenance.
+                Setup creates the ignored `local.build.props` file. If it already exists, edit its paths directly. Doctor checks reference availability; builds also verify game versions and native generation provenance.
 
                 ## Build and load
 
-                Build serially because the project's NuGet restore state is shared:
+                Run these commands one at a time:
 
                 ```powershell
                 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
                 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
                 ```
 
-                Outputs are `bin/Release/Mono/netstandard2.1/{{name}}.dll` and `bin/Release/Il2Cpp/net6.0/{{name}}.dll`. Copy the selected DLL into that installation's `Mods` directory. For IL2CPP, also copy the adjacent `S1Interop.Runtime.dll` into `UserLibs`. All compiler-built mods must use compatible support generations. Do not distribute `.s1interop/authoring` metadata from build outputs or game reference assemblies.
+                | Runtime | Mod DLL |
+                | --- | --- |
+                | Mono | `bin/Release/Mono/netstandard2.1/{{name}}.dll` |
+                | IL2CPP | `bin/Release/Il2Cpp/net6.0/{{name}}.dll` |
 
-                Builds do not deploy or launch the game. On launch, check for `{{name}} loaded.` in MelonLoader. After loading a save, press F8 to log the NPC count. Verify the actual behavior separately on both runtimes.
+                Builds do not deploy or launch the game. With the game closed, copy its matching mod DLL into `Mods`. For IL2CPP, also copy the adjacent `S1Interop.Runtime.dll` into `UserLibs`. Installed compiler-built mods must use compatible support generations.
 
-                See the [compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for supported behavior, existing-mod adoption, diagnostics, and remaining limits.
+                Launch the game and check MelonLoader for `{{name}} loaded.`. Load a save, then press F8 to log the NPC count. Repeat on the other runtime.
+
+                ## Develop your mod
+
+                Edit `Mod.cs` using ordinary game and Unity APIs. Rebuild the selected runtime, replace its deployed DLL with the game closed, and test your change. Leave generated files under `obj` unchanged.
+
+                Follow [Everyday development](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/common-tasks.md) for reference updates and [Troubleshooting](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/troubleshooting.md) for build failures.
+
+                Before sharing, follow [Test and distribute a mod](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/distributing-mods.md). Keep game references, local paths, and `.s1interop/authoring` metadata out of player downloads.
                 """
         };
     }

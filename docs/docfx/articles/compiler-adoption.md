@@ -1,56 +1,61 @@
 ---
-title: Adopt the compiler in an existing mod
-description: Evaluate existing Mono source in a compiler project without running the original project's deployment targets.
+title: Bring an existing mod
+description: Bring source and dependencies into a compiler project, then validate both runtime outputs.
 uid: s1interop.compiler-adoption
 ---
 
-# Adopt the compiler in an existing mod
+# Bring an existing mod
 
-Use this route to evaluate the same ordinary Mono source on both backends. The compiler is the candidate's primary workflow. `migrate --dual-runtime` and `migrate --backend-neutral` are older generator workflows and do not enable it.
+Use the same compiler project and build commands as the [first-mod walkthrough](first-mod.md). Keep the original mod while you check the new build.
 
-There is not yet an automatic conversion of arbitrary project files, dependencies, resources, and deployment targets into compiler projects. Start with a separate compiler project so its source coverage and build behavior are explicit. Preserve your original project.
+Adoption is currently manual. You need to carry over source files, resources, dependencies, and packaging.
 
 ## Create the compiler project
 
-Follow [candidate installation](getting-started.md), then create a sibling evaluation directory:
+Complete [installation](getting-started.md). Create an empty sibling project:
 
 ```powershell
 s1interop new ../MyMod-Compiler --apply
 ```
 
-Inside that new directory, follow its README to restore the pinned local tool and configure `local.build.props` for matching game installations. Use the same candidate feed used for installation. Keep the generated build imports and tool manifest together.
+In the new directory, restore the pinned tool and configure both game paths as described in [Create and configure](first-mod.md#create-and-configure).
 
-## Bring over author source and dependencies
+## Bring over source and dependencies
 
-Remove the generated starter `Mod.cs` from the evaluation project before adding your mod's sources. Copy the source files selected by the original project's compile items and exclusions into a `Source` directory. Do not copy `bin`, `obj`, generated wrapper trees, or the original project/build scripts. The new SDK project includes ordinary C# files under its directory automatically, including `Source`; keep unrelated C# files outside it.
+1. Remove the generated `Mod.cs` starter.
+2. Copy the original project's selected source files into a `Source` directory.
+3. Preserve the original assembly name when source or dependencies rely on it.
+4. Add the mod's third-party references and required resources.
 
-Preserve the original assembly name in the evaluation project's `<AssemblyName>` when source, patches, or dependencies rely on it. Keep the original Melon metadata and entry point; the generated starter must not remain as a second mod. Inventory embedded resources, linked source, content, and source generators separately so a passing build does not silently omit required behavior.
+The new project includes C# files under its directory automatically. Keep unrelated files outside it. Preserve compile exclusions, linked source, source generators, and embedded resources; copying a directory may not capture them.
 
-Add necessary third-party references explicitly. The compiler imports provide game, Unity, MelonLoader, and Harmony references. Do not import the original project's auto-deploy, game-launch, or process-termination targets. Do not combine the compiler imports with the older generator's game-reference integration.
+Keep the original mod entry point and Melon metadata. Leave out `bin`, `obj`, generated wrappers, and the original build scripts. The compiler imports already provide game, Unity, MelonLoader, and Harmony references.
 
-For libraries you build through the compiler, use normal `ProjectReference` entries. For compiler-built IL2CPP libraries distributed as binaries, retain their `.s1interop/authoring` companions alongside them. A prebuilt dependency with a different backend-specific API is not automatically adapted merely because its consuming mod uses the compiler.
+Use normal `ProjectReference` entries for libraries built through the compiler. Prebuilt libraries need compatible dependency APIs for each output. Keep `.s1interop/authoring` companions with compiler-built IL2CPP libraries distributed as binaries.
 
-Keep source unchanged during the initial comparison. Existing runtime conditionals select `MONO` for both outputs; new compiler-authored code does not need those branches. Framework symbols still follow the selected framework. Record missing or changed game APIs separately from compiler failures.
+Start with unchanged author source. Both compiler outputs select existing `MONO` branches. Review `IL2CPP` and `!MONO` branches for independent features you need to bring into that author source. Framework symbols still follow the selected framework.
 
-Review existing `#if IL2CPP` and `#if !MONO` branches: they are not selected in either compiler output. Backend-specific proxy work should be handled by compiler adaptation, but independent features implemented only in those branches will not become part of the Mono authoring path automatically. Account for those features in your source inventory and runtime comparison.
+## Access non-public game members
 
-## Build and inspect both outputs
+The compiler prepares publicized, metadata-only game references under `obj` and generates runtime access attributes. A member being private on Mono but public in an IL2CPP wrapper does not, by itself, require conditional source. Original game assemblies remain unchanged.
 
-Run these serially in the evaluation directory:
+This addresses the same visibility difference as [S1MelonModTemplate's Krafs.Publicizer setup](https://github.com/k073l/S1MelonModTemplate/blob/master/template/MyMod.csproj). Compiler projects need no additional publicizer package. S1Interop also preserves original hashes and field visibility for reflection adaptation and native repair validation.
+
+Publicization cannot supply absent members or stripped native code. The compiler preserves virtual member visibility and the visibility of fields sharing event or property names to avoid changing source binding. Report unsupported access patterns with the compiler diagnostic and a small example.
+
+## Build and test
+
+Run these commands serially from the new project:
 
 ```powershell
 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```
 
-The DLLs are under `bin/Release/Mono/netstandard2.1` and `bin/Release/Il2Cpp/net6.0`. The native output also contains `S1Interop.Runtime.dll`. Generated lowering inputs remain under `obj`; do not edit them to fix author code.
+Outputs go to `bin/Release/Mono/netstandard2.1` and `bin/Release/Il2Cpp/net6.0`. The IL2CPP output also contains `S1Interop.Runtime.dll`.
 
-Check that all intended source files, resources, and dependencies are represented. Resolve author-binding failures before treating later lowering diagnostics as compatibility defects. A mod targeting an older game API does not establish a compiler regression merely because it fails against the current game's Mono metadata.
+Resolve missing dependencies and outdated game API calls before diagnosing compiler adaptation. Check that the build includes all intended sources and resources. Keep generated files under `obj` unchanged.
 
-## Validate behavior before replacing the original workflow
+Follow [Test and distribute a mod](distributing-mods.md). Verify loading and the actual feature on each runtime, including saves or multiplayer where applicable. Compare behavior with the original mod.
 
-Follow [Test and distribute a mod](distributing-mods.md) with dedicated test installations. Verify loading, then the mod's actual feature, including saves or multiplayer where applicable. Record evidence separately for each backend.
-
-The existing-mod corpus includes unchanged BiggerLobbies, MoreXP, and SteamNetworkLib sources. Its [evidence report](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md#existing-mod-corpus) separates compilation from live checks and identifies author API mismatches. SteamNetworkLib's local transport-override probe does not establish Steam networking or voice behavior.
-
-Once your evaluation is validated, move the reviewed compiler project structure into your normal development workflow and restore only the packaging steps you intend to keep. Until then, the original project remains the comparison point; no rollback command is needed for an untouched original.
+After validation, adopt the compiler project as your normal build and restore the packaging steps you need. The [existing-mod evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md#existing-mod-corpus) records completed compile and runtime checks.

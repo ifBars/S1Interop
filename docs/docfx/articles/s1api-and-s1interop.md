@@ -4,7 +4,7 @@ S1API provides curated gameplay workflows. S1Interop's source compiler adapts or
 
 ## Different responsibilities
 
-A gameplay library can define how content is registered, when a save system loads, or how a builder creates an NPC. Compiler adaptation preserves supported program behavior across backend type systems; it does not invent those gameplay rules.
+A gameplay library can register content, manage save loading, or provide an NPC builder. Compiler adaptation preserves supported program behavior across backend type systems; it does not invent those gameplay rules.
 
 You can write directly against game APIs or use higher-level libraries where they help. S1Interop's current compatibility limits still apply to direct access and to dependencies. Metadata discovery alone is not proof that every native operation is available or correctly adapted.
 
@@ -18,7 +18,7 @@ The current [real-mod evidence](https://github.com/ifBars/S1Interop/blob/main/do
 
 ## Keeping an existing build workflow
 
-You can use `analyze` or `lint` without adopting the compiler. The older generator package also provides diagnostics, helpers, and selected facades. These routes are documented under **Legacy generator workflows** and do not change the compiler's ordinary-source authoring model.
+You can use `analyze` or `lint` without adopting the compiler. The older generator package also provides diagnostics, helpers, and selected facades. See [Advanced](advanced.md) for these tools. They do not change the compiler's ordinary-source authoring model.
 
 ## Distribution
 

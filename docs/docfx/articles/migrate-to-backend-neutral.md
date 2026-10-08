@@ -1,10 +1,8 @@
-# Migrate to backend-neutral
+# Legacy facade migration
 
-Use this path when an existing Mono mod should move toward one assembly that runs on Mono or IL2CPP.
+This guide converts direct game access to generated `S1Interop.*` facades. It is for developers maintaining the experimental facade workflow. A single assembly depends on every game access and dependency resolving correctly on both runtimes; migration alone does not establish that compatibility.
 
-Backend-neutral source moves away from direct `ScheduleOne.*` or `Il2CppScheduleOne.*` calls and uses generated facades under `S1Interop.ScheduleOne.*`. Mono and IL2CPP configurations remain useful as validation targets.
-
-This is not the only S1Interop path. If you want diagnostics while keeping manual runtime branches, use [Ways to use S1Interop](use-cases.md). If you want separate Mono and IL2CPP outputs first, use [Migrate to dual-runtime](migrate-to-dual-runtime.md).
+For ordinary game source and separate runtime outputs, use [Bring an existing mod](compiler-adoption.md). The commands below do not enable the source compiler.
 
 ## 1. Analyze the mod
 

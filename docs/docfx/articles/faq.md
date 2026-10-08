@@ -1,49 +1,41 @@
 # FAQ
 
-## Which workflow should I start with?
+## Do I need the Unity Editor?
 
-Use the locally built candidate's source compiler: [install it](getting-started.md), then follow [the first-mod guide](first-mod.md) or [existing-mod adoption](compiler-adoption.md). It builds ordinary game source for both runtimes without facade declarations. The earlier published package has different defaults.
+No. Use a C# editor and the .NET SDK. The [first-mod walkthrough](first-mod.md) creates a project that builds against your installed game.
 
-Use `--legacy-generator` or `--backend-neutral` only when you deliberately want the older helper or facade project. The `migrate` commands still target those older workflows; they do not enable the compiler.
+## Do I need both game installations?
 
-## Do I need both the CLI and the generator package?
+Mono builds need Mono game metadata. IL2CPP builds need that metadata plus a matching IL2CPP installation with MelonLoader's generated interop assemblies. Configure both to build and test both outputs.
 
-The default compiler project needs the pinned `s1interop` local tool and its matching build imports. Those imports call `s1interop compiler` during builds. It does not need `S1Interop.Generators`.
+## Do I need wrappers or runtime conditionals?
 
-The generator package is for the older declaration, helper, and diagnostics workflow. You can continue using that package without adopting the compiler.
+Write ordinary `ScheduleOne.*` source. The compiler adapts supported operations and publicizes compile references for supported non-public access.
 
-## Do players install S1Interop?
+The compiler selects existing `MONO` branches for both outputs. It skips existing `IL2CPP` branches, so bring any independent features from those branches into your author source. Framework-specific symbols still follow the selected framework.
 
-Players do not install the CLI or generator. Compiler-built IL2CPP mods require the matching `S1Interop.Runtime.dll` in `UserLibs`; Mono outputs do not. Use compatible support generations across installed compiler-built mods. See [distribution](distributing-mods.md).
+## Does every game operation work?
 
-## Do I need a Mono installation to build an IL2CPP mod?
+Not yet. Some source patterns and native operations remain unsupported. Publicization cannot restore missing APIs or stripped native code. See [Compiler support and evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md).
 
-Yes. The compiler binds author source against Mono metadata, then adapts it to the matching IL2CPP reference surface. The native installation must have generated MelonLoader interop assemblies. The build verifies the game versions and interop generation provenance.
+Test the mod's actual feature on each runtime. Successful compilation alone does not establish gameplay or multiplayer compatibility.
 
-## Do I have to use the generated SDK or runtime conditionals?
+## What do players install?
 
-No. New compiler projects use ordinary `ScheduleOne.*` source. Existing `MONO` branches are selected for both outputs; the compiler adapts supported differences. Framework-specific conditionals remain framework-specific. No manual facade catalog is required.
+Players install the mod DLL for their runtime and its dependencies. Compiler-built IL2CPP mods also need compatible `S1Interop.Runtime.dll` support in `UserLibs`. They do not install the compiler tool.
 
-## Will S1Interop convert my entire mod automatically?
+See [Test and distribute a mod](distributing-mods.md) for archive contents.
 
-That is not established. The compiler has known unsupported operations and unverified runtime behavior. Missing dependencies and source written for a different game API must also be distinguished from lowering failures. Read the [support and evidence guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md). Build success alone does not prove gameplay or multiplayer compatibility.
+## Can I use S1API or another library?
 
-## Does S1Interop redistribute Schedule One game files?
+Yes, when its dependency APIs are compatible with your compiler build. Adding compiler imports to a mod does not automatically adapt prebuilt libraries.
 
-No. Keep game assemblies, reference-only copies, generated IL2CPP proxies, decompiled source, and game assets local. Do not commit machine-specific `local.build.props`. Distribute only your mod and its permitted runtime dependencies.
+[Existing-mod adoption](compiler-adoption.md) covers dependencies. [S1API and S1Interop](s1api-and-s1interop.md) explains their different responsibilities.
 
-## Does S1Interop replace S1API or other helper libraries?
+## Why does installation build from source?
 
-It adapts direct game access, rather than defining gameplay systems. Higher-level libraries may remain useful, but their dependency surfaces must be compatible with the chosen compiler build. See [S1API and S1Interop](s1api-and-s1interop.md).
+The alpha.2 compiler candidate is not published yet. Published alpha.1 contains the older generator workflow. Follow [Install S1Interop](getting-started.md) for the version these docs use.
 
-## What does --dry-run do vs --apply?
+## Where are the generator and migration guides?
 
-Project-changing commands preview their plan until `--apply` is supplied; `--dry-run` requests an explicit preview. Applied legacy migrations record backups and rollback manifests. Compiler builds generate intermediate files and output assemblies normally; they are not migration previews and do not deploy the default scaffold.
-
-## Why are my declaration diagnostics silent?
-
-This concerns the older generator workflow. Declaration diagnostics require actual game reference metadata. See [generator diagnostics](diagnostics.md) and [local paths](local-paths.md). Silence is not proof of compatibility.
-
-## When do generated facades update?
-
-This also concerns the older generator workflow. An IDE design-time build or normal compilation runs the generator after declarations change. Restore alone does not generate those symbols. See [generated output](generator-package.md).
+They are under [Advanced](advanced.md), along with diagnostics-only use and the experimental facade workflow.

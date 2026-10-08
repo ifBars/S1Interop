@@ -10,7 +10,7 @@ On the verified Mono/IL2CPP 0.4.7f9 pair, the compiler harness passes 31 runtime
 
 This is local transport-override and buffer coverage. Steam networking, voice playback, audio-thread behavior and multiplayer remain unverified. See [the source compiler evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md#existing-mod-corpus) for scope and remaining gaps. The earlier facade/migration lanes below are separate workflows.
 
-## Evidence Lanes
+## Legacy migration evidence lanes
 
 ```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral
@@ -28,9 +28,9 @@ Run the full integration lane before release-facing validation:
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration
 ```
 
-## Last Local Verifications
+## Historical migration runs
 
-On August 12, 2026, the focused backend-neutral lane completed against the current checkout:
+On August 12, 2026, the focused backend-neutral lane completed against the checkout available on that date:
 
 ```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug --no-build -- --integration-backend-neutral
@@ -40,7 +40,7 @@ Result: `S1Interop fixture tests passed (9 executed).`
 
 The local Hoverboard checkout was unavailable, so its migration-convergence, SDK-generation, and duplicate-`LangVersion` checks skipped explicitly. The remaining registered backend-neutral fixtures completed. This run therefore refreshes the broader lane without replacing the earlier Hoverboard-specific evidence below.
 
-On July 5, 2026, the focused backend-neutral real-mod lane passed locally against the current checkout:
+On July 5, 2026, the focused backend-neutral real-mod lane passed locally against the checkout available on that date:
 
 ```batch
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- --integration-backend-neutral

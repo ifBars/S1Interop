@@ -1,6 +1,6 @@
 # Generated output
 
-Check this page when generated symbols are missing or you need to know what a declaration emits.
+This reference covers `S1Interop.Generators`, the legacy generator package. Use it to inspect missing generated symbols or find what a declaration emits. Default compiler projects do not use this package.
 
 For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md). For the conceptual facade model, see [Backend-neutral SDK](backend-neutral-sdk.md).
 
@@ -9,7 +9,7 @@ For the attribute reference that drives generation, see [Declarations](backend-n
 `S1Interop.Generators` is a Roslyn incremental source generator. It runs as part of C# compilation in two places:
 
 - **Design-time builds**: triggered by Visual Studio, Rider, and OmniSharp when files or project state change. This is what makes generated symbols show up in IntelliSense, Go-to-Definition, and completion.
-- **Full builds**: triggered by `dotnet build`, `dotnet rebuild`, MSBuild, or IDE build commands. This is what produces the generated source that ends up in the output assembly.
+- **Full builds**: triggered by `dotnet build`, MSBuild, or IDE build commands. This is what produces the generated source that ends up in the output assembly.
 
 After adding, editing, or removing a declaration, rebuild the project or let the IDE regenerate before calling the new symbols. If a generated type or member is missing from IntelliSense, run `dotnet build` once.
 
@@ -33,7 +33,7 @@ If your mod references only the generator package, you can author declarations b
 
 ## Build integration
 
-The package also ships MSBuild targets. Every feature is off until the project opts in, so adding the package for diagnostics alone changes no references or output. `s1interop new` enables all of them:
+The package also ships MSBuild targets. Game references and deployment require project opt-in. `s1interop new --legacy-generator` enables the integration shown below:
 
 ```xml
 <S1InteropTargetRuntime>Il2Cpp</S1InteropTargetRuntime>   <!-- per configuration -->

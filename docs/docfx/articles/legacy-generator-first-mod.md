@@ -1,18 +1,18 @@
 ---
-title: Earlier generator first mod
+title: Legacy project setup
 description: Set up MelonLoader, create a C# project, load your first Schedule I mod, and change its code.
 uid: s1interop.legacy-first-mod
 ---
 
-# Earlier generator first mod
+# Legacy project setup
 
-You will build a mod that prints a message when Schedule I starts. No Unity project or previous modding experience is required. Begin with the game runtime you already have installed.
+Use this page when maintaining a generator project. New compiler projects follow [Build your first mod](first-mod.md).
 
 All terminal examples on this page use **PowerShell on Windows**. Run each command separately and stop on an error. Commands belong in PowerShell, C# belongs in `.cs` files, and XML belongs in `.props` or `.csproj` files.
 
 ## Before you start
 
-1. Follow [Install S1Interop](getting-started.md), including its published-version notes. Check `s1interop --version`.
+1. Install the [candidate](getting-started.md) or keep [published alpha.1](advanced.md#maintain-published-alpha1) for an existing project. Check `s1interop --version`.
 2. Install Schedule I and launch it once normally. Close the game.
 3. Locate the game folder in Steam: right-click Schedule I and open **Manage > Browse local files**. Keep the folder path containing `Schedule I.exe`.
 4. Install MelonLoader using its [official installer instructions](https://github.com/LavaGang/MelonLoader#how-to-use-the-installer). Select this game's executable and follow the loader's runtime prerequisites.
@@ -43,6 +43,8 @@ s1interop new --legacy-generator .\MyFirstMod --apply
 Set-Location .\MyFirstMod
 ```
 
+For published alpha.1, omit `--legacy-generator`; its plain `new` already creates this project.
+
 The first command writes nothing. The second requires an empty or nonexistent target folder. The final command enters the new project; `.` in subsequent commands means this folder.
 
 | File | Purpose |
@@ -65,7 +67,7 @@ s1interop setup . --il2cpp-game-path "D:\Games\Schedule I" --apply
 
 For Mono, use `--mono-game-path` in all three commands instead. Repeat the path on each command: `doctor` is read-only and does not save its arguments. Automatic detection is available by omitting the flag.
 
-The candidate requires at least one ready runtime for the legacy generator scaffold. **Published alpha.1 requires Mono for automatic setup**, even for an IL2CPP build. An alpha.1 user with only IL2CPP should use the manual [local configuration](local-paths.md#configure-a-new-project).
+The candidate requires at least one ready runtime for the legacy generator scaffold. **Published alpha.1 requires Mono for automatic setup**, even for an IL2CPP build. For alpha.1 with only IL2CPP, copy `local.build.props.example` to `local.build.props` and set `Il2CppGamePath` to the game root.
 
 Expect a `[ready]` check for your runtime. Fix missing game/loader references before continuing. `setup --apply` writes only the ignored `local.build.props`; it does not install software or overwrite existing configuration. Edit that file directly when a path changes.
 
@@ -89,7 +91,7 @@ The first build restores packages from NuGet (or your candidate feed). Wait for 
 MyFirstMod -> D:\Games\Schedule I\Mods\MyFirstMod.dll
 ```
 
-Debug builds deploy this way; Release builds only write `bin\`. If the build fails, start with the first error in [Troubleshooting](troubleshooting.md).
+Debug builds deploy this way; Release builds only write `bin\`. If the build fails, start with the first error in [Legacy troubleshooting](legacy-troubleshooting.md).
 
 ## 4. Load it in Schedule I
 
@@ -132,6 +134,6 @@ Save, close the game, and run `dotnet run -c "Debug Il2Cpp"` (or `"Debug Mono"`)
 
 ## Next steps
 
-Read [Write code for both runtimes](dual-runtime-code.md) before touching more game code. Use [Common tasks](common-tasks.md) to add the other runtime or analyze source. Use [S1API and S1Interop](s1api-and-s1interop.md) to choose an API for a gameplay feature.
+Use [Runtime helpers](dual-runtime-code.md) when game code needs runtime-specific conversions, and [Legacy troubleshooting](legacy-troubleshooting.md) for generator or project configuration errors.
 
-Before sharing a mod, follow [Test and distribute a mod](distributing-mods.md). The default two-build project is the recommended route. One-DLL backend-neutral facades remain [experimental](backend-neutral-sdk.md).
+Before sharing, build the release configurations declared in your project and test each output in its matching game install. Package the mod DLL and its runtime dependencies separately for each runtime. Do not include game assemblies, loader DLLs, or the generator package. The compiler distribution guide's commands and shared runtime dependency do not apply to this generator project.

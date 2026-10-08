@@ -37,7 +37,7 @@ s1interop --version
 | `new` | Create a compiler-enabled project with ordinary game source and pinned local tooling. `--legacy-generator` retains the earlier helper scaffold; `--backend-neutral` selects the separate one-DLL facade experiment. |
 | `init` | Add a declaration file and generator support to an existing project. |
 | `lint` | Report issues using inferred project/runtime context. Useful for diagnostics-only adoption. |
-| `sdkgen` | Generate SDK declarations and facades when you want generated game access. |
+| `sdkgen` | Write declarations for the experimental facade SDK; the generator package emits their implementations during compilation. |
 | `build-hook` | Add build-time validation hooks where supported. Useful when you keep manual runtime branches. |
 | `migrate` | Plan or apply migration changes. Use `--dual-runtime` for separate Mono and IL2CPP builds. |
 | `verify-migration` | Run migration plans in a disposable sandbox, optionally with builds. |
@@ -50,7 +50,7 @@ The source checkout uses the same `s1interop` executable for automatic compiler 
 s1interop compiler --help
 ```
 
-MSBuild invokes `compiler prepare-references`, `compiler verify-installations`, and `compiler lower` using explicit file manifests and output paths. These are build operations, not migration previews: preparation and lowering write their designated generated outputs. The published alpha.1 package does not contain these commands. See the [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for the current source-checkout setup and compatibility limits.
+MSBuild invokes `compiler prepare-references`, `compiler verify-installations`, and `compiler lower` using explicit file manifests and output paths. These are build operations, not migration previews: preparation and lowering write their designated generated outputs. The published alpha.1 package does not contain these commands. See the [source compiler guide](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) for compiler behavior and compatibility limits.
 
 ## Dry-run and apply
 

@@ -1,8 +1,8 @@
-# Declarations
+# Legacy generator declarations
 
 Declarations tell the `S1Interop.Generators` package which game types and members should be resolved through generated backend-neutral helpers. They are assembly-level attributes written to a single S1Interop-owned source file and consumed by the Roslyn generator at compile time.
 
-Most projects should let `sdkgen` write these declarations first, then keep the generated file small and reviewable as the mod touches more of the game surface. See [SDK generation](sdk-generation.md) for the CLI side.
+Facade projects can use `sdkgen` to write these declarations, then keep the generated file small and reviewable as the mod touches more of the game surface. See [SDK generation](sdk-generation.md) for the CLI side.
 
 For what the generator emits from these declarations and when, see [Generated output](generator-package.md).
 

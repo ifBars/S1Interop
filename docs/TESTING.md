@@ -1,6 +1,6 @@
 # Testing
 
-S1Interop uses an executable fixture harness instead of a framework-specific test runner.
+S1Interop has separate executable harnesses for compiler contracts and CLI, migration, and generator fixtures. Run them from the repository root with the .NET 8 SDK.
 
 ## Compiler workflow
 
@@ -74,7 +74,7 @@ dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug -- 
 
 Run the full `--integration` lane when a change crosses multiple migration domains or before a broad release-facing validation pass. Do not use it as the default iteration loop.
 
-See Real-mod evidence (in the Contributors section) for the current real-mod coverage matrix and the limits of what those lanes prove.
+See [Real-mod evidence](https://github.com/ifBars/S1Interop/blob/main/docs/REAL_MOD_EVIDENCE.md) for dated runs and the limits of those lanes.
 
 ### All
 
@@ -84,9 +84,9 @@ Portable plus integration when the local workspace is available:
 dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj -c Debug
 ```
 
-## Backend-Neutral Local Validation
+## Legacy facade validation
 
-Use the backend-neutral build validator for demo projects or new mods that should compile from one source tree against both reference surfaces:
+These runners validate experimental facade projects created with `s1interop new --backend-neutral`. They do not validate the default compiler scaffold.
 
 ```batch
 powershell -NoProfile -File .\tests\Run-BackendNeutralBuildValidation.ps1 ^
@@ -97,10 +97,6 @@ powershell -NoProfile -File .\tests\Run-BackendNeutralBuildValidation.ps1 ^
 ```
 
 The script checks expected MelonLoader and Unity reference files before building. It does not launch the game or copy files into `Mods/`.
-
-For manual IDE validation of a project created with `s1interop new`, run `s1interop doctor` and preview `s1interop setup`. The default generated project builds with `"Debug Mono"` and `"Debug Il2Cpp"` configurations. `setup --apply` may create only an ignored `local.build.props` containing `MonoGamePath` and `Il2CppGamePath`. Compiler projects restore the pinned local tool; use the candidate feed for unpublished versions.
-
-The backend-neutral build validator above and runtime smoke runner below are specifically for projects created with `s1interop new --backend-neutral`. That one-DLL facade path is experimental and should retain the default dual-runtime shape as its fallback.
 
 Use the runtime smoke runner when a backend-neutral mod logs deterministic probe markers:
 
@@ -122,22 +118,18 @@ The default expected marker is `S1InteropSmoke|PASS|Backend=<Runtime>`. The runn
 
 For build-only/audit-only checks, add `-NoLaunch`. Runtime logs are copied under `artifacts/runtime-smoke/`, which is ignored by git. Do not commit game assemblies, generated IL2CPP wrappers, logs, or copied game installs.
 
-## CI-Equivalent Local Validation
+## CI and release checks
 
-GitHub Actions runs on Windows with .NET 8 and executes:
+Pull requests and pushes to `main` run two independent Windows workflows with .NET 8:
 
-```batch
-dotnet restore .\S1Interop.sln
-dotnet build .\S1Interop.sln --no-restore --configuration Release
-dotnet run --project .\tests\S1Interop.Tests\S1Interop.Tests.csproj --configuration Release --no-build -- --portable
-dotnet pack .\src\S1Interop.Cli\S1Interop.Cli.csproj --no-build --configuration Release --output .\artifacts\packages
-dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj --no-build --configuration Release --output .\artifacts\packages
-powershell -NoProfile -File .\tests\Test-Packages.ps1
-```
+| Workflow | Checks |
+| --- | --- |
+| [CI](https://github.com/ifBars/S1Interop/blob/main/.github/workflows/ci.yml) | Solution restore/build, portable CLI and generator fixtures, package creation, and legacy generator package adoption. |
+| [Source compiler contracts](https://github.com/ifBars/S1Interop/blob/main/.github/workflows/source-compiler.yml) | Compiler contracts and isolated installation of the packaged compiler workflow. |
 
-Run the Release build and portable test steps locally before pushing changes that affect CLI packaging, source generators, build verification, or public command behavior.
+The package scripts use fresh caches and the candidate feed. `Test-CompilerPackage.ps1` checks default compiler project creation and build imports. `Test-Packages.ps1` checks the explicitly selected legacy scaffold and its documentation sample against synthetic loader references. Neither establishes live game compatibility.
 
-The package check uses a .NET 8 consumer compiler, a fresh package cache, and only the just-packed feed. It checks CLI installation, dry-run behavior, generated starter compilation, and the first-mod documentation sample. Its synthetic loader contract does not prove live game loading. See Release readiness in the Contributors section for the additional pre-stable gates.
+Use [Release readiness](https://github.com/ifBars/S1Interop/blob/main/docs/RELEASING.md#automated-gate-for-every-candidate) for the complete local command sequence, including compiler contracts, both package checks, and documentation validation. Run the Release build and portable fixtures before pushing CLI, packaging, generator, or build-verification changes.
 
 ## Fixture Organization
 

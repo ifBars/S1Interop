@@ -1,53 +1,29 @@
 ---
 title: Install S1Interop
-description: Install and check the published tool or an unreleased candidate.
+description: Build and install the compiler candidate for the first-mod walkthrough.
 uid: s1interop.install
 ---
 
 # Install S1Interop
 
-The `S1Interop` package provides the single terminal command and source compiler. New compiler projects pin it in a local tool manifest. `S1Interop.Generators` belongs to the earlier helper/facade workflow and is not required by the compiler starter. Players install the built mod and, for IL2CPP compiler builds, its matching `S1Interop.Runtime.dll`.
+These instructions install **0.1.0-alpha.2**, the unpublished compiler candidate. Published alpha.1 does not contain the compiler used in this walkthrough.
 
-> [!IMPORTANT]
-> These docs describe the **0.1.0-alpha.2 candidate**, which is not yet published. The published version is **0.1.0-alpha.1**. Use the source-build route below for the compiler and compiler-first project creation. See [Release readiness](../contributors/release-readiness.md) for publication gates.
+## Install the .NET 8 SDK
 
-## 1. Check the .NET SDK
-
-Install the Windows x64 **SDK** from the [.NET 8 download page](https://dotnet.microsoft.com/en-us/download/dotnet/8.0), then open a new PowerShell window. The SDK compiles C# into a DLL; a runtime alone cannot build a mod.
+Install the Windows x64 SDK from the [.NET 8 download page](https://dotnet.microsoft.com/en-us/download/dotnet/8.0), then open PowerShell:
 
 ```powershell
 dotnet --list-sdks
 dotnet --list-runtimes
 ```
 
-For the candidate, expect an SDK at `8.0` or newer and a `Microsoft.NETCore.App 8.0` runtime. A newer major SDK does not necessarily install the .NET 8 runtime needed by the command; install the .NET 8 SDK alongside it if missing.
-
-**Published alpha.1 requires a .NET 9 SDK (9.0.200 or newer) for its generator.** Install it from the [.NET 9 download page](https://dotnet.microsoft.com/en-us/download/dotnet/9.0). The candidate fixes this by targeting Roslyn 4.8, the compiler API available from .NET 8.
-
-## 2. Install the command
-
-For the currently published version:
-
-```powershell
-dotnet tool install --global S1Interop --version 0.1.0-alpha.1
-```
-
-If already installed, use `dotnet tool update` with the same arguments. Published packages restore from NuGet.org without a custom source.
-
-## 3. Check the installation
-
-```powershell
-s1interop --version
-s1interop --help
-```
-
-The output identifies the installed version and lists commands including `doctor`, `setup`, `new`, `analyze`, and `verify-migration`. If PowerShell cannot find the command, reopen it and check `dotnet tool list --global`.
-
-For published alpha.1, continue to the [earlier generator walkthrough](legacy-generator-first-mod.md). For the compiler-first [Build your first mod](first-mod.md) walkthrough, install the candidate below.
+Check for an `8.0` SDK and `Microsoft.NETCore.App 8.0`. Install the SDK even if you already have the runtime. Keep .NET 8 installed alongside any newer SDKs; this checkout selects it through `global.json`.
 
 ## Build and install the candidate from source
 
-Download or clone the [S1Interop repository](https://github.com/ifBars/S1Interop), open PowerShell in its root (the folder containing `S1Interop.sln`), and run each command separately:
+Clone or download the [S1Interop repository](https://github.com/ifBars/S1Interop). Open PowerShell in its root, beside `S1Interop.sln`.
+
+Run each command separately. Stop if a command fails.
 
 ```powershell
 dotnet restore .\S1Interop.sln
@@ -60,8 +36,8 @@ $candidateFeed = (Resolve-Path .\artifacts\packages).Path
 s1interop --version
 ```
 
-Stop if a command fails. Expect `S1Interop 0.1.0-alpha.2` before continuing. Use this same PowerShell window for the walkthrough: the path and candidate feed apply only to this terminal and its child processes. No feed or package-cache path belongs in `local.build.props`.
+Expect `S1Interop 0.1.0-alpha.2`. Keep this PowerShell window open: the next page uses its tool path and `$candidateFeed`.
 
-When rebuilding an unpublished candidate with the same version, use a new cache directory name (for example `candidate-cache-2`) so an older compiler or build asset is not reused. Install the CLI into a fresh tool directory too. The public global tool can remain installed.
+Continue to [Build your first mod](first-mod.md). Create your mod outside the S1Interop checkout and game directories.
 
-Contributors should run `./tests/Test-CompilerPackage.ps1 -PackageDirectory ./artifacts/packages`, which validates the compiler package, generated project, and local tool restore in an isolated .NET 8 environment. Supply both `-MonoGamePath` and `-Il2CppGamePath` to also verify setup, doctor, and both real-reference builds. `Test-Packages.ps1` covers the separate generator package workflow.
+If you rebuild the candidate with the same version, use fresh cache and tool directories, such as `candidate-cache-2` and `.tools-2`. This prevents NuGet from reusing an earlier build. See [Troubleshooting](troubleshooting.md) if restore selects the wrong package.

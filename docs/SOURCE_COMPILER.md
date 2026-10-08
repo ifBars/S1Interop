@@ -1,10 +1,10 @@
-# Source compiler experiment
+# Compiler support and evidence
 
 This experiment moves runtime adaptation into the build. Authors write ordinary C# against their local Mono game assemblies, including the original `ScheduleOne` namespaces. The IL2CPP build binds that source, maps referenced types from the installed metadata, lowers runtime-specific operations, and compiles the result against the IL2CPP wrappers. The original files stay unchanged.
 
 There is no per-game-type wrapper catalog. A game update supplies the new reference metadata. The compiler still needs tested rules for each kind of runtime difference; automatic discovery is not a promise that every C# program already has a correct translation.
 
-**Status: working prototype, not unlimited compatibility.** The same unmodified probe and library source pass 117 menu checks on Mono and IL2CPP **0.4.7f9**, with MelonLoader **0.7.3**. The Mono `alternate-beta` build was downloaded with SteamCMD and checked against the installed native beta. This establishes the behaviors listed below; it does not establish arbitrary gameplay compatibility.
+**Status: working prototype, not unlimited compatibility.** The same unmodified probe and library source pass 120 menu checks on Mono and IL2CPP **0.4.7f9**, with MelonLoader **0.7.3**. The Mono `alternate-beta` build was downloaded with SteamCMD and checked against the installed native beta. This establishes the behaviors listed below; it does not establish arbitrary gameplay compatibility.
 
 The original goal is not complete. Metadata discovery removes the need to maintain a catalog of game wrappers, but does not remove compiler or runtime maintenance. Unity's [managed stripping](https://docs.unity3d.com/2022.3/Documentation/Manual/ManagedCodeStripping.html) can remove code from the shipped build, and its [AOT restrictions](https://docs.unity3d.com/2022.3/Documentation/Manual/ScriptingRestrictions.html) affect code generated at runtime and generic execution. This compiler does not restore absent native implementations. Matching Mono assemblies supply authoring signatures; executing their method bodies against native game objects would require an additional implementation that preserves object identity, dispatch, engine bindings, and shared state. That is not implemented or established by the current tests.
 
@@ -80,35 +80,13 @@ Post-binding verification still rejects hidden snapshot conversions with `S1IC03
 
 ## Try the source checkout
 
-The candidate's `s1interop new <path> --apply` now creates a compiler-enabled project by default. It includes a pinned local tool manifest, matching build imports, and an ordinary game-source starter. Build and install the candidate package, create the project, then run `dotnet tool restore --add-source <candidate-feed>` in it. Configure `local.build.props` using its example and follow its README to build both runtimes. The earlier helper scaffold is available explicitly through `--legacy-generator`. The source sample below remains useful for compiler development and existing-project integration.
+Follow [Install S1Interop](docfx/articles/getting-started.md) and [Build your first mod](docfx/articles/first-mod.md). Existing mods use the same compiler project through [Bring an existing mod](docfx/articles/compiler-adoption.md).
 
-There is one CLI: `s1interop`. Compiler build operations live under `s1interop compiler`; run `s1interop compiler --help` for its file-manifest commands. Earlier experimental checkouts used a separate `S1Interop.Compiler.Cli` executable. Rebuild the main CLI and use the updated imports together; custom `S1InteropCompilerTool` overrides must point to `S1Interop.Cli.dll` and direct invocations must include the `compiler` prefix. The compiler implementation remains a separate library.
+Compiler contributors can use the [checkout sample](../samples/SourceCompiler/README.md) to test local build imports. It is a development fixture, not a separate adoption workflow.
 
-Build the lowering tool with the repository's .NET 8 SDK:
+## Build integration details
 
-```powershell
-dotnet build src/S1Interop.Cli/S1Interop.Cli.csproj -c Release
-```
-
-Create an ignored `samples/SourceCompiler/local.build.props`:
-
-```xml
-<Project>
-  <PropertyGroup>
-    <MonoGamePath>C:\Games\ScheduleI-Mono</MonoGamePath>
-    <Il2CppGamePath>C:\Games\ScheduleI-Il2Cpp</Il2CppGamePath>
-  </PropertyGroup>
-</Project>
-```
-
-Both installs must contain MelonLoader. The IL2CPP install must also contain its generated interop assemblies. Use `alternate-beta` and `beta` for matching beta installs, or `alternate` and the default branch for matching stable installs. Verify exact patch versions, not just the major/minor release.
-
-Use the candidate CLI's `new` command for a new project. To integrate an existing project from a source checkout, follow the sample structure: import the `.props` file near the start and the `.targets` file at the end. The props select `netstandard2.1` for Mono and `net6.0` for IL2CPP unless the project explicitly supplies a framework. The tool requires .NET 8. Both source checkout imports and the locally packed candidate are tested; the compiler workflow is not yet in the published S1Interop package.
-
-```powershell
-dotnet build samples/SourceCompiler/SourceCompiler.csproj -c Release -p:S1InteropCompilerRuntime=Mono
-dotnet build samples/SourceCompiler/SourceCompiler.csproj -c Release -p:S1InteropCompilerRuntime=Il2Cpp
-```
+The props select `netstandard2.1` for Mono and `net6.0` for IL2CPP unless the project explicitly supplies a framework. The tool requires .NET 8.
 
 Configuration names containing a `Mono` or `Il2Cpp` word also select that runtime, including `Debug Il2Cpp`. An explicit runtime contradicting the configuration fails with `S1C906`. Build the two runtimes serially: NuGet restore state is still shared by the project.
 
@@ -153,7 +131,7 @@ Mapped callback array parameters use the native shared-storage representation re
 
 Compiler reference preparation records hashes and original-image paths beside metadata-only compile references. During `compiler lower`, `AtomicEventRepairPlan.Create` analyzes those original images and emits startup instructions for failed accessors whose complete source instance or static event loop matches the supported atomic pattern. Original assembly inputs can be analyzed directly. Publicized format-3 references embed the original-image hash and require a matching provenance sidecar; missing, changed or corrupt provenance stops the build. Raw and prepared copies of identical images deduplicate, while conflicting images with the same assembly name are rejected. Framework reference packs and metadata-only authoring companions are excluded. Older unmarked publicized references must be regenerated; normal project builds recreate the current format automatically. No original game IL or machine paths are copied into the mod's repair initializer.
 
-At startup, the shared runtime verifies the loaded wrapper hash and module ID, method token and signature, exact native field owner/type, and native object CAS overload. It patches the managed throwing wrapper method, covering internal wrapper calls such as `AudioClip.Create`. Compatible repeated registrations reuse the installed repair. Unsupported or mismatched installations stop initialization; rebuild against the current verified game pair. The original installation assemblies remain unchanged. The f9 build plans 190 accessors, including 110 static accessors. Static updates initialize the owning native class and use its exported static-field storage plus the metadata offset; thread-local fields, generic owners and unsupported layouts are rejected. The shared core probe tests duplicate subscription, single removal, native dispatch and absent-handler removal on `AudioSettings.OnAudioConfigurationChanged` and passes 117 checks per backend. PCM accessors also have dedicated reconstruction coverage. Other planned accessors lack behavioral coverage, and throwing static constructors, competing static updates and arbitrary-thread collector behavior remain unverified.
+At startup, the shared runtime verifies the loaded wrapper hash and module ID, method token and signature, exact native field owner/type, and native object CAS overload. It patches the managed throwing wrapper method, covering internal wrapper calls such as `AudioClip.Create`. Compatible repeated registrations reuse the installed repair. Unsupported or mismatched installations stop initialization; rebuild against the current verified game pair. The original installation assemblies remain unchanged. The f9 build plans 190 accessors, including 110 static accessors. Static updates initialize the owning native class and use its exported static-field storage plus the metadata offset; thread-local fields, generic owners and unsupported layouts are rejected. The shared core probe tests duplicate subscription, single removal, native dispatch and absent-handler removal on `AudioSettings.OnAudioConfigurationChanged` and passes 120 checks per backend. PCM accessors also have dedicated reconstruction coverage. Other planned accessors lack behavioral coverage, and throwing static constructors, competing static updates and arbitrary-thread collector behavior remain unverified.
 
 The [native atomic event diagnostic](../tests/S1Interop.Compiler.NativeAtomicEventSmoke/README.md) passes 29 checks, including add/remove, forced competing updates, lifetime, a controlled collection between raw pointer read and wrapper acquisition, and source-planned PCM reconstruction. That interleaving is not a universal collector guarantee or a test of every background schedule. The delegate cache's separate pointer-acquisition window remains uninstrumented.
 
@@ -203,7 +181,7 @@ The live checks cover casts and switch dispatch, interface conversions, referenc
 
 The compiler's 189 portable contracts also cover cross-mod support identity, rejection of mismatched support before mod execution, missing or stale authoring companions, deterministic, non-executable publicized references, and consistent authoring symbols through the actual MSBuild hooks. Private constructors and nested types, event subscriptions, and protected overrides are tested against original unmodified contract assemblies. These counts describe the current tested implementation, not coverage of every game member or language feature.
 
-Immediate `Traverse.Create(root).Field(constantName).GetValue<T>()` reads now adapt when reference metadata verifies the field-to-property representation. This covers the unchanged BiggerLobbies Mono expression for `_lobbyService`. The runtime uses the native field owner instead of blindly selecting a same-named property, preserves null roots and Type-root behavior, and rewraps native values for typed reads. Portable contracts cover field/property shadows and interface proxies. A field owner not represented in the root's wrapper hierarchy remains unsupported; unknown runtime types, arbitrary traversal chains and full reflection identity are not established. Recognized unsupported field traversal descriptors produce `S1IC041` rather than silently returning an empty traversal.
+Immediate `Traverse.Create(root).Field(constantName).GetValue<T>()` reads now adapt when reference metadata verifies the field-to-property representation. This covers the unchanged BiggerLobbies Mono expression for `_lobbyService`. The runtime uses the native field owner instead of blindly selecting a same-named property, preserves null roots and Type-root behavior, and rewraps native values for typed reads. Compatible list and dictionary fields use live collection views, including object-typed results and supported managed interfaces. Portable contracts check shared mutations, repeated-read identity, replacement, null values, incompatible list/dictionary/array casts, and single evaluation of the root. The live probe checks the game console command dictionary through Traverse on both f9 runtimes and restores the original table afterward. Portable contracts also cover field/property shadows and interface proxies. A field owner not represented in the root's wrapper hierarchy remains unsupported; unknown runtime types, arbitrary traversal chains and full reflection identity are not established. Recognized unsupported field traversal descriptors produce `S1IC041` rather than silently returning an empty traversal.
 
 ## Semantic requirements
 

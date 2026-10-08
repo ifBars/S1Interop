@@ -12,7 +12,7 @@ internal static class CliHelp
               s1interop setup [path=.] [--mono-game-path path] [--il2cpp-game-path path] [--dry-run|--apply] [--format text|json]
               s1interop compiler --help
 
-            Existing project analysis and earlier generator workflows:
+            Advanced: existing project analysis and legacy generators:
               s1interop analyze [path=.] [--configuration name] [--format text|json]
               s1interop new <path> <--legacy-generator|--backend-neutral> [--dry-run|--apply] [--format text|json]
               s1interop init [path=.] [--dry-run|--apply] [--format text|json]

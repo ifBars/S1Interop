@@ -1,8 +1,8 @@
 # Backend-neutral Harmony patching
 
-Use S1Interop patch attributes when a mod needs to patch a Schedule One method without choosing `ScheduleOne.*` on Mono and `Il2CppScheduleOne.*` on IL2CPP in source.
+This guide covers patch attributes emitted by the legacy generator package. Compiler projects use ordinary Harmony patches; see [Everyday development](common-tasks.md).
 
-The patch still lands on the real native method. S1Interop only owns target lookup: it reads the Mono type and method name from your attribute, maps that target to the active backend, resolves the `MethodInfo`, and applies the Harmony patch through generated code.
+The generated patch targets the resolved game method. S1Interop only owns target lookup: it reads the Mono type and method name from your attribute, maps that target to the active backend, resolves the `MethodInfo`, and applies the Harmony patch through generated code.
 
 ## Basic patch
 

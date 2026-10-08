@@ -1,32 +1,8 @@
-# Migration overview
+# Legacy migration and rollback
 
-For the current compiler workflow, start with [Adopt the compiler in an existing mod](compiler-adoption.md). It keeps ordinary game source and produces both runtime outputs. The `migrate` commands below belong to the earlier generator/helper workflows; they do not install or enable the source compiler.
+These commands maintain projects using generator helpers or experimental facades. They edit project files and supported source patterns; they do not enable the source compiler. For compiler adoption, use [Bring an existing mod](compiler-adoption.md).
 
-Use migration when an existing mod still carries direct game-wrapper code. S1Interop can move that access toward one of two shapes:
-
-- backend-neutral single assembly: one mod assembly uses generated `S1Interop.*` facades and resolves Mono or IL2CPP at runtime;
-- dual-runtime: the project builds separate Mono and IL2CPP assemblies from runtime-specific configurations.
-
-Pick the shape first. The commands and output are different enough to keep separate.
-
-You can also choose a smaller path: diagnostics only, build hooks only, generated patch targets only, or a few helper declarations. See [Use cases](use-cases.md) before assuming a migration has to rewrite the whole mod.
-
-| Goal | Start here |
-| --- | --- |
-| One assembly that can run on either backend | [Migrate to backend-neutral](migrate-to-backend-neutral.md) |
-| Two assemblies/configurations, one for Mono and one for IL2CPP | [Migrate to dual-runtime](migrate-to-dual-runtime.md) |
-
-## Common first step
-
-Start with analysis:
-
-```batch
-s1interop analyze .
-```
-
-Analysis reports the current runtime target, visible game paths or references, and source patterns likely to fail on IL2CPP.
-
-Most mods already have MelonLoader lifecycle code, Harmony patches, deployment scripts, helper libraries, and maybe S1API or MAPI references. `analyze` separates normal mod structure from direct game calls that need interop work.
+The migration procedures are [dual-runtime configuration migration](migrate-to-dual-runtime.md) and [experimental facade migration](migrate-to-backend-neutral.md). This page covers their shared review, rollback, and verification behavior.
 
 ## Safety model
 

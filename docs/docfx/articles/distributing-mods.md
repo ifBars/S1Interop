@@ -14,18 +14,18 @@ For a project created by the default `s1interop new` command:
 Restore its pinned local tool first, using the candidate feed described in [installation](getting-started.md). Run the builds below serially because the project shares NuGet restore state.
 
 ```powershell
-dotnet build .\MyFirstMod.csproj -c "Release Mono"
-dotnet build .\MyFirstMod.csproj -c "Release Il2Cpp"
+dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
+dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```
 
-Existing projects may use different configuration names; use the names reported by `s1interop analyze .`.
+Use the same commands for an existing mod after adopting the compiler project.
 
 | Build | Shipping DLL |
 | --- | --- |
-| Mono | `bin\Release Mono\Mono\netstandard2.1\MyFirstMod.dll` |
-| IL2CPP | `bin\Release Il2Cpp\Il2Cpp\net6.0\MyFirstMod.dll` |
+| Mono | `bin\Release\Mono\netstandard2.1\MyMod.dll` |
+| IL2CPP | `bin\Release\Il2Cpp\net6.0\MyMod.dll` |
 
-Keep the two files in separate archives, such as `MyFirstMod-0.1.0-Mono.zip` and `MyFirstMod-0.1.0-Il2Cpp.zip`. Both contain `Mods/MyFirstMod.dll` and a short README; the IL2CPP archive additionally contains `UserLibs/S1Interop.Runtime.dll`. Players install one runtime variant. Each DLL declares its intended MelonLoader platform domain; verify loader behavior with the versions you support.
+Keep the two files in separate archives, such as `MyMod-0.1.0-Mono.zip` and `MyMod-0.1.0-Il2Cpp.zip`. Both contain `Mods/MyMod.dll` and a short README; the IL2CPP archive additionally contains `UserLibs/S1Interop.Runtime.dll`. Players install one runtime variant. Each DLL declares its intended MelonLoader platform domain; verify loader behavior with the versions you support.
 
 Compiler builds do not deploy to your local game, in either Debug or Release. The IL2CPP archive must also include the matching `S1Interop.Runtime.dll` under `UserLibs`. Include other mod-library dependencies according to their distribution requirements.
 
@@ -36,7 +36,7 @@ Compiler builds do not deploy to your local game, in either Debug or Release. Th
 3. Exercise the actual feature. Check its expected output, repeat it, and check `MelonLoader\Latest.log` for failures. For a Harmony patch, confirm the handler fires; for a save feature, reload the save and check the result.
 4. Repeat on the other runtime if you advertise support for it. Record game version/branch, MelonLoader version, mod version, dependencies, and observed result separately for Mono and IL2CPP.
 
-A synthetic fixture, sandbox build, or Mono-only playtest cannot establish IL2CPP gameplay compatibility. Test each compiler-produced shipping DLL on its own runtime. If using the older backend-neutral one-DLL workflow instead, test that same shipping DLL on both runtimes.
+A synthetic fixture, sandbox build, or Mono-only playtest cannot establish IL2CPP gameplay compatibility. Test each compiler-produced shipping DLL on its own runtime.
 
 ## Include what players need
 
@@ -48,6 +48,6 @@ If distributing a compiler-built library to other developers, preserve its `.s1i
 
 ## Report a compatibility problem
 
-Include the S1Interop version, selected configuration, game branch/version, MelonLoader version, first relevant error, and a small source example. For a migration issue, include the dry-run operation and diagnostic identifiers. Remove personal paths and credentials from logs. Keep proprietary binaries local.
+Include the S1Interop version, selected configuration, game branch/version, MelonLoader version, first relevant error, and a small source example. Remove personal paths and credentials from logs. Keep proprietary binaries local.
 
 For a S1Interop bug, use the [issue tracker](https://github.com/ifBars/S1Interop/issues). For a loader or dependency failure, first confirm which component emitted the error using [Troubleshooting](troubleshooting.md).

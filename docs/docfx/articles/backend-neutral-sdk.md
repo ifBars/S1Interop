@@ -1,11 +1,8 @@
-# Backend-neutral SDK
+# Experimental facade SDK
 
-> [!WARNING]
-> This facade path is experimental and fragile. It is not the default scaffold or the primary S1Interop promise. Keep separate Mono and IL2CPP builds or a conditional implementation until your mod has sustained in-game validation on both runtime branches.
+This reference describes the legacy `S1Interop.*` facades. They resolve game types and members at runtime and have separate coverage limits from the source compiler. Validate facade calls in both game runtimes before distributing a mod.
 
-For what the generator emits at build time and when those symbols appear, see [Generated output](generator-package.md). For the attribute reference that drives generation, see [Declarations](backend-neutral-declarations.md).
-
-This page covers the full backend-neutral facade path. If you only want diagnostics, dual-runtime project setup, patch targets, Steam P2P helpers, or a few explicit member bindings, see [Use cases](use-cases.md).
+See [Generated output](generator-package.md) for emitted symbols and [Declarations](backend-neutral-declarations.md) for attributes. New compiler projects use ordinary game types; start with [Build your first mod](first-mod.md).
 
 Instead of writing code against `ScheduleOne.*` in Mono and `Il2CppScheduleOne.*` in IL2CPP, use generated facades under `S1Interop.ScheduleOne.*`.
 

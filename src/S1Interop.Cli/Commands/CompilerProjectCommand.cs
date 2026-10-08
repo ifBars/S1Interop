@@ -14,7 +14,7 @@ internal static class CompilerProjectCommand
                 throw new ArgumentException("Target directory must be empty: " + root);
             if (command.Apply) scaffolder.Apply(root);
             string[] files = plan.Keys.Select(path => Path.GetFullPath(Path.Combine(root, path))).ToArray();
-            string[] next = ["Open the created directory in your terminal.", "dotnet tool restore (add --add-source <candidate-feed> for an unpublished version)",
+            string[] next = ["Open the created directory in your terminal.", "Restore the pinned compiler tool using the package feed instructions in README.md.",
                 "dotnet tool run s1interop -- setup . --mono-game-path <mono-install> --il2cpp-game-path <il2cpp-install> --apply",
                 "dotnet tool run s1interop -- doctor .",
                 "dotnet build -c Release -p:S1InteropCompilerRuntime=Mono", "dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp"];
