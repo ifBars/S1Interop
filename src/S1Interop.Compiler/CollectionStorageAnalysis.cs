@@ -35,6 +35,9 @@ internal sealed partial class CollectionStorageAnalysis
                     seeds.Add(Expression(expression, model));
                 switch (node)
                 {
+                    case InvocationExpressionSyntax traversal when NativeTraverseLowering.ReturnsNativeCollection(traversal, model, map):
+                        seeds.Add(Expression(traversal, model));
+                        break;
                     case InvocationExpressionSyntax reflection when NativeReflectionVerifier.ReturnsNativeCollectionDescriptor(reflection, model, map):
                         seeds.Add(Expression(reflection, model));
                         break;

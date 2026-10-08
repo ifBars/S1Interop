@@ -60,6 +60,25 @@ public sealed class Mod : MelonMod
                 reflectedCommands.Add("__s1interop_probe__", null!);
                 Require(ReferenceEquals(replacementCommands, reflectedCommands) && ScheduleOne.Console.commands.ContainsKey("__s1interop_probe__"),
                     "reflected dictionary replacement and mutation share native game storage");
+                var traversedCommands = HarmonyLib.Traverse.Create(typeof(ScheduleOne.Console))
+                    .Field("commands").GetValue<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>();
+                Require(ReferenceEquals(reflectedCommands, traversedCommands),
+                    "Traverse collection read preserves reflected command table identity");
+                traversedCommands.Add("__s1interop_traverse_probe__", null!);
+                Require(replacementCommands.ContainsKey("__s1interop_traverse_probe__") &&
+                    ScheduleOne.Console.commands.ContainsKey("__s1interop_traverse_probe__"),
+                    "Traverse collection mutation shares native game storage");
+                bool invalidTraversalCast = false;
+                try
+                {
+                    List<int> wrongCommands = HarmonyLib.Traverse.Create(typeof(ScheduleOne.Console))
+                        .Field("commands").GetValue<List<int>>();
+                    _ = wrongCommands.Count;
+                }
+                catch (InvalidCastException) { invalidTraversalCast = true; }
+                Require(invalidTraversalCast, "Traverse incompatible collection cast preserves InvalidCastException");
+
+
             }
             finally { consoleReflection.Write(originalCommands!); }
             Require(ReferenceEquals(originalCommands, consoleReflection.Read()) && ReferenceEquals(originalCommands, ScheduleOne.Console.commands),

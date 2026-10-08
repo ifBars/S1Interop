@@ -299,7 +299,7 @@ internal sealed class SemanticLoweringRewriter : CSharpSyntaxRewriter
         }
 
         var visited = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
-        if (NativeTraverseLowering.Rewrite(node, visited, model, map) is { } traverseRead)
+        if (NativeTraverseLowering.Rewrite(node, visited, model, map, collectionStorage) is { } traverseRead)
         {
             RewrittenNodes++;
             return traverseRead;

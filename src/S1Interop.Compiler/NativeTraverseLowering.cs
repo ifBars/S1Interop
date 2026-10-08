@@ -37,8 +37,48 @@ internal static class NativeTraverseLowering
         }
     }
 
+    internal static bool ReturnsNativeCollection(InvocationExpressionSyntax syntax, SemanticModel model, MetadataSymbolMap map) =>
+        ResolveRead(syntax, model, map) is { } read &&
+        NativeReflectionVerifier.CollectionAdapter(read.FieldType, read.Property.Type, map) is not null;
+
     public static ExpressionSyntax? Rewrite(InvocationExpressionSyntax syntax, InvocationExpressionSyntax visited,
-        SemanticModel model, MetadataSymbolMap map)
+        SemanticModel model, MetadataSymbolMap map, CollectionStorageAnalysis? collectionStorage = null)
+    {
+        if (ResolveRead(syntax, model, map) is not { } read ||
+            visited.Expression is not MemberAccessExpressionSyntax
+                { Expression: InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax
+                    { Expression: InvocationExpressionSyntax createCall } } })
+            return null;
+
+        string? adapter = NativeReflectionVerifier.CollectionAdapter(read.FieldType, read.Property.Type, map);
+        string resultType = map.TargetDisplay(read.ResultType);
+        if (collectionStorage?.IsBridged(syntax, model) == true)
+            resultType = read.ResultType is IArrayTypeSymbol array
+                ? NativeArrayLowering.Display(map, array) : collectionStorage.Display(read.ResultType);
+        else if (adapter is not null && SymbolEqualityComparer.Default.Equals(read.ResultType, read.FieldType))
+            resultType = adapter;
+        // Keep the root expression once. Native metadata selects the actual field owner,
+        // including fields hidden by a derived property.
+        var arguments = new List<ArgumentSyntax> {
+            SyntaxFactory.Argument(createCall.ArgumentList.Arguments[0].Expression),
+            SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(read.Name))),
+            SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(read.TypeRoot ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression))
+        };
+        if (adapter is not null)
+        {
+            string nativeType = read.Property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            arguments.Add(SyntaxFactory.Argument(SyntaxFactory.ParseExpression(
+                $"static __value => {adapter}.FromNative(({nativeType})__value)")));
+        }
+        var convert = SyntaxFactory.ParseExpression(NativeFieldInfoSource.TypeName + ".ReadTraverse<" + resultType + ">");
+        return SyntaxFactory.InvocationExpression(convert, SyntaxFactory.ArgumentList(
+            SyntaxFactory.SeparatedList(arguments))).WithTriviaFrom(syntax);
+    }
+
+    private sealed record FieldRead(string Name, bool TypeRoot, ITypeSymbol ResultType,
+        ITypeSymbol FieldType, IPropertySymbol Property);
+
+    private static FieldRead? ResolveRead(InvocationExpressionSyntax syntax, SemanticModel model, MetadataSymbolMap map)
     {
         if (map.NativeObjectBase is null || model.GetOperation(syntax) is not IInvocationOperation read ||
             !IsTraverse(read, "GetValue") || read.TargetMethod.TypeArguments.Length != 1 || read.Arguments.Length != 0 ||
@@ -61,22 +101,10 @@ internal static class NativeTraverseLowering
                 map.ReferenceFields.FieldType(owner, name) is not { } fieldType ||
                 target.GetMembers(name).OfType<IPropertySymbol>().Where(property => !property.IsIndexer).ToArray() is not [ { GetMethod: not null } property ] ||
                 property.IsStatic != attributes.HasFlag(System.Reflection.FieldAttributes.Static) ||
-                map.TargetDisplay(fieldType) != property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)) return null;
+                map.TargetDisplay(fieldType) != property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) &&
+                NativeReflectionVerifier.CollectionAdapter(fieldType, property.Type, map) is null) return null;
 
-            var resultType = SyntaxFactory.ParseTypeName(map.TargetDisplay(read.TargetMethod.TypeArguments[0]));
-            // Keep the root expression once. Native metadata chooses the actual field;
-            // looking up a property by name alone could select a derived source property.
-            if (visited.Expression is not MemberAccessExpressionSyntax
-                { Expression: InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax
-                    { Expression: InvocationExpressionSyntax createCall } } })
-                return null;
-            var convert = SyntaxFactory.ParseExpression(NativeFieldInfoSource.TypeName + ".ReadTraverse<" + resultType + ">");
-            return SyntaxFactory.InvocationExpression(convert, SyntaxFactory.ArgumentList(
-                SyntaxFactory.SeparatedList(new[] {
-                    SyntaxFactory.Argument(createCall.ArgumentList.Arguments[0].Expression),
-                    SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(name))),
-                    SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(root is ITypeOfOperation ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression))
-                }))).WithTriviaFrom(syntax);
+            return new(name, root is ITypeOfOperation, read.TargetMethod.TypeArguments[0], fieldType, property);
         }
         return null;
     }

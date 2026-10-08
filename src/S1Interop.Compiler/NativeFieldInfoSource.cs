@@ -72,7 +72,7 @@ internal static class NativeFieldInfoSource
                             typeof(global::System.Func<object, global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase>)));
                     return cast(value) ?? value;
                 }
-                public static T ReadTraverse<T>(object root, string name, bool typeRoot) {
+                public static T ReadTraverse<T>(object root, string name, bool typeRoot, global::System.Func<object, object> readValue = null) {
                     if (root == null) return default(T);
                     var wrapperType = typeRoot ? (global::System.Type)root : root.GetType();
                     var nativeRoot = root as global::Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
@@ -93,6 +93,7 @@ internal static class NativeFieldInfoSource
                             if (access == null) continue;
                             if (typeRoot && !access.IsStatic) return default(T);
                             object value = access.GetValue(typeRoot ? null : root);
+                            if (value != null && readValue != null) value = readValue(value);
                             return value == null ? default(T) : (T)Rewrap(value, typeof(T));
                         }
                         if (field == global::System.IntPtr.Zero) return default(T);
