@@ -18,7 +18,7 @@ Doctor checks local reference availability. The build's installation verifier ch
 
 Compiler projects should keep their ordinary `ScheduleOne.*` imports. Verify that the project imports both compiler build files and builds through its pinned tool. Keep your ordinary author source and report unsupported compiler operations with a small reproducer.
 
-`S1IC001` or `S1IC002` indicates missing or ambiguous target metadata. Other `S1IC` diagnostics identify unsupported runtime adaptation. Preserve the original source, the diagnostic, and a small reproducer. See the [compiler support and limits](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) before interpreting successful compilation as equivalent gameplay behavior.
+`S1IC001` or `S1IC002` indicates missing or ambiguous target metadata. Other `S1IC` diagnostics identify unsupported runtime adaptation. Preserve the original source, the diagnostic, and a small reproducer. See the [compiler support and limits](compatibility.md) before interpreting successful compilation as equivalent gameplay behavior.
 
 ## The compiler-built mod fails to load
 

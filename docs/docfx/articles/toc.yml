@@ -20,6 +20,8 @@
       href: core-concepts.md
 - name: Help
   items:
+    - name: Compatibility
+      href: compatibility.md
     - name: Troubleshooting
       href: troubleshooting.md
     - name: FAQ

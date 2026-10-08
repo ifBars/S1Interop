@@ -35,4 +35,4 @@ Compiler-built IL2CPP libraries also produce `.s1interop/authoring` metadata com
 
 Metadata discovery removes the need to maintain a wrapper catalog for every game type. The compiler itself still needs maintenance when runtime contracts change.
 
-The compiler cannot restore native code absent from the game. [Support and evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md) records known gaps and distinguishes compile checks from runtime behavior.
+The compiler cannot restore native code absent from the game. [Compatibility](compatibility.md) records known gaps and distinguishes compile checks from runtime behavior.

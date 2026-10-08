@@ -16,7 +16,7 @@ The compiler selects existing `MONO` branches for both outputs. It skips existin
 
 ## Does every game operation work?
 
-Not yet. Some source patterns and native operations remain unsupported. Publicization cannot restore missing APIs or stripped native code. See [Compiler support and evidence](https://github.com/ifBars/S1Interop/blob/main/docs/SOURCE_COMPILER.md).
+Not yet. Some source patterns and native operations remain unsupported. Publicization cannot restore missing APIs or stripped native code. See [Compatibility](compatibility.md).
 
 Test the mod's actual feature on each runtime. Successful compilation alone does not establish gameplay or multiplayer compatibility.
 
