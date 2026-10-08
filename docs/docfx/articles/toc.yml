@@ -6,12 +6,12 @@
       href: getting-started.md
     - name: Build your first mod
       href: first-mod.md
-    - name: Write game code
-      href: writing-code.md
     - name: Bring an existing mod
       href: compiler-adoption.md
 - name: Develop your mod
   items:
+    - name: Write game code
+      href: writing-code.md
     - name: Everyday development
       href: common-tasks.md
     - name: Local game paths
