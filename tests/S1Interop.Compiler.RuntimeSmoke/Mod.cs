@@ -67,10 +67,15 @@ public sealed class Mod : MelonMod
                 "ConsoleForAll cached dictionary reflection preserves the game table identity");
             try
             {
-                var replacementCommands = GenericValueProbe.Make<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>();
+                Func<Dictionary<string, ScheduleOne.Console.ConsoleCommand>> makeCommands =
+                    GenericValueProbe.Make<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>;
+                var replacementCommands = makeCommands();
                 consoleReflection.Write(replacementCommands);
-                ScheduleOne.Console.commands = replacementCommands.Identity();
-                var managedNumbers = GenericValueProbe.Make<List<int>>();
+                Func<Dictionary<string, ScheduleOne.Console.ConsoleCommand>> retainCommands =
+                    replacementCommands.Identity<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>;
+                ScheduleOne.Console.commands = retainCommands();
+                Func<List<int>> makeManagedNumbers = GenericValueProbe.Make<List<int>>;
+                var managedNumbers = makeManagedNumbers();
                 Require(managedNumbers.GetType() == typeof(List<int>),
                     "generic factory retains independent CLR call storage");
                 DynamicFieldProbe.WriteConsole("commands", replacementCommands);
@@ -111,7 +116,8 @@ public sealed class Mod : MelonMod
             serializedOwner.transform.SetParent(created.transform, false);
             var serialized = serializedOwner.AddComponent<LibrarySerializedComponent>();
             var ownPayload = GenericValueProbe.Identity(new byte[] { 7 });
-            serialized.Payload = ownPayload.Identity();
+            Func<byte[], byte[]> forwardPayload = GenericValueProbe.Identity;
+            serialized.Payload = forwardPayload(ownPayload);
             serialized.Payload[0] = 19;
             Require(ownPayload[0] == 19,
                 "generic identity and extension receivers preserve native array aliases across library fields");

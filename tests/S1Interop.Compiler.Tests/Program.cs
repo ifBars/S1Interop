@@ -10,6 +10,87 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("GenericValueDelegateAliasesFollowGenericFixedPoint", () => Verify("""
+        using System;
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            private static T Choose<T, U>(T witness, U actual) => (T)(object)actual;
+            public static int Run() {
+                Func<List<int>, List<int>> witness = Identity<List<int>>;
+                Func<List<int>, List<int>> actual = Identity<List<int>>;
+                var forward = Choose(witness, actual);
+                var values = new List<int> { 17 };
+                Actor.ReflectionNumbers = forward(values);
+                Actor.ReflectionNumbers[0] = 23;
+                return values[0];
+            }
+        }
+        """, 23)),
+    ("GenericValueClosedExtensionDelegateKeepsReceiverStorage", () => Verify("""
+        using System;
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Extensions { public static T Identity<T>(this T value) => value; }
+        public static class Probe {
+            public static int Run() {
+                var values = new List<int> { 17 };
+                Func<List<int>> forward = values.Identity<List<int>>;
+                Actor.ReflectionNumbers = forward();
+                Actor.ReflectionNumbers[0] = 23;
+                return values[0];
+            }
+        }
+        """, 23)),
+    ("GenericValueDelegateFactoryUsesCallerStorage", () => Verify("""
+        using System;
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Make<T>() where T : new() => new T();
+            public static int Run() {
+                var make = new Func<List<int>>(Make<List<int>>);
+                Func<List<int>> managedMake = Make<List<int>>;
+                Actor.ReflectionNumbers = make();
+                Actor.ReflectionNumbers.Add(41);
+                if (managedMake().GetType() != typeof(List<int>)) return -1;
+                return Actor.ReflectionNumbers[0];
+            }
+        }
+        """, 41)),
+    ("GenericValueInferredDelegateArrayKeepsAliases", () => Verify("""
+        using System;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            public static int Run() {
+                Func<int[], int[]> forward = Identity;
+                var values = new int[] { 11 };
+                ArrayStore.Values = forward(values);
+                ArrayStore.Values[0] = 29;
+                return values[0];
+            }
+        }
+        """, 29)),
+    ("GenericValueMethodGroupsPreserveIndependentStorage", () => Verify("""
+        using System;
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            public static int Run() {
+                Func<List<int>, List<int>> forward = Identity<List<int>>;
+                Func<List<int>, List<int>> managedForward = Identity<List<int>>;
+                var values = new List<int> { 17 };
+                Actor.ReflectionNumbers = forward(values);
+                Actor.ReflectionNumbers[0] = 23;
+                var managed = managedForward(new List<int> { 31 });
+                if (managed.GetType() != typeof(List<int>)) return -1;
+                return values[0] + managed[0];
+            }
+        }
+        """, 54)),
     ("GenericValueConditionalExtensionPreservesNullAndAliases", () => Verify("""
         #nullable enable
         using System.Collections.Generic;

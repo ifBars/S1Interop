@@ -64,19 +64,58 @@ internal sealed partial class CollectionStorageAnalysis
                 };
                 if (implementation is null || !map.IsAuthorType(implementation.ContainingType) ||
                     implementation.Parameters.Length != invoke.Parameters.Length) continue;
+                var ports = new List<(int Definition, int Constructed)>();
+                var definition = (implementation.ReducedFrom ?? implementation).OriginalDefinition;
+                ExpressionSyntax reference = model.GetOperation(expression) is IDelegateCreationOperation { Target.Syntax: ExpressionSyntax targetReference }
+                    ? targetReference : expression;
                 for (int index = 0; index < invoke.Parameters.Length; index++)
                     if (Eligible(invoke.Parameters[index].Type) &&
                         SymbolEqualityComparer.Default.Equals(invoke.Parameters[index].Type, implementation.Parameters[index].Type))
-                        Join(DelegateSlot(valueOwner, index), Symbol(implementation.ReducedFrom is { } extension
-                            ? extension.Parameters[index + 1] : implementation.Parameters[index]));
+                    {
+                        int slot = DelegateSlot(valueOwner, index);
+                        var parameter = definition.Parameters[index + (implementation.ReducedFrom is null ? 0 : 1)];
+                        if (!ConnectGenericMethodReferencePort(reference, definition, parameter.Type, parameter, slot, ports))
+                            Join(slot, Symbol(implementation.ReducedFrom is { } extension
+                                ? extension.Parameters[index + 1] : implementation.Parameters[index]));
+                    }
                 if (Eligible(invoke.ReturnType) && SymbolEqualityComparer.Default.Equals(invoke.ReturnType, implementation.ReturnType))
                 {
-                    Join(DelegateSlot(valueOwner, -1), Symbol(implementation.ReducedFrom ?? implementation));
+                    int slot = DelegateSlot(valueOwner, -1);
+                    if (!ConnectGenericMethodReferencePort(reference, definition, definition.ReturnType, definition, slot, ports))
+                        Join(slot, Symbol(implementation.ReducedFrom ?? implementation));
                     if (expression is LambdaExpressionSyntax { Body: ExpressionSyntax body })
                         Join(DelegateSlot(valueOwner, -1), Expression(body, model));
                 }
+                if (implementation.ReducedFrom is not null && reference is MemberAccessExpressionSyntax bound)
+                {
+                    var receiverParameter = definition.Parameters[0];
+                    ConnectGenericMethodReferencePort(reference, definition, receiverParameter.Type, receiverParameter,
+                        Expression(bound.Expression, model), ports);
+                }
+                if (ports.Count != 0) genericPorts.Add(ports);
             }
         }
+    }
+
+    private bool MergeDelegateSlots()
+    {
+        // Generic flow can merge delegate owners after their invoke slots were indexed.
+        // Re-key the slots and propagate any newly discovered aliasing back to the fixed point.
+        var previous = delegateSlots.ToArray();
+        delegateSlots.Clear();
+        bool changed = false;
+        foreach (var entry in previous)
+        {
+            var key = (Root(entry.Key.Owner), entry.Key.Position);
+            if (delegateSlots.TryGetValue(key, out int existing))
+            {
+                if (Root(existing) == Root(entry.Value)) continue;
+                Join(existing, entry.Value);
+                changed = true;
+            }
+            else delegateSlots.Add(key, entry.Value);
+        }
+        return changed;
     }
 
     private int DelegateSlot(int owner, int position)

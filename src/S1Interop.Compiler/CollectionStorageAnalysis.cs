@@ -143,6 +143,7 @@ internal sealed partial class CollectionStorageAnalysis
         }
         ConnectGenericValueStorage(author, cancellationToken);
         ConnectDelegateStorage(author, cancellationToken);
+        ResolveGenericValueStorage(cancellationToken);
         nativeRoots = seeds.Select(Root).ToHashSet();
     }
 
