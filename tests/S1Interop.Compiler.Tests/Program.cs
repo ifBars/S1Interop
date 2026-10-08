@@ -10,6 +10,112 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("GenericValueConditionalExtensionPreservesNullAndAliases", () => Verify("""
+        #nullable enable
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Extensions {
+            public static int Calls;
+            public static T Identity<T>(this T value) { Calls++; return value; }
+        }
+        public static class Probe {
+            public static int Run() {
+                List<int>? values = new List<int> { 41 };
+                Actor.ReflectionNumbers = values?.Identity<List<int>>()!;
+                Actor.ReflectionNumbers[0] = 43;
+                if (values[0] != 43 || Extensions.Calls != 1) return -1;
+                values = null;
+                Actor.ReflectionNumbers = values?.Identity<List<int>>()!;
+                return Actor.ReflectionNumbers == null && Extensions.Calls == 1 ? 43 : -2;
+            }
+        }
+        """, 43)),
+    ("GenericValueCrossParameterFlowIgnoresDeclarationOrder", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            public static int Run() {
+                var values = new List<int> { 31 };
+                Actor.ReflectionNumbers = Forward<List<int>, List<int>>(values);
+                Actor.ReflectionNumbers[0] = 37;
+                return values[0];
+            }
+            private static U Forward<T, U>(T value) => Cast<T, U>(value);
+            private static U Cast<T, U>(T value) => (U)(object)value;
+        }
+        """, 37)),
+    ("GenericValueNullableTypeArgumentsUseCallerStorage", () => Verify("""
+        #nullable enable
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            public static int Run() {
+                var values = new List<int> { 23 };
+                Actor.ReflectionNumbers = Identity<List<int>?>(values)!;
+                Actor.ReflectionNumbers[0] = 29;
+                return values[0];
+            }
+        }
+        """, 29)),
+    ("GenericValueFactoryUsesCallerStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Make<T>() where T : new() => new T();
+            public static int Run() {
+                Actor.ReflectionNumbers = Make<List<int>>();
+                Actor.ReflectionNumbers.Add(17);
+                var managed = Make<List<int>>();
+                if (managed.GetType() != typeof(List<int>) || managed.Count != 0) return -1;
+                return Actor.ReflectionNumbers[0];
+            }
+        }
+        """, 17)),
+    ("GenericValueArrayIdentityKeepsAliasesAcrossHelpers", () => Verify("""
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            private static T Forward<T>(T value) => Identity<T>(value);
+            public static int Run() {
+                var source = new int[] { 7 };
+                ArrayStore.Values = Forward<int[]>(source);
+                ArrayStore.Values[0] = 19;
+                var managed = Forward<int[]>(new int[] { 13 });
+                if (managed.GetType() != typeof(int[])) return -1;
+                return source[0] + managed[0];
+            }
+        }
+        """, 32)),
+    ("GenericValueIdentityPreservesNativeAndIndependentClrStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Identity<T>(T value) => value;
+            public static int Run() {
+                var native = new List<int> { 7 };
+                Actor.ReflectionNumbers = Identity<List<int>>(native);
+                Actor.ReflectionNumbers.Add(11);
+                if (native.Count != 2) return -1;
+                var managed = Identity<List<int>>(new List<int> { 13 });
+                if (managed.GetType() != typeof(List<int>)) return -2;
+                return native[1] + managed[0];
+            }
+        }
+        """, 24)),
+    ("GenericValueExtensionReceiverPreservesNativeStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Extensions { public static T Identity<T>(this T value) => value; }
+        public static class Probe {
+            public static int Run() {
+                var values = new List<int> { 7 };
+                Actor.ReflectionNumbers = values.Identity();
+                Actor.ReflectionNumbers.Add(11);
+                return values.Count == 2 ? values[1] : -1;
+            }
+        }
+        """, 11)),
     ("DynamicFieldNamesPreserveInheritedInternalVisibility", () => Verify("""
         using System.Reflection;
         using ScheduleOne.Testing;

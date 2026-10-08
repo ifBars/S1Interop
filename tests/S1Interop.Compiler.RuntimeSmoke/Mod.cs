@@ -67,8 +67,12 @@ public sealed class Mod : MelonMod
                 "ConsoleForAll cached dictionary reflection preserves the game table identity");
             try
             {
-                var replacementCommands = new Dictionary<string, ScheduleOne.Console.ConsoleCommand>();
+                var replacementCommands = GenericValueProbe.Make<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>();
                 consoleReflection.Write(replacementCommands);
+                ScheduleOne.Console.commands = replacementCommands.Identity();
+                var managedNumbers = GenericValueProbe.Make<List<int>>();
+                Require(managedNumbers.GetType() == typeof(List<int>),
+                    "generic factory retains independent CLR call storage");
                 DynamicFieldProbe.WriteConsole("commands", replacementCommands);
                 var dynamicCommands = DynamicFieldProbe.ReadConsole<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>("commands");
                 Require(ReferenceEquals(replacementCommands, dynamicCommands),
@@ -106,6 +110,11 @@ public sealed class Mod : MelonMod
             var serializedOwner = new GameObject("S1Interop serialized field probe");
             serializedOwner.transform.SetParent(created.transform, false);
             var serialized = serializedOwner.AddComponent<LibrarySerializedComponent>();
+            var ownPayload = GenericValueProbe.Identity(new byte[] { 7 });
+            serialized.Payload = ownPayload.Identity();
+            serialized.Payload[0] = 19;
+            Require(ownPayload[0] == 19,
+                "generic identity and extension receivers preserve native array aliases across library fields");
             serialized.DecodePayload(" Q U J D\r\n");
             var payloadAlias = serialized.Payload;
             payloadAlias[1] = 90;

@@ -74,7 +74,11 @@ internal sealed partial class CollectionStorageAnalysis
                         break;
                     case ArgumentSyntax argument when model.GetOperation(argument) is IArgumentOperation { Parameter: { } parameter }:
                         if (map.IsAuthorType(parameter.ContainingType))
-                            Join(Symbol(parameter), Expression(argument.Expression, model));
+                        {
+                            // Generic T arguments have call-specific representation slots.
+                            if (parameter.OriginalDefinition.Type is not ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method })
+                                Join(Symbol(parameter), Expression(argument.Expression, model));
+                        }
                         else if (Eligible(parameter.Type) && NativeSlot(slots.ExpectedTargetType(argument.Expression), parameter.Type))
                             seeds.Add(Expression(argument.Expression, model));
                         break;
@@ -243,7 +247,11 @@ internal sealed partial class CollectionStorageAnalysis
         if (symbol is ILocalSymbol or IParameterSymbol or IFieldSymbol or IPropertySymbol ||
             expression is InvocationExpressionSyntax && symbol is IMethodSymbol)
         {
-            if (symbol is not IMethodSymbol method || map.IsAuthorType(method.ContainingType)) Join(node, Symbol(symbol));
+            if (symbol is not IMethodSymbol method)
+                Join(node, Symbol(symbol));
+            else if (map.IsAuthorType(method.ContainingType) &&
+                method.OriginalDefinition.ReturnType is not ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method })
+                Join(node, Symbol(symbol));
         }
         return node;
     }
