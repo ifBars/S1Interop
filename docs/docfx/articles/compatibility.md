@@ -27,6 +27,8 @@ These are tested categories, not a promise that every use of them works. The com
 - **Existing libraries:** prebuilt dependencies don't become compatible just because your mod uses the compiler.
 - **Missing game code:** publicizing references cannot restore stripped native code or APIs absent from the target game version.
 
+[Polyfill](https://github.com/DooDesch-Mods/ScheduleOne-Polyfill) by DooDesch ([Nexus Mods](https://www.nexusmods.com/schedule1/mods/2452)) tackles a related gap: repairing missing or changed API names in MelonLoader's generated assemblies so older mods can run. Its documented limits include code removed without a successor. We haven't verified it alongside S1Interop.
+
 Unsupported cases may produce a compiler diagnostic, but some only fail at runtime. The compiler itself still needs maintenance as these cases and game updates surface.
 
 ## Before sharing your mod

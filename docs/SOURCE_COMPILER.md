@@ -8,6 +8,8 @@ There is no per-game-type wrapper catalog. A game update supplies the new refere
 
 The original goal is not complete. Metadata discovery removes the need to maintain a catalog of game wrappers, but does not remove compiler or runtime maintenance. Unity's [managed stripping](https://docs.unity3d.com/2022.3/Documentation/Manual/ManagedCodeStripping.html) can remove code from the shipped build, and its [AOT restrictions](https://docs.unity3d.com/2022.3/Documentation/Manual/ScriptingRestrictions.html) affect code generated at runtime and generic execution. This compiler does not restore absent native implementations. Matching Mono assemblies supply authoring signatures; executing their method bodies against native game objects would require an additional implementation that preserves object identity, dispatch, engine bindings, and shared state. That is not implemented or established by the current tests.
 
+[Polyfill](https://github.com/DooDesch-Mods/ScheduleOne-Polyfill) by DooDesch separately repairs missing or changed API names in generated interop assemblies for older mods. Its documented limits include code removed without a successor; compatibility with S1Interop has not been verified.
+
 ## Authoring surface
 
 Ordinary game namespaces, types, members, and generics are discovered from the referenced assemblies. Mod authors do not declare a wrapper for each game type:
