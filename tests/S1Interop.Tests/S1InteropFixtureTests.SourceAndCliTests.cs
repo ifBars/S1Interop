@@ -168,11 +168,19 @@ internal sealed partial class S1InteropFixtureTests
 
     private void CliHelpUsageLinesAreDocumented()
     {
+        foreach (string newline in new[] { "\n", "\r\n" })
+        {
+            string fixture = string.Join(newline, "S1Interop", "  s1interop new <path>", "", "  s1interop --version");
+            Assert(GetHelpUsageLines(fixture).SequenceEqual(new[] { "s1interop new <path>", "s1interop --version" }),
+                "CLI usage parsing must accept LF and CRLF output.");
+        }
         ProcessResult help = RunCli("--help");
         Assert(help.ExitCode == 0, $"s1interop --help should succeed. Output: {help.Output}");
 
         string commandReference = File.ReadAllText(Path.Combine(RepositoryRoot, "docs", "docfx", "articles", "commands.md"));
-        foreach (string usageLine in GetHelpUsageLines(help.Output))
+        string[] usageLines = GetHelpUsageLines(help.Output).ToArray();
+        Assert(usageLines.Length > 0, "CLI help must contain usage lines to validate against the documentation.");
+        foreach (string usageLine in usageLines)
         {
             Assert(
                 commandReference.Contains(usageLine, StringComparison.Ordinal),
@@ -210,7 +218,8 @@ internal sealed partial class S1InteropFixtureTests
 
     private static IEnumerable<string> GetHelpUsageLines(string helpOutput)
     {
-        foreach (string line in helpOutput.Split([Environment.NewLine], StringSplitOptions.None))
+        using var reader = new StringReader(helpOutput);
+        while (reader.ReadLine() is { } line)
         {
             string trimmed = line.Trim();
             if (trimmed.StartsWith("s1interop ", StringComparison.Ordinal))
