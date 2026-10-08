@@ -7,7 +7,7 @@ using FieldAttributes = System.Reflection.FieldAttributes;
 
 namespace S1Interop.Compiler;
 
-internal static class NativeReflectionVerifier
+internal static partial class NativeReflectionVerifier
 {
     private static readonly DiagnosticDescriptor FieldBecameProperty = new("S1IC034", "Native reflection shape changed",
         "Field lookup '{0}.{1}' targets an IL2CPP property; this FieldInfo usage is not supported and could lose the field at runtime",
@@ -34,10 +34,23 @@ internal static class NativeReflectionVerifier
             }
             else continue;
             while (typeExpression is IConversionOperation conversion) typeExpression = conversion.Operand;
-            if (typeExpression is not ITypeOfOperation { TypeOperand: INamedTypeSymbol source } ||
-                nameExpression?.ConstantValue is not { HasValue: true, Value: string name } || map.IsAuthorType(source)) continue;
+            if (typeExpression is not ITypeOfOperation { TypeOperand: INamedTypeSymbol source } || map.IsAuthorType(source)) continue;
             var mapped = map.Resolve(source);
             if (mapped.Status != TypeMappingStatus.Mapped || mapped.Target is null) continue;
+            if (nameExpression?.ConstantValue is not { HasValue: true, Value: string name })
+            {
+                if (nameExpression?.ConstantValue.HasValue == false && !HasOnlyValueAccess(syntax, model))
+                {
+                    for (INamedTypeSymbol? owner = source; owner is not null; owner = owner.BaseType)
+                    {
+                        if (map.Resolve(owner).Target is not { } nativeOwner ||
+                            !map.ReferenceFields.FieldNames(owner).Any(fieldName => nativeOwner.GetMembers(fieldName).OfType<IPropertySymbol>().Any())) continue;
+                        yield return Diagnostic.Create(FieldBecameProperty, syntax.GetLocation(), source.ToDisplayString(), "<computed name>");
+                        break;
+                    }
+                }
+                continue;
+            }
             var field = FindField(source, name, map, MayIgnoreCase(invocation));
             if (Find(mapped.Target, field?.Name ?? name) is IPropertySymbol property &&
                 HasPhysicalField(source, field?.Name ?? name, invocation, map) &&
@@ -49,6 +62,7 @@ internal static class NativeReflectionVerifier
 
     public static ExpressionSyntax? Rewrite(InvocationExpressionSyntax syntax, InvocationExpressionSyntax visited, SemanticModel model, MetadataSymbolMap map)
     {
+        if (RewriteDynamic(syntax, visited, model, map) is { } dynamicLookup) return dynamicLookup;
         if (ResolveLookup(syntax, model, map) is not { } resolved ||
             !HasOnlyValueAccess(syntax, model, map, CollectionAdapter(resolved.Field.Type, resolved.Property.Type, map))) return null;
         var (invocation, direct, source, fieldName, field, property) = resolved;
@@ -119,6 +133,7 @@ internal static class NativeReflectionVerifier
 
     internal static bool ReturnsNativeCollectionDescriptor(InvocationExpressionSyntax syntax, SemanticModel model, MetadataSymbolMap map)
     {
+        if (ResolveDynamicLookup(syntax, model, map) is not null) return true;
         return ResolveLookup(syntax, model, map) is { } resolved &&
             CollectionAdapter(resolved.Field.Type, resolved.Property.Type, map) is { } adapter &&
             HasOnlyValueAccess(syntax, model, map, adapter);
@@ -146,12 +161,7 @@ internal static class NativeReflectionVerifier
 
     private static bool CanAdapt(IMethodSymbol method, INamedTypeSymbol source, Field field, IPropertySymbol property, MetadataSymbolMap map, bool ignoreCase)
     {
-        if ((field.Attributes & (FieldAttributes.Literal | FieldAttributes.InitOnly)) != 0 ||
-            property.GetMethod is null || property.SetMethod is null ||
-            field.Attributes.HasFlag(FieldAttributes.Static) != property.IsStatic ||
-            !SymbolEqualityComparer.Default.Equals(map.Resolve(field.Owner).Target, property.ContainingType) ||
-            map.TargetDisplay(field.Type) != property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) &&
-            CollectionAdapter(field.Type, property.Type, map) is null) return false;
+        if (!CanAdaptValue(field, property, map)) return false;
         if (method.ContainingType.ToDisplayString() == "HarmonyLib.AccessTools") return true;
         // A single known candidate preserves runtime flag selection. Hidden fields and
         // case-folded ambiguities require a candidate-set lookup, not a guessed winner.
@@ -161,10 +171,23 @@ internal static class NativeReflectionVerifier
         return candidates == 1;
     }
 
+    private static bool CanAdaptValue(Field field, IPropertySymbol property, MetadataSymbolMap map)
+    {
+        if ((field.Attributes & (FieldAttributes.Literal | FieldAttributes.InitOnly)) != 0 ||
+            property.GetMethod is null || property.SetMethod is null ||
+            field.Attributes.HasFlag(FieldAttributes.Static) != property.IsStatic ||
+            !SymbolEqualityComparer.Default.Equals(map.Resolve(field.Owner).Target, property.ContainingType) ||
+            map.TargetDisplay(field.Type) != property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) &&
+            CollectionAdapter(field.Type, property.Type, map) is null) return false;
+        return true;
+    }
+
     private static bool HasOnlyValueAccess(InvocationExpressionSyntax lookup, SemanticModel model, MetadataSymbolMap? map = null, string? collectionAdapter = null)
     {
         SyntaxNode value = lookup;
-        while (value.Parent is ParenthesizedExpressionSyntax || value.Parent is PostfixUnaryExpressionSyntax postfix && postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+        while (value.Parent is ParenthesizedExpressionSyntax ||
+            value.Parent is BinaryExpressionSyntax coalesce && coalesce.IsKind(SyntaxKind.CoalesceExpression) && coalesce.Left == value && coalesce.Right is ThrowExpressionSyntax ||
+            value.Parent is PostfixUnaryExpressionSyntax postfix && postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             value = value.Parent;
         ISymbol? storage = value.Parent switch
         {

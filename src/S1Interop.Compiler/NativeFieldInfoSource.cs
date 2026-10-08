@@ -129,6 +129,52 @@ internal static class NativeFieldInfoSource
                     }
                     finally { global::System.GC.KeepAlive(root); }
                 }
+                public sealed class Candidate {
+                    public readonly global::System.Type Owner;
+                    public readonly string Name;
+                    public readonly global::System.Reflection.FieldAttributes Attributes;
+                    public readonly global::System.Func<global::System.Reflection.FieldInfo> Factory;
+                    public Candidate(global::System.Type owner, string name, global::System.Reflection.FieldAttributes attributes,
+                        global::System.Func<global::System.Reflection.FieldInfo> factory) {
+                        Owner = owner; Name = name; Attributes = attributes; Factory = factory;
+                    }
+                }
+                private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<global::System.Type, Candidate[]> candidates = new();
+                public static global::System.Reflection.FieldInfo LookupCandidates(global::System.Type type, string name,
+                    global::System.Reflection.BindingFlags flags, bool harmony, global::System.Func<Candidate[]> createCandidates) {
+                    if (name == null) {
+                        if (harmony) return null;
+                        throw new global::System.ArgumentNullException(nameof(name));
+                    }
+                    Candidate selected = null;
+                    foreach (var candidate in candidates.GetOrAdd(type, _ => createCandidates())) {
+                        var comparison = !harmony && (flags & global::System.Reflection.BindingFlags.IgnoreCase) != 0
+                            ? global::System.StringComparison.OrdinalIgnoreCase : global::System.StringComparison.Ordinal;
+                        if (!string.Equals(candidate.Name, name, comparison)) continue;
+                        if (!harmony) {
+                            bool inherited = candidate.Owner != type;
+                            bool isStatic = (candidate.Attributes & global::System.Reflection.FieldAttributes.Static) != 0;
+                            var visibility = candidate.Attributes & global::System.Reflection.FieldAttributes.FieldAccessMask;
+                            bool publicField = visibility == global::System.Reflection.FieldAttributes.Public;
+                            if (inherited && ((flags & global::System.Reflection.BindingFlags.DeclaredOnly) != 0 ||
+                                visibility == global::System.Reflection.FieldAttributes.Private)) continue;
+                            if (inherited && isStatic && (flags & global::System.Reflection.BindingFlags.FlattenHierarchy) == 0) continue;
+                            if ((flags & (isStatic ? global::System.Reflection.BindingFlags.Static : global::System.Reflection.BindingFlags.Instance)) == 0 ||
+                                (flags & (publicField ? global::System.Reflection.BindingFlags.Public : global::System.Reflection.BindingFlags.NonPublic)) == 0) continue;
+                        }
+                        if (selected != null) {
+                            if (selected.Owner == candidate.Owner) throw new global::System.Reflection.AmbiguousMatchException(name);
+                            continue;
+                        }
+                        selected = candidate;
+                        if (harmony) break;
+                    }
+                    if (selected == null) return null;
+                    if (selected.Factory == null) throw new global::System.NotSupportedException("Dynamic field representation is not yet adapted: " + selected.Owner.FullName + "." + selected.Name);
+                    var result = selected.Factory();
+                    if (result is S1InteropNativeFieldInfo adapted) adapted.reflectedType = harmony ? selected.Owner : type;
+                    return result;
+                }
                 private object CheckTarget(object target) {
                     if (IsStatic) return null;
                     if (target == null) throw new global::System.Reflection.TargetException("Non-static field requires a target.");

@@ -41,6 +41,19 @@ public sealed class Mod : MelonMod
                 "MoreXP reflection reads and writes native Unity object field");
             Require(((LayerMask)maskField.GetValue(recycler)!).value == 257 && recycler.DetectionMask.value == 257,
                 "MoreXP reflection round-trips boxed LayerMask field");
+            var vehicle = recyclerOwner.AddComponent<ScheduleOne.Vehicles.LandVehicle>();
+            var wheel = recyclerOwner.AddComponent<WheelCollider>();
+            var wheels = new[] { wheel };
+            DynamicFieldProbe.WriteVehicle(vehicle, "driveWheels", wheels);
+            var wheelAlias = DynamicFieldProbe.ReadVehicle<WheelCollider[]>(vehicle, "driveWheels");
+            Require(wheelAlias[0] == wheel && vehicle.driveWheels[0] == wheel,
+                "Forklift generic dynamic field lookup reads native reference array elements");
+            wheelAlias[0] = null!;
+            Require(wheels[0] == null && vehicle.driveWheels[0] == null,
+                "Forklift dynamic array write retains source and native storage aliases");
+            DynamicFieldProbe.WriteVehicle(vehicle, "maxSteeringAngle", 38f);
+            Require(DynamicFieldProbe.ReadVehicle<float>(vehicle, "maxSteeringAngle") == 38f && vehicle.maxSteeringAngle == 38f,
+                "Forklift generic dynamic field helper also preserves scalar values");
             var lobby = ScheduleOne.DevUtilities.Singleton<ScheduleOne.Networking.Lobby>.Instance;
             if (lobby == null) throw new InvalidOperationException("BiggerLobbies reflection probe requires the initialized menu lobby");
             var lobbyService = BiggerLobbiesReflectionProbe.GetLobbyService(lobby);
@@ -56,6 +69,13 @@ public sealed class Mod : MelonMod
             {
                 var replacementCommands = new Dictionary<string, ScheduleOne.Console.ConsoleCommand>();
                 consoleReflection.Write(replacementCommands);
+                DynamicFieldProbe.WriteConsole("commands", replacementCommands);
+                var dynamicCommands = DynamicFieldProbe.ReadConsole<Dictionary<string, ScheduleOne.Console.ConsoleCommand>>("commands");
+                Require(ReferenceEquals(replacementCommands, dynamicCommands),
+                    "dynamic generic dictionary lookup preserves replacement identity");
+                dynamicCommands.Add("__s1interop_dynamic_probe__", null!);
+                Require(ScheduleOne.Console.commands.ContainsKey("__s1interop_dynamic_probe__") && replacementCommands.ContainsKey("__s1interop_dynamic_probe__"),
+                    "dynamic generic dictionary mutation reaches native game storage");
                 var reflectedCommands = consoleReflection.Read()!;
                 reflectedCommands.Add("__s1interop_probe__", null!);
                 Require(ReferenceEquals(replacementCommands, reflectedCommands) && ScheduleOne.Console.commands.ContainsKey("__s1interop_probe__"),

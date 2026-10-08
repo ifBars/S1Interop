@@ -21,7 +21,7 @@ These are tested categories, not a promise that every use of them works. The com
 
 ## What still needs work
 
-- **Reflection:** computed types or names, escaped reflection descriptors, and stored or chained Harmony Traverse calls have gaps.
+- **Reflection:** computed types, unsupported dynamic field representations, escaped reflection descriptors, and stored or chained Harmony Traverse calls have gaps.
 - **Collections and callbacks:** some generic, array, and collection flows across game or library boundaries remain unsupported.
 - **Unity components and assets:** arbitrary serialized fields, prefab scripts, and AssetBundle integration are not fully covered.
 - **Existing libraries:** prebuilt dependencies don't become compatible just because your mod uses the compiler.

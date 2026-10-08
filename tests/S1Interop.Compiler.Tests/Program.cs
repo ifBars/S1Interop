@@ -10,6 +10,205 @@ using S1Interop.Compiler.Tests;
 
 var tests = new (string Name, Action Test)[]
 {
+    ("DynamicFieldNamesPreserveInheritedInternalVisibility", () => Verify("""
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static int Read(string name, BindingFlags flags) {
+                var field = typeof(Employee).GetField(name, flags);
+                if (field == null) return -1;
+                field.SetValue(null, 29);
+                return (int)field.GetValue(null);
+            }
+            public static int Run() {
+                var flags = BindingFlags.NonPublic | BindingFlags.Static;
+                if (Read("ReflectionInternal", flags) != -1) return -1;
+                return Read("ReflectionInternal", flags | BindingFlags.FlattenHierarchy);
+            }
+        }
+        """, 29)),
+    ("DynamicFieldDescriptorEscapeIsDiagnosed", () => {
+        var result = Lower("""
+            public static class Probe {
+                public static System.Reflection.FieldInfo Find(string name) => typeof(ScheduleOne.Testing.Actor).GetField(name);
+            }
+            """);
+        Assert(!result.Success && result.Diagnostics.Any(d => d.Id == "S1IC034"), "Dynamic descriptor escape was silently left as a CLR field lookup.");
+    }),
+    ("DynamicFieldNamesPreserveCaseAmbiguityAndHiding", () => Verify("""
+        using System.Reflection;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static object Read(string name, BindingFlags flags) {
+                var field = typeof(CollectionShadowActor).GetField(name, flags);
+                return field.GetValue(new CollectionShadowActor());
+            }
+            private static object ReadBase(string name, BindingFlags flags) {
+                var field = typeof(Actor).GetField(name, flags);
+                return field.GetValue(null);
+            }
+            public static int Run() {
+                var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy;
+                if (Read("ReflectionScores", flags) is not System.Collections.Generic.List<int>) return -1;
+                if (Read("reflectionScores", flags | BindingFlags.IgnoreCase) is not System.Collections.Generic.List<int>) return -2;
+                try { ReadBase("reflectionScores", flags | BindingFlags.IgnoreCase); return -3; }
+                catch (AmbiguousMatchException) { return 1; }
+            }
+        }
+        """, 1)),
+    ("DynamicFieldNamesPreserveGenericArrayStorage", () => Verify("""
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Read<T>(string name) {
+                var field = typeof(ArrayStore).GetField(name);
+                return (T)field.GetValue(null);
+            }
+            private static void Write<T>(string name, T value) {
+                var field = typeof(ArrayStore).GetField(name);
+                field.SetValue(null, value);
+            }
+            public static int Run() {
+                var values = new int[] { 7 };
+                Write("Values", values);
+                var read = Read<int[]>("Values");
+                read[0] = 11;
+                if (values[0] != 11 || ArrayStore.Values[0] != 11) return -1;
+                var actors = new Actor[] { new Actor { Name = "before" } };
+                Write("Actors", actors);
+                var objects = Read<Actor[]>("Actors");
+                var replacement = new Actor();
+                objects[0] = replacement;
+                if (!object.ReferenceEquals(actors[0], replacement) || !object.ReferenceEquals(ArrayStore.Actors[0], replacement)) return -2;
+                Write<Actor[]>("Actors", null);
+                if (Read<Actor[]>("Actors") != null || ArrayStore.Actors != null) return -3;
+                return read[0];
+            }
+        }
+        """, 11)),
+    ("DynamicFieldNamesPreserveGenericCollectionStorage", () => Verify("""
+        using System.Collections.Generic;
+        using ScheduleOne.Testing;
+        public static class Probe {
+            private static T Read<T>(string name) {
+                var field = typeof(Actor).GetField(name);
+                return (T)field.GetValue(null);
+            }
+            private static void Write<T>(string name, T value) {
+                var field = typeof(Actor).GetField(name);
+                field.SetValue(null, value);
+            }
+            public static int Run() {
+                var values = new List<int> { 7 };
+                Write("ReflectionNumbers", values);
+                var read = Read<List<int>>("ReflectionNumbers");
+                read.Add(11);
+                if (!object.ReferenceEquals(values, read) || Actor.ReflectionNumbers.Count != 2) return -1;
+                Actor.ReflectionNumbers[0] = 13;
+                if (values[0] != 13) return -2;
+                var scores = new Dictionary<string,int> { ["one"] = 17 };
+                Write("ReflectionScores", scores);
+                var table = Read<Dictionary<string,int>>("ReflectionScores");
+                table["two"] = 19;
+                if (!object.ReferenceEquals(scores, table) || Actor.ReflectionScores["two"] != 19) return -3;
+                Write<List<int>>("ReflectionNumbers", null);
+                if (Read<List<int>>("ReflectionNumbers") != null || Actor.ReflectionNumbers != null) return -4;
+                Write("ReflectionCount", 23);
+                return Read<int>("ReflectionCount");
+            }
+        }
+        """, 23)),
+    ("DynamicFieldLookupPreservesNamedArgumentEvaluationOrder", () => Verify("""
+        public static class Probe {
+            private static int order;
+            private static string Name() { order = order * 10 + 2; return "ReflectionCount"; }
+            private static System.Reflection.BindingFlags Flags() { order = order * 10 + 1; return System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static; }
+            public static int Run() {
+                ScheduleOne.Testing.Actor.ReflectionCount = 5;
+                var field = typeof(ScheduleOne.Testing.Actor).GetField(bindingAttr: Flags(), name: Name());
+                return (int)field.GetValue(null) + order;
+            }
+        }
+        """, 17)),
+    ("DynamicAccessToolsFieldNamesPreserveGenericWritesAndPrivateFields", () => Verify("""
+        namespace HarmonyLib {
+            public static class AccessTools {
+                public static System.Reflection.FieldInfo Field(System.Type type, string name) {
+                    if (name == null) return null;
+                    for (var owner = type; owner != null; owner = owner.BaseType) {
+                        var field = owner.GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly);
+                        if (field != null) return field;
+                    }
+                    return null;
+                }
+            }
+        }
+        public static class Probe {
+            private static void Write<T>(ScheduleOne.Testing.Employee actor, string name, T value) {
+                var field = HarmonyLib.AccessTools.Field(typeof(ScheduleOne.Testing.Employee), name)
+                    ?? throw new System.MissingFieldException(name);
+                field.SetValue(actor, value);
+            }
+            private static T Read<T>(ScheduleOne.Testing.Employee actor, string name) {
+                var field = HarmonyLib.AccessTools.Field(typeof(ScheduleOne.Testing.Employee), name)
+                    ?? throw new System.MissingFieldException(name);
+                return (T)field.GetValue(actor);
+            }
+            private static bool Visible(string name, System.Reflection.BindingFlags flags) {
+                var field = typeof(ScheduleOne.Testing.Employee).GetField(name, flags);
+                return field != null;
+            }
+            public static int Run() {
+                var actor = new ScheduleOne.Testing.Employee();
+                Write(actor, "Salary", 13);
+                Write(actor, "ReflectionPrivate", 17);
+                if (Read<int>(actor, "Salary") != 13 || Read<int>(actor, "ReflectionPrivate") != 17) return -1;
+                if (Visible("ReflectionPrivate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy)) return -2;
+                if (!Visible("Salary", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)) return -3;
+                return 1;
+            }
+        }
+        """, 1)),
+    ("DynamicFieldNamesPreserveLookupFlagsAndWrites", () => Verify("""
+        public static class Probe {
+            private static System.Reflection.FieldInfo Find(string name, System.Reflection.BindingFlags flags) {
+                var field = typeof(ScheduleOne.Testing.Employee).GetField(name, flags);
+                if (field == null) return null;
+                field.SetValue(null, 47);
+                return null;
+            }
+            private static int Read(string name, System.Reflection.BindingFlags flags) {
+                var field = typeof(ScheduleOne.Testing.Employee).GetField(name, flags);
+                return field == null ? -1 : (int)field.GetValue(null);
+            }
+            public static int Run() {
+                var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+                if (Read("ReflectionCount", flags) != -1) return -1;
+                flags |= System.Reflection.BindingFlags.FlattenHierarchy;
+                Find("ReflectionCount", flags);
+                if (Read("ReflectionCount", flags) != 47) return -2;
+                if (Read("reflectioncount", flags) != -1) return -3;
+                if (Read("reflectioncount", flags | System.Reflection.BindingFlags.IgnoreCase) != 47) return -4;
+                if (Read("ReflectionCount", flags | System.Reflection.BindingFlags.DeclaredOnly) != -1) return -5;
+                if (Read("Missing", flags) != -1) return -6;
+                try { Read(null, flags); return -7; } catch (System.ArgumentNullException) { }
+                return 1;
+            }
+        }
+        """, 1)),
+    ("DynamicFieldNamesPreserveGenericReads", () => Verify("""
+        public static class Probe {
+            private static T Read<T>(ScheduleOne.Testing.Actor actor, string name) {
+                var field = typeof(ScheduleOne.Testing.Actor).GetField(name)
+                    ?? throw new System.MissingFieldException(name);
+                return (T)field.GetValue(actor);
+            }
+            public static int Run() {
+                ScheduleOne.Testing.Actor.ReflectionCount = 43;
+                return Read<int>(new ScheduleOne.Testing.Actor(), "ReflectionCount");
+            }
+        }
+        """, 43)),
     ("ReflectionCollectionsKeepLiveStorageAndReplacement", () => Verify("""
         using System.Collections.Generic;
         using System.Reflection;
@@ -2624,8 +2823,8 @@ static void Verify(string source, int expected)
     Assert(Execute(mono, Contracts.MonoBytes) == expected, "Original Mono-contract behavior differs from expectation.");
     var result = Lower(source);
     Assert(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
-    Assert(Execute(result.Compilation, Contracts.NativeBytes, result.RuntimeAssembly) == expected,
-        "Lowered IL2CPP-contract behavior differs from original source.");
+    int actual = Execute(result.Compilation, Contracts.NativeBytes, result.RuntimeAssembly);
+    Assert(actual == expected, $"Lowered IL2CPP-contract behavior differs from original source: expected {expected}, got {actual}.");
 }
 
 static void Reject(string source)

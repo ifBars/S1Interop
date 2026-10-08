@@ -137,6 +137,7 @@ internal sealed partial class CollectionStorageAnalysis
                     Join(Expression(enumerate, model), Expression(sequence.Expression, model));
             }
         }
+        ConnectGenericValueStorage(author, cancellationToken);
         ConnectDelegateStorage(author, cancellationToken);
         nativeRoots = seeds.Select(Root).ToHashSet();
     }
@@ -195,7 +196,7 @@ internal sealed partial class CollectionStorageAnalysis
     {
         ITypeSymbol? written = model.GetTypeInfo(syntax).Type ?? model.GetSymbolInfo(syntax).Symbol as ITypeSymbol;
         if (!Eligible(written)) return false;
-        if (IsNativeDelegateTypeArgument(syntax, model)) return true;
+        if (IsNativeDelegateTypeArgument(syntax, model) || IsNativeMethodTypeArgument(syntax, model)) return true;
         SyntaxNode node = syntax;
         while (node.Parent is NullableTypeSyntax or RefTypeSyntax or QualifiedNameSyntax or AliasQualifiedNameSyntax) node = node.Parent;
         ISymbol? symbol = node.Parent switch
@@ -221,7 +222,7 @@ internal sealed partial class CollectionStorageAnalysis
             };
         }
         if (node.Parent is PatternSyntax && node.Ancestors().OfType<IsPatternExpressionSyntax>().FirstOrDefault() is { } pattern)
-            return HasNativeStorage(pattern.Expression);
+            return IsConnected(pattern.Expression, model);
         return node.Parent is ExpressionSyntax expression && IsBridged(expression, model);
     }
 
