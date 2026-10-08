@@ -11,9 +11,9 @@ Build success checks references and C# code. A release also needs evidence that 
 
 For a project created by the default `s1interop new` command:
 
-Restore its pinned local tool first, using the candidate feed described in [installation](getting-started.md). Run the builds below serially because the project shares NuGet restore state.
+Restore its pinned local tool first with `dotnet tool restore`. Run the builds below serially because the project shares NuGet restore state.
 
-```powershell
+```console
 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```

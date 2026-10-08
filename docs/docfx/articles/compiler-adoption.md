@@ -14,7 +14,7 @@ Adoption is currently manual. You need to carry over source files, resources, de
 
 Complete [installation](getting-started.md). Create an empty sibling project:
 
-```powershell
+```console
 s1interop new ../MyMod-Compiler --apply
 ```
 
@@ -47,7 +47,7 @@ Publicization cannot supply absent members or stripped native code. The compiler
 
 Run these commands serially from the new project:
 
-```powershell
+```console
 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```

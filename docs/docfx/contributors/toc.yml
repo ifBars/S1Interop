@@ -6,6 +6,8 @@
   href: product-direction.md
 - name: Real-mod evidence
   href: real-mod-evidence.md
+- name: Test a source build
+  href: source-builds.md
 - name: Testing
   href: testing.md
 - name: Publishing docs

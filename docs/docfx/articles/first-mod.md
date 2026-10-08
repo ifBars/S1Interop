@@ -10,35 +10,28 @@ Create a mod that logs a message at startup and reports the NPC count when you p
 
 ## Prerequisites
 
-Complete [Install S1Interop](getting-started.md) and keep that PowerShell window open. Prepare matching Mono and IL2CPP Schedule I installations with [MelonLoader](https://github.com/LavaGang/MelonLoader#how-to-use-the-installer). Launch each installation once. Wait for IL2CPP to finish generating `MelonLoader/Il2CppAssemblies`, then close both games.
+Complete [Install S1Interop](getting-started.md). Prepare matching Mono and IL2CPP Schedule I installations with [MelonLoader](https://github.com/LavaGang/MelonLoader#how-to-use-the-installer). Launch each installation once. Wait for IL2CPP to finish generating `MelonLoader/Il2CppAssemblies`, then close both games.
 
 The `alternate` branches are Mono; the default and `beta` branches are IL2CPP. Match exact game patch versions. The compiler checks version and native generation provenance, but those checks do not prove gameplay compatibility.
 
 ## Create and configure
 
-Create the project in your Documents folder. Run these PowerShell commands separately:
+Open a terminal in the folder where you keep your mod projects, outside the game installation. Create the project and restore its compiler:
 
-```powershell
-Set-Location ([Environment]::GetFolderPath('MyDocuments'))
-s1interop new .\MyMod
-s1interop new .\MyMod --apply
-Set-Location .\MyMod
+```console
+s1interop new MyMod --apply
+cd MyMod
+dotnet tool restore
 ```
 
-The first command previews the files. Apply requires an empty destination.
-
-Restore the project's pinned compiler tool. For an unpublished candidate, use the package directory produced by the installation guide:
-
-```powershell
-dotnet tool restore --add-source $candidateFeed
-```
+`MyMod` must be a new or empty directory. The project pins its compiler version so everyone working on it uses the same tool.
 
 Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use the local tool rather than a globally installed version.
 
 Configure the installations using the project's restored tool. Replace the example paths with your installations:
 
-```powershell
-dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' --il2cpp-game-path 'C:\Games\ScheduleI-Il2Cpp' --apply
+```console
+dotnet tool run s1interop -- setup . --mono-game-path "C:\Games\ScheduleI-Mono" --il2cpp-game-path "C:\Games\ScheduleI-Il2Cpp" --apply
 dotnet tool run s1interop -- doctor .
 ```
 
@@ -46,7 +39,7 @@ dotnet tool run s1interop -- doctor .
 
 ## Build both runtimes
 
-```powershell
+```console
 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
 ```

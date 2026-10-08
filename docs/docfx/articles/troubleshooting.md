@@ -4,9 +4,9 @@ Start with the first failing diagnostic. These fixes apply to compiler projects 
 
 ## Missing tool or failed restore
 
-From the project directory, run `dotnet tool restore`. For an unpublished candidate, add `--add-source <candidate-feed>` as described in [installation](getting-started.md#build-and-install-the-candidate-from-source). Invoke it with `dotnet tool run s1interop -- compiler --help`; a global alpha.1 installation cannot replace the compiler project's pinned candidate.
+From the project directory, run `dotnet tool restore`, then `dotnet tool run s1interop -- compiler --help`. The project uses its pinned compiler, even if you have a different version installed globally.
 
-Keep the tool manifest and `.s1interop` build imports from the same scaffold generation. When rebuilding an unpublished package with the same version, use a fresh package cache and tool directory.
+If NuGet cannot find that version, check the [installation page](getting-started.md) for publication status. Keep the tool manifest and `.s1interop` build imports from the same scaffold generation. Contributors testing local packages should follow [Test a source build](../contributors/source-builds.md).
 
 ## Rejected game references or versions
 

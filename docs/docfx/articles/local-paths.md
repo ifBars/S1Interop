@@ -25,8 +25,8 @@ Both compiler outputs require Mono metadata. IL2CPP output additionally requires
 
 After restoring the project's pinned tool, run:
 
-```powershell
-dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' --il2cpp-game-path 'C:\Games\ScheduleI-Il2Cpp' --apply
+```console
+dotnet tool run s1interop -- setup . --mono-game-path "C:\Games\ScheduleI-Mono" --il2cpp-game-path "C:\Games\ScheduleI-Il2Cpp" --apply
 dotnet tool run s1interop -- doctor .
 ```
 

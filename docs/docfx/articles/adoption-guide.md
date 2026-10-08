@@ -15,7 +15,7 @@ S1Interop compiles ordinary `ScheduleOne.*` C# into separate Mono and IL2CPP mod
 3. [Write game code](writing-code.md).
 4. [Test and distribute it](distributing-mods.md).
 
-The compiler is experimental. The installation guide uses the alpha.2 source candidate because published alpha.1 does not contain it. You need matching Mono and IL2CPP game installations to build both outputs.
+The compiler is experimental. Check [installation](getting-started.md) for package availability. You need matching Mono and IL2CPP game installations to build both outputs.
 
 ## Bring an existing mod
 

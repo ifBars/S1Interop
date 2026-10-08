@@ -33,7 +33,7 @@ To add the older generator diagnostics to normal builds, reference its package:
 <PackageReference Include="S1Interop.Generators" Version="0.1.0-alpha.2" PrivateAssets="all" />
 ```
 
-For this unpublished package, run the following from the S1Interop checkout after the [candidate build](getting-started.md):
+For this unpublished package, run the following from the S1Interop checkout after the [contributor source build](../contributors/source-builds.md):
 
 ```powershell
 dotnet pack .\src\S1Interop.Generators\S1Interop.Generators.csproj -c Release --no-build -o .\artifacts\packages

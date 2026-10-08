@@ -111,7 +111,7 @@ $env:NUGET_PACKAGES = Join-Path $env:TEMP ("s1interop-cache-" + [guid]::NewGuid(
 dotnet restore
 ```
 
-Follow the [candidate feed setup](getting-started.md#build-and-install-the-candidate-from-source) first. The isolated cache leaves existing packages untouched. Release publication must always use a new version for changed contents.
+Follow the [candidate feed setup](../contributors/source-builds.md) first. The isolated cache leaves existing packages untouched. Release publication must always use a new version for changed contents.
 
 ## Generated helper returns null or false
 

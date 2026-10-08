@@ -74,15 +74,13 @@ public sealed class CompilerProjectScaffolder
 
                 ## Restore the compiler
 
-                Run commands from this project directory. Use the .NET 8 SDK and the package feed from [Install S1Interop](https://github.com/ifBars/S1Interop/blob/main/docs/docfx/articles/getting-started.md).
+                Run commands from this project directory using the .NET 8 SDK. Command Prompt and PowerShell both work.
 
-                Restore the pinned S1Interop {{version}} tool from the same PowerShell window used for installation:
+                Restore this project's pinned S1Interop {{version}} tool:
 
-                ```powershell
-                dotnet tool restore --add-source $candidateFeed
+                ```console
+                dotnet tool restore
                 ```
-
-                In a new terminal, first set `$candidateFeed` to the absolute path of that installation's `artifacts/packages` directory. Once your pinned version is published on NuGet.org, plain `dotnet tool restore` is sufficient.
 
                 Commit `.config/dotnet-tools.json` and the matching `.s1interop` build files. Builds use this project's pinned tool.
 
@@ -92,8 +90,8 @@ public sealed class CompilerProjectScaffolder
 
                 Replace the example paths with your game installation roots:
 
-                ```powershell
-                dotnet tool run s1interop -- setup . --mono-game-path 'C:\Games\ScheduleI-Mono' --il2cpp-game-path 'C:\Games\ScheduleI-Il2Cpp' --apply
+                ```console
+                dotnet tool run s1interop -- setup . --mono-game-path "C:\Games\ScheduleI-Mono" --il2cpp-game-path "C:\Games\ScheduleI-Il2Cpp" --apply
                 dotnet tool run s1interop -- doctor .
                 ```
 
@@ -103,7 +101,7 @@ public sealed class CompilerProjectScaffolder
 
                 Run these commands one at a time:
 
-                ```powershell
+                ```console
                 dotnet build -c Release -p:S1InteropCompilerRuntime=Mono
                 dotnet build -c Release -p:S1InteropCompilerRuntime=Il2Cpp
                 ```

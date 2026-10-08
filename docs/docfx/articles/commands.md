@@ -1,6 +1,6 @@
 # Commands
 
-The `S1Interop` tool provides one `s1interop` command for project creation, setup, and compilation. Compiler projects pin it in a local tool manifest, and MSBuild invokes its `compiler` command group during builds. See [Build your first mod](first-mod.md) for the primary workflow. These commands describe the unpublished alpha.2 candidate; published alpha.1 uses the earlier generator workflow.
+The `S1Interop` tool provides one `s1interop` command for project creation, setup, and compilation. Compiler projects pin it in a local tool manifest, and MSBuild invokes its `compiler` command group during builds. See [Build your first mod](first-mod.md) for the primary workflow. See [installation](getting-started.md) for package availability.
 
 Most commands default to the current directory when a path is optional.
 Unknown options, missing option values, and invalid option values fail before command dispatch so migration typos do not silently fall back to defaults.
